@@ -1,0 +1,92 @@
+html{
+    height: 100%;/*to get the background gradient right*/
+    background: linear-gradient(rgb(21, 21, 138),rgb(88, 112, 139),lightblue,lightgrey);
+}
+
+#parent1 {
+        /*border: 3px solid rgba(0,0,0,1);
+        /*border-radius: 50%; */
+        position: absolute;
+        z-index: 99;
+        margin: 0 auto;
+        left: 0;
+        right: 0;
+    /* padding: 20px; */
+    width: 400px;
+    height: 400px;
+    transform-style: preserve-3d;
+	transform: rotateX(60deg);
+    transition: transform 0.7s linear;
+}
+.island {
+    /* TODO Change Island sizes to be percentages for multiple display formats*/
+	position: absolute;
+	width: auto;
+    height: 150px;
+    transform: rotateX(-90deg) scaleY(1.14);/*1.15 is a height corrector for this to look right with all the 3d transforms we're doing*/
+	transition: transform 0.7s linear;
+}
+#island1{
+    z-index: 10;
+    top: -75px;   /* -child size/2 */
+	left: 155px;   /* parent size/2 - child size/2 */
+}
+#island1persp{
+    z-index: 11;
+    opacity: 0.45;
+    top: -75px;   /* -child size/2 */
+	left: 155px;   /* parent size/2 - child size/2 */
+}
+#island2{
+    z-index: 12;
+    top: 150px;   /* child size */
+	left: -50px;   /* parent size/2 - child size*2 */
+}
+#island2persp{
+    z-index: 13;
+    opacity: 0.25;
+    top: 150px;   /* child size */
+	left: -50px;   /* parent size/2 - child size*2 */
+}
+#island3{
+    z-index: 14;
+    top: 330px;   /* parent size */
+	left: 155px;   /* parent size/2 - child size/2 */
+}
+#island3persp{
+    z-index: 15;
+    opacity: 0.0;
+    top: 330px;   /* parent size */
+	left: 155px;   /* parent size/2 - child size/2 */
+}
+#island4{
+    z-index: 16;
+    top: 150px;   /* child size */
+	left: 365px;   /* parent size/ - amount */
+}
+#island4persp{
+    z-index: 17;
+    opacity: 0.25;
+    top: 150px;   /* child size */
+	left: 365px;   /* parent size/ - amount */
+}
+.arrow{
+    position: absolute;
+    z-index: 99;
+    margin: 0 auto;
+    top:50%;
+    z-index: 2000;
+    opacity: 0.7;
+}
+#leftArrow{
+    left:30%;
+}
+#rightArrow{
+
+    right:30%;
+}
+img.active {
+    transition: all 0.3s;
+    opacity:1.0;
+    height: 35px;
+}
