@@ -30,7 +30,11 @@ var opValue1, opValue2, opValue3, opValue4;
 
 function getOpScalar(rect)
 {
-
+   // ToDO Change 33 and 400 to screen percentages for multiple display formats
+  var value = rect.top + window.scrollY; //Use object's position to set opacity
+  value = (value - 33)/400; //Shift and scale range to be 0.0-0.5
+  value = (1 - value) - 0.55;  //Invert and shift values due to the way opacity works in css i.e. 0 is fully transparent
+  return value;
 }
 
 var fadeSpeed = 850;
@@ -75,10 +79,7 @@ function updateIsland(direction)
       opValue4 = getOpScalar(rect3);
     }
   }
-  $("#island1persp").fadeTo(fadeSpeed, opValue1);
-  $("#island2persp").fadeTo(fadeSpeed, opValue2);
-  $("#island3persp").fadeTo(fadeSpeed, opValue3);
-  $("#island4persp").fadeTo(fadeSpeed, opValue4);
+
 }
 
 
