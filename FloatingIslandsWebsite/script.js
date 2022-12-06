@@ -37,7 +37,7 @@ function getOpScalar(rect)
   return value;
 }
 
-var fadeSpeed = 850;
+var fadeSpeed = 3850;
 
 function updateIsland(direction)
 {
