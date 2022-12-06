@@ -79,7 +79,10 @@ function updateIsland(direction)
       opValue4 = getOpScalar(rect3);
     }
   }
-
+  $("#island1persp").fadeTo(fadeSpeed, opValue1);
+  $("#island2persp").fadeTo(fadeSpeed, opValue2);
+  $("#island3persp").fadeTo(fadeSpeed, opValue3);
+  $("#island4persp").fadeTo(fadeSpeed, opValue4);
 }
 
 
