@@ -7,8 +7,8 @@ $('.arrow').on('mouseover', toggleIcon);
 $('.arrow').on('mouseout', toggleIcon);
 
 var ellipseAngle = 60;
-var childAngle = -90;
-var heightCorrector = 1.14; //Used to make the island images appear vertical even though they are actually angled in 3D slightly
+var childAngle = 90;
+var heightCorrector = 2.0; //Used to make the island images appear vertical even though they are actually angled in 3D slightly
 var isle1opacity = 1.0; 
 var isle1Angle = 0; 
 
@@ -16,15 +16,27 @@ var isle1Angle = 0;
 $( '#rightArrow' ).click(function() 
 { 
   isle1Angle -= 90;
-  updateIsland("right");
+  updateIslandOpacity("right");
+  updateIslandRotation("right");
 });
 
 $( '#leftArrow' ).click(function()
 { 
   isle1Angle += 90;
-  updateIsland("left");
+  updateIslandOpacity("left");
+  updateIslandRotation("left");
 });
 
+function updateIslandRotation(direction)
+{
+  $("#parent1").css({ transform: 'rotateX(' + ellipseAngle + 'deg) rotateZ(' + isle1Angle + 'deg)' });
+  $(".island").css({ transform: 'rotateZ(' + childAngle + 'deg) scaleY(' + heightCorrector + ')'  });
+  childAngle += 90;
+  /*Problem: opacity transitions don't speed up when the user clicks rapdily, speeding up rotation.  
+  /* --May need to figure out another method to do this.*/
+ }
+
+var fadeSpeed = 1700;
 var rect1, rect2, rect3, rect4;
 var opValue1, opValue2, opValue3, opValue4;
 
@@ -37,15 +49,7 @@ function getOpScalar(rect)
   return value;
 }
 
-var fadeSpeed = 850;
-
-function updateIsland(direction)
-{
-  $("#parent1").css({ transform: 'rotateX(' + ellipseAngle + 'deg) rotate(' + isle1Angle + 'deg)' });
-  $(".island").css({ transform: 'rotateX(' + childAngle + 'deg) rotateY(' + isle1Angle + 'deg) scaleY(' + heightCorrector + ')'  });
-  /*Problem: opacity transitions don't speed up when the user clicks rapdily, speeding up rotation.  
-  /* --May need to figure out another method to do this.*/
-  
+function updateIslandOpacity(direction){ 
   /* update island bounding rectangles*/
   rect1 = document.getElementById('island1').getBoundingClientRect();
   rect2 = document.getElementById('island2').getBoundingClientRect();
@@ -86,5 +90,5 @@ function updateIsland(direction)
 }
 
 
-$( '#island1persp' ).on('mouseover',toggleIcon); 
+$('#island1persp' ).on('mouseover',toggleIcon); 
 $('#island1persp').on('mouseout', toggleIcon);
