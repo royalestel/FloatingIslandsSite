@@ -55,14 +55,13 @@ uses VICE's default palette, the one the article uses.
      * Ocean: blue, dark grey, purple, light blue, cyan, light green
      * Forest: brown, dark grey, orange, green, light grey, light green
      * Dusk: blue, dark grey, purple, light red, cyan, yellow
-   * **`STYLE=0` (default): dithering on the colour boundaries only.**
-     Each colour gets two solid shading levels, then one level where it and
-     the next colour alternate on even and odd scanlines (the article's
-     "Poor Man's Dithering"), which a PAL TV blends. Most of each band is
-     solid colour. The shading loop is unrolled by two, so even and odd
-     lines read their own ramp table. `FLICKER=1` also swaps each pair
-     every frame, which looks smoother on a sharp LCD or emulator but
-     flickers.
+   * **`STYLE=0` (default): dithering only where white used to be.** The
+     bar's own colours are solid bands. Between the brightest bar colour
+     and the white highlight, the two alternate on even and odd scanlines
+     (the article's "Poor Man's Dithering"), which a PAL TV blends. The
+     shading loop is unrolled by two, so even and odd lines read their own
+     ramp table. `FLICKER=1` also swaps the pair every frame, which looks
+     smoother on a sharp LCD or emulator but flickers.
    * **`STYLE=1`: the article's "scaled split".** Two lines of colour,
      then one black line, counted outwards from each bar's centre. The
      black lines belong to the bar, so they also cover the bars behind it.

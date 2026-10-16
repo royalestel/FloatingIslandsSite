@@ -104,15 +104,15 @@ with open(os.path.join(here, "tables.inc"), "w") as f:
 # levels, whatever its hue.  The article's white end is dropped here:
 # white is reserved for the specular highlight.
 #
-# STYLE 0, "Poor Man's Dithering" on the colour boundaries only: every
-# colour gets two solid shading levels, then one level where it and the
-# next colour alternate on even/odd scanlines (a PAL TV blends them).
-# So most of each colour band is solid and only the boundaries dither.
+# STYLE 0: the bar's own colours are solid bands.  "Poor Man's Dithering"
+# is used only where the article's white used to be: between the
+# brightest bar colour and the white specular highlight, the two
+# alternate on even/odd scanlines (a PAL TV blends them).
 #
 # Intensity = diffuse (0..14) + env (0..2) + specular (0..8) = 0..24
-#   0..16  the bar's colours: solid, solid, boundary mix, solid, ...
-#   17     highlight fringe: brightest bar colour mixed with white
-#   18+    specular core: white
+#   0..16  the bar's colours, solid, about three levels each
+#   17,18  highlight fringe: brightest bar colour dithered with white
+#   19+    specular core: white
 # Diffuse + env tops out at 16, so only the specular term reaches white.
 WHITE = 1
 RAMPS = [                        # the article's multichrome gradients
@@ -123,24 +123,22 @@ RAMPS = [                        # the article's multichrome gradients
 RAMPLEN = 32
 NSTEPS = 3 * len(RAMPS[0][1]) - 1     # 17: levels 0..16
 
+def solid(base, lvl):
+    """Shading level 0..16 -> one of the 6 colours, about 3 levels each."""
+    return base[(lvl + 1) // 3]
+
 def stretch(base):
-    """6 colours -> 32 (even, odd) pairs, dithered only at the boundaries."""
-    steps = []
-    for lvl in range(NSTEPS):
-        i, r = divmod(lvl, 3)
-        if r < 2:
-            steps.append((base[i], base[i]))          # solid
-        else:
-            steps.append((base[i], base[i + 1]))      # boundary mix
-    steps.append((base[-1], WHITE))                   # highlight fringe
+    """6 colours -> 32 (even, odd) pairs: solid, dithered only into white."""
+    steps = [(solid(base, lvl),) * 2 for lvl in range(NSTEPS)]
+    steps += [(base[-1], WHITE)] * 2                  # highlight fringe
     steps += [(WHITE, WHITE)] * (RAMPLEN - len(steps))
     return steps
 
 def split(base):
-    """STYLE 1, the article's "scaled split": no mixes (a boundary level
-    snaps to the brighter colour); the black lines are drawn by raybars.s.
-    Same 64-byte slot per bar as the dithered ramps (the 2nd half unused)."""
-    steps = [base[(lvl + 1) // 3] for lvl in range(NSTEPS)]
+    """STYLE 1, the article's "scaled split": no mixes at all; the black
+    lines are drawn by raybars.s.  Same 64-byte slot per bar as the
+    dithered ramps (the 2nd half unused)."""
+    steps = [solid(base, lvl) for lvl in range(NSTEPS)]
     steps.append(base[-1])                            # no fringe mix
     steps += [WHITE] * (2 * RAMPLEN - len(steps))
     return steps

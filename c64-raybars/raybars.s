@@ -38,12 +38,13 @@
 ;  Each bar's ramp takes one colour from each VIC-II brightness level,
 ;  whatever its hue, so it gets every brightness step the chip has.  The
 ;  article's white end is dropped: white is only for the highlight.
-;  STYLE=0 (default): "Poor Man's Dithering" on the colour boundaries
-;  only.  Each colour gets two solid shading levels, then one level where
-;  it and the next colour alternate on even/odd scanlines (a PAL TV blends
-;  them).  The shading loop is unrolled by two so even and odd lines read
-;  their own ramp table at no extra cost per line.  FLICKER=1 also swaps
-;  the pair every frame (smoother on sharp screens, but it flickers).
+;  STYLE=0 (default): the bar's colours are solid bands.  "Poor Man's
+;  Dithering" is used only where the article's white used to be: between
+;  the brightest bar colour and the white highlight, the two alternate on
+;  even/odd scanlines (a PAL TV blends them).  The shading loop is
+;  unrolled by two so even and odd lines read their own ramp table at no
+;  extra cost per line.  FLICKER=1 also swaps the pair every frame
+;  (smoother on sharp screens, but it flickers).
 ;  STYLE=1: the article's "scaled split" -- two colour lines, then one
 ;  black line, counted outwards from each bar's centre.
 ;
