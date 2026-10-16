@@ -6,7 +6,7 @@ of the colour buffer to preview.png / preview.gif.
 
     pip install py65 pillow
     cl65 -g -t none -C raybars.cfg -Ln raybars.lbl -o raybars.prg raybars.s
-    python3 simulate.py
+    python3 simulate.py [name]     # name.prg/name.lbl -> name.gif/name.png
 """
 import os, sys
 from py65.devices.mpu6502 import MPU
@@ -14,7 +14,7 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = 256
-NLINES = 200
+NLINES = 184
 FIRSTLINE = 50
 # Budget: update starts after the colour loop (~line 252) and must be done
 # before irq1 at line FIRSTLINE of the next frame.  Keep some slack for
@@ -28,11 +28,12 @@ PAL = [0x000000, 0xFFFFFF, 0x894036, 0x7ABFC7, 0x8A46AE, 0x68A941, 0x3E31A2,
 RGB = [((c >> 16) & 255, (c >> 8) & 255, c & 255) for c in PAL]
 
 labels = {}
-for ln in open(os.path.join(HERE, "raybars.lbl")):
+NAME = sys.argv[1] if len(sys.argv) > 1 else "raybars"
+for ln in open(os.path.join(HERE, NAME + ".lbl")):
     _, addr, name = ln.split()
     labels[name.lstrip(".")] = int(addr, 16)
 
-prg = open(os.path.join(HERE, "raybars.prg"), "rb").read()
+prg = open(os.path.join(HERE, NAME + ".prg"), "rb").read()
 mpu = MPU()
 load = prg[0] | prg[1] << 8
 mpu.memory[load:load + len(prg) - 2] = list(prg[2:])
@@ -80,6 +81,8 @@ ok &= (c == 63)
 used = sorted({v for fr in frames for v in fr})
 print("colours used:", used)
 
+PREFIX = "preview" if NAME == "raybars" else "preview_" + NAME
+
 # --- render ------------------------------------------------------------------
 # Left half: the raw scanlines.  Right half: a rough PAL/CRT view, each line
 # averaged with its neighbour, which is how the mixed colour pairs blend on
@@ -101,7 +104,7 @@ for fr in frames[::4]:
         for x in range(W):
             px[x, y] = raw[y] if x < W // 2 - 1 else (0, 0, 0) if x <= W // 2 else mix[y]
     imgs.append(im.resize((W * SCALE, NLINES * SCALE), Image.NEAREST))
-imgs[0].save(os.path.join(HERE, "preview.gif"), save_all=True,
+imgs[0].save(os.path.join(HERE, PREFIX + ".gif"), save_all=True,
              append_images=imgs[1:], duration=80, loop=0)
 
 # contact sheet: 32 frames side by side, PAL-blended
@@ -114,6 +117,6 @@ for i, fr in enumerate(frames[::8][:32]):
         for x in range(strip_w - 2):
             px[i * strip_w + x, y] = mix[y]
 sheet.resize((sheet.width * 2, NLINES * 2), Image.NEAREST).save(
-    os.path.join(HERE, "preview.png"))
-print("wrote preview.gif, preview.png")
+    os.path.join(HERE, PREFIX + ".png"))
+print(f"wrote {PREFIX}.gif, {PREFIX}.png")
 sys.exit(0 if ok else 1)

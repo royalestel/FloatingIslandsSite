@@ -37,18 +37,18 @@
 ;  STRETCHED PALETTE  (after Daniel Krajzewicz, "Stretching the c64 Palette")
 ;  Each bar's ramp takes one colour from each VIC-II brightness level,
 ;  whatever its hue, so it gets every brightness step the chip has.
-;  Between neighbours there is a mixed step: colour A on even scanlines,
-;  colour B on odd ones, which a PAL TV blends into an in-between shade.
-;  7 colours -> 13 steps, so the bars can be 32 lines tall without banding.
-;  The shading loop is unrolled by two so even and odd lines read their own
-;  ramp table at no extra cost per line.  FLICKER=1 also swaps the pair
-;  every frame, which mixes them over time as well (smoother on sharp
-;  LCD/emulator screens, but it flickers).
+;  STYLE=1 (default): the article's "scaled split" -- two colour lines,
+;  then one black line, counted outwards from each bar's centre.
+;  STYLE=0: "Poor Man's Dithering" -- between neighbours, a mixed step with
+;  colour A on even scanlines and B on odd ones, which a PAL TV blends:
+;  7 colours -> 13 steps.  The shading loop is unrolled by two so even and
+;  odd lines read their own ramp table at no extra cost per line.
+;  FLICKER=1 also swaps the pair every frame (smoother on sharp screens,
+;  but it flickers).
 ;
 ;  Intensity per scanline = diffuse(0..10) + env(0..2) + specular(0..6),
 ;  looked up in the ramp.  Diffuse+env tops out at 12, the brightest bar
-;  colour; 13 mixes that with white and 14+ is WHITE, so only the
-;  specular term can reach white.
+;  colour, so only the specular term can reach WHITE.
 ;  The bars are depth-sorted and drawn back to front (painter's algorithm).
 ; =============================================================================
 
@@ -56,14 +56,17 @@
 
 ; ---- tunables ---------------------------------------------------------------
 FIRSTLINE = 50          ; raster line where irq1 fires
-NLINES    = 200         ; scanlines of colour buffer shown (lines 52..251)
+NLINES    = 184         ; scanlines of colour buffer shown (lines 52..235)
 R         = 16          ; bar radius in scanlines
 BARH      = 2*R         ; bar height (must match gen_tables.py)
-NBARS     = 3
+NBARS     = 4
 YMID      = 100         ; orbit axis, in colour-buffer lines
 LZ        = 100         ; light depth: distance in front of the orbit axis
 HTUNE     = 0           ; extra NOPs to slide the colour split into hblank
-.ifndef FLICKER         ; 1 = also swap the mixed colour pairs every frame
+.ifndef STYLE           ; 1 = "scaled split": 2 colour lines, 1 black line
+STYLE     = 1           ; 0 = dithered in-between steps (--asm-define STYLE=0)
+.endif
+.ifndef FLICKER         ; STYLE 0 only: also swap the mixed pairs every frame
 FLICKER   = 0           ;     (cl65 ... --asm-define FLICKER=1)
 .endif
 
@@ -279,16 +282,17 @@ place:  lda orbit
         dex
         bpl place
 
-        ; ---- 4. depth sort, farthest first (3-element sorting network) ------
-        ldx #0
-        stx order
-        inx
-        stx order+1
-        inx
-        stx order+2
+        ; ---- 4. depth sort, farthest first (4-element sorting network) ------
+        ldx #NBARS-1
+init:   txa
+        sta order,x
+        dex
+        bpl init
         cswap 0, 1
+        cswap 2, 3
+        cswap 0, 2
+        cswap 1, 3
         cswap 1, 2
-        cswap 0, 1
 
         ; ---- 5. light position ---------------------------------------------
         ldy lang
@@ -327,6 +331,7 @@ next:   stx k
         sta shade::dst1         ; patch: where in colbuf this bar lands
         sta shade::dst2
 
+.if ::STYLE = 0
         ; Pick even/odd ramps so the mix pattern follows SCREEN lines, not
         ; bar lines: the first line shaded is top+BARH-1 (odd y).
         clc
@@ -349,6 +354,33 @@ next:   stx k
         eor #32                 ; the other line uses the other table
         sta shade::rampb
         jsr shade
+.else
+        txa                     ; one ramp for every line
+        lsr
+        ror
+        ror                     ; bar * 64 (bar < 4)
+        sta shade::rampa
+        sta shade::rampb
+        jsr shade
+
+        ; Black separators: every third line, counted outwards from the
+        ; bar's centre so the pattern is symmetric (..cc0cc|cc0cc..).
+        ; They are part of the bar, so they also hide what is behind it.
+        ldx bar
+        ldy bartop,x
+        lda #0
+        .repeat ::BARH, I
+          .if I < ::BARH/2
+            .if (::BARH/2 - 1 - I) .mod 3 = 2
+        sta colbuf+I,y
+            .endif
+          .else
+            .if (I - ::BARH/2) .mod 3 = 2
+        sta colbuf+I,y
+            .endif
+          .endif
+        .endrep
+.endif
 
         ldx k
         inx
@@ -429,13 +461,17 @@ irq2:   txs                     ; throw away irq2's stack frame
         .assert <spectab = 0, error, "spectab must be page aligned"
         .assert <envtab  = 0, error, "envtab must be page aligned"
 
-phase:  .byte 0, 85, 171        ; bars 120 degrees apart on the orbit
+phase:  .byte 0, 64, 128, 192    ; bars 90 degrees apart on the orbit
 
 ; Stretched colour ramps, 64 bytes per bar: even-line table, odd-line
 ; table, 32 entries each.  Generated from the 6-colour lists in gen_tables.py.
 .segment "RAMPS"
 ramps:
-        .include "ramps.inc"
+.if STYLE = 0
+        .include "ramps_dither.inc"
+.else
+        .include "ramps_split.inc"
+.endif
         .assert <ramps = 0, error, "ramps must be page aligned"
 
 ; =============================================================================

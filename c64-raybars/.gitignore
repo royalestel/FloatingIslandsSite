@@ -1,3 +1,4 @@
 *.lbl
 *.map
 *.o
+dither.*
