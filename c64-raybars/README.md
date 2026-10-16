@@ -163,6 +163,41 @@ python3 sim_goldlight.py     # needs -g -Ln goldlight.lbl; renders preview_goldl
   `32 + 80k`; adjust `HTUNE` and that constant if the highlight looks
   offset from the ball.
 
+## GOLDORBIT: the light orbits the bar
+
+`goldorbit.s` sends the light around the bar. It rises in front, slips
+behind the bar at the top, sinks behind it, and comes back out in front at
+the bottom, while drifting slowly sideways.
+
+```sh
+cl65 -t none -C raybars.cfg -o goldorbit.prg goldorbit.s   # --asm-define STEAL=6 to try 6
+python3 sim_goldorbit.py     # needs -g -Ln goldorbit.lbl; renders preview_goldorbit.gif
+```
+
+* **Depth.** The ball is drawn at 8 pre-drawn sizes, radius 3..10 pixels,
+  picked from the light's depth: small behind, big in front.
+* **Occlusion.** While the light is behind, the sprite rows that fall on
+  the bar's lines are blanked. It uses the line positions of the segment
+  under the ball, so the cut follows the slant. The ball is drawn into two
+  alternating buffers, switched at the top of the frame, so it never tears.
+* **Light from behind.** `atan2` now covers all four quadrants. Once the
+  light is behind the bar, the reflection angle passes 90 degrees and the
+  front loses its highlight. With the light below, the highlight moves to
+  the bar's bottom edge.
+* **Timing on sprite lines.** On every line where the sprite is drawn,
+  the VIC stops the CPU for a few cycles to fetch its data, whether the
+  ball is in front or masked behind. Each speedcode row's padding starts
+  with a branch whose opcode is patched every frame. With the carry clear,
+  `bcs` is never taken and costs 2 cycles; `bcc` is always taken, costs 3,
+  and skips an `inc $ea`, making the row `STEAL` cycles shorter. Rows on
+  the sprite's lines get the short version, and the simulator checks they
+  are exactly the right rows. How many cycles the VIC really takes depends
+  on what the CPU is doing at that moment, so `STEAL` (4 or 6) needs tuning
+  in VICE. The stable double IRQ can also lose a cycle when the ball sits
+  right above the bar.
+* **Cost.** The per-frame work uses at most about 54% of the time before
+  the top IRQ.
+
 ## Tuning notes
 
 * PAL only: the loop is 63 cycles per line, and an NTSC frame has too little vblank.
