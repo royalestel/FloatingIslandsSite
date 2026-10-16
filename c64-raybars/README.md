@@ -88,6 +88,40 @@ uses VICE's default palette, the one the article uses.
    63-cycle loop writing `$d020`, and the whole screen is border. The tracer
    uses about 5,000 of the roughly 6,800 vblank cycles (73%).
 
+## GOLDTILT: one slanted gold bar
+
+`goldtilt.s` is a separate program: one gold bar that bobs up and down and
+rocks like a see-saw.
+
+```sh
+cl65 -t none -C raybars.cfg -o goldtilt.prg goldtilt.s
+python3 sim_goldtilt.py      # needs -g -Ln goldtilt.lbl; renders preview_goldtilt.gif
+```
+
+* **Splitting each line.** A raster bar normally can't slant, because the
+  colour only changes where the CPU writes `$d020`. Here every line of the
+  bar is split into 6 segments. Each split is `lda #c / sta $d020 / nop`,
+  8 cycles or 64 pixels, so 6 segments cover the whole 384-pixel visible
+  line. The fastest possible split is 6 cycles (48 pixels), but six of
+  those would only cover 288 pixels, leaving the last segment stretched.
+* **The slant.** Segment *k* is drawn shifted down by `off_k` = 0..5
+  lines, so the bar becomes a staircase that reads as one slanted bar. The
+  slope follows `off_k = round(2.5 + (k - 2.5) * sin(tilt))`.
+* **Black padding.** The gold column gets 6 black rows above and 6 below,
+  so every segment is the same 36-entry column read at a different shift:
+  `colour(row r, segment k) = column[r + 6 - off_k]`.
+* **Speedcode.** The 30 display rows are unrolled code with no branches,
+  exactly 63 cycles per row. Each frame, an unrolled patcher rewrites the
+  180 `lda #` values in it.
+* **The rest of the screen** is black, so the stable double IRQ simply
+  fires 2 lines above wherever the bar is. The per-frame work uses at most
+  about 16% of the time before the next IRQ.
+* **The highlight** is traced exactly as in `STYLE=2`. Its dither follows
+  each segment's own screen lines.
+* **Horizontal position.** Where the splits land across the screen depends
+  on exact cycle timing that only a real C64 or VICE shows. Use `HTUNE` to
+  slide them so the first split falls in the horizontal blank.
+
 ## Tuning notes
 
 * PAL only: the loop is 63 cycles per line, and an NTSC frame has too little vblank.
