@@ -34,19 +34,20 @@
 ;   8. The screen is blanked (DEN=0): no badlines, so the raster loop is a
 ;      plain 63-cycle loop writing $d020, and the border IS the canvas.
 ;
-;  STRETCHED PALETTE
-;  Each bar's 6 colours are ranked by luminance, and between neighbours we
-;  add a mixed step: colour A on even scanlines, colour B on odd ones,
-;  which a PAL TV blends into an in-between shade.  So each ramp has 11
-;  steps instead of 6, and the bars can be 32 lines tall without banding.
+;  STRETCHED PALETTE  (after Daniel Krajzewicz, "Stretching the c64 Palette")
+;  Each bar's ramp takes one colour from each VIC-II brightness level,
+;  whatever its hue, so it gets every brightness step the chip has.
+;  Between neighbours there is a mixed step: colour A on even scanlines,
+;  colour B on odd ones, which a PAL TV blends into an in-between shade.
+;  7 colours -> 13 steps, so the bars can be 32 lines tall without banding.
 ;  The shading loop is unrolled by two so even and odd lines read their own
 ;  ramp table at no extra cost per line.  FLICKER=1 also swaps the pair
 ;  every frame, which mixes them over time as well (smoother on sharp
 ;  LCD/emulator screens, but it flickers).
 ;
-;  Intensity per scanline = diffuse(0..8) + env(0..2) + specular(0..5),
-;  looked up in the ramp.  Diffuse+env tops out at 10, the brightest bar
-;  colour; 11 mixes that with white and 12+ is WHITE, so only the
+;  Intensity per scanline = diffuse(0..10) + env(0..2) + specular(0..6),
+;  looked up in the ramp.  Diffuse+env tops out at 12, the brightest bar
+;  colour; 13 mixes that with white and 14+ is WHITE, so only the
 ;  specular term can reach white.
 ;  The bars are depth-sorted and drawn back to front (painter's algorithm).
 ; =============================================================================
@@ -155,19 +156,19 @@ nmi:    rti                     ; RESTORE key does nothing
 
 ; -----------------------------------------------------------------------------
 ;  shade: the per-scanline "ray tracer".  All operands marked *_op are
-;  patched by update.  Carry stays clear: 8 + 2 + 5 never overflows.
+;  patched by update.  Carry stays clear: 10 + 2 + 6 never overflows.
 ; -----------------------------------------------------------------------------
 .proc shade
         ldy #BARH-1             ; BARH is even: y alternates odd, even, ...
         clc
 line:   ldx theta,y             ; ---- odd y ------------------------------
 dif1 = * + 1
-        lda difftab,x           ; diffuse   0..8
+        lda difftab,x           ; diffuse   0..10
         ldx theta2,y
 env1 = * + 1
         adc envtab,x            ; + env     0..2
 spe1 = * + 1
-        adc spectab,x           ; + specular 0..5
+        adc spectab,x           ; + specular 0..6
         tax
 rampa = * + 1
         lda ramps,x             ; intensity -> colour (one parity's ramp)
@@ -334,20 +335,18 @@ next:   stx k
         eor orbit               ; swap the pair every frame
 .endif
         and #1
-        asl
-        asl
-        asl
-        asl                     ; 0 or 16: even or odd table
+        lsr
+        ror                     ; carry -> bit 7 ...
+        lsr
+        lsr                     ; ... -> bit 5: 0 or 32, even or odd table
         sta tmp
         txa
-        asl
-        asl
-        asl
-        asl
-        asl                     ; bar * 32
+        lsr
+        ror
+        ror                     ; bar * 64 (bar < 4)
         ora tmp
         sta shade::rampa
-        eor #16                 ; the other line uses the other table
+        eor #32                 ; the other line uses the other table
         sta shade::rampb
         jsr shade
 
@@ -432,8 +431,8 @@ irq2:   txs                     ; throw away irq2's stack frame
 
 phase:  .byte 0, 85, 171        ; bars 120 degrees apart on the orbit
 
-; Stretched colour ramps, 32 bytes per bar: even-line table, odd-line
-; table.  Generated from the 6-colour lists in gen_tables.py.
+; Stretched colour ramps, 64 bytes per bar: even-line table, odd-line
+; table, 32 entries each.  Generated from the 6-colour lists in gen_tables.py.
 .segment "RAMPS"
 ramps:
         .include "ramps.inc"

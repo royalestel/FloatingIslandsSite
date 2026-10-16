@@ -21,10 +21,10 @@ FIRSTLINE = 50
 # the IRQ entry/exit code.
 BUDGET = ((312 - (FIRSTLINE + 2 + NLINES)) + FIRSTLINE) * 63 - 150
 
-# Pepto's C64 palette
-PAL = [0x000000, 0xFFFFFF, 0x68372B, 0x70A4B2, 0x6F3D86, 0x588D43, 0x352879,
-       0xB8C76F, 0x6F4F25, 0x433900, 0x9A6759, 0x444444, 0x6C6C6C, 0x9AD284,
-       0x6C5EB5, 0x959595]
+# VICE's default palette (the one "Stretching the c64 Palette" uses)
+PAL = [0x000000, 0xFFFFFF, 0x894036, 0x7ABFC7, 0x8A46AE, 0x68A941, 0x3E31A2,
+       0xD0DC71, 0x905F25, 0x5C4700, 0xBB776D, 0x555555, 0x808080, 0xACEA88,
+       0x7C70DA, 0xABABAB]
 RGB = [((c >> 16) & 255, (c >> 8) & 255, c & 255) for c in PAL]
 
 labels = {}

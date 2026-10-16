@@ -19,7 +19,8 @@ x64sc raybars.prg                                        # VICE, PAL machine
 (`pip install py65 pillow`, and build with `-g -Ln raybars.lbl`). It checks
 the cycle budget and the 63-cycle raster loop, and renders `preview.gif` and
 `preview.png`. The GIF's left half shows the raw scanlines. The right half
-roughly approximates how a PAL TV blends neighbouring lines.
+roughly approximates how a PAL TV blends neighbouring lines. The preview
+uses VICE's default palette, the one the article uses.
 
 ## How it works, step by step
 
@@ -45,23 +46,30 @@ roughly approximates how a PAL TV blends neighbouring lines.
    each, so `table[t − p]` becomes `lda table+(−p),x`, with `−p` patched into
    the operand once per bar. The inner loop takes about 39 cycles per
    scanline.
-7. **Colour uses a stretched palette.** Each bar has 6 colours ranked by
-   luminance. Between each pair of neighbours there is a mixed step: colour A
-   on even scanlines and colour B on odd ones. A PAL TV's delay line and the
-   CRT blur blend the pair into an in-between shade, so each ramp has 11
-   steps instead of 6. That lets the bars grow to 32 lines without visible
-   banding. The shading loop is unrolled by two, so even and odd lines read
-   their own ramp table at no extra cost per line.
-   * Intensity is diffuse (0..8) + env (0..2) + specular (0..5).
-   * Diffuse plus env tops out at 10, the bar's brightest colour.
-   * Step 11 mixes that colour with white, and 12 and up is **white**, so
-     only the specular term reaches white.
-   * Fire: black, brown, red, orange, light red, yellow
-   * Ocean: black, blue, dark grey, purple, light blue, cyan
-   * Toxic: black, dark grey, grey, green, cyan, light green
-   * Build with `--asm-define FLICKER=1` to also swap each mixed pair every
-     frame. That blends the pair over time as well as across lines, which
-     looks smoother on a sharp LCD or emulator but flickers.
+7. **Colour uses a stretched palette.** This follows Daniel Krajzewicz's
+   [Stretching the c64 Palette](https://www.krajzewicz.de/blog/stretching-the-c64-palette.php).
+   * **Multichrome ramps.** Each ramp takes one colour from each of the
+     VIC-II's brightness levels, whatever its hue, so it gets every
+     brightness step the chip has. These are the article's three "basic
+     multichrome bars", with their white end dropped:
+     * Fire: black, brown, red, orange, light red, light grey, yellow
+     * Ocean: black, blue, dark grey, purple, light blue, cyan, light green
+     * Forest: black, brown, dark grey, orange, green, light grey, light green
+   * **In-between steps.** Between neighbours there is a mixed step, the
+     article's "Poor Man's Dithering" at scale 2: the two colours on
+     alternating scanlines, which a PAL TV blends. 7 colours give 13 steps,
+     enough for 32-line bars. The shading loop is unrolled by two, so even
+     and odd lines read their own ramp table at no extra cost per line.
+   * **Correct widths.** The article notes that hand-made patterns never
+     give each brightness its correct width. Here the widths come from the
+     cosine shading, so the bars actually look round.
+   * **Intensity** is diffuse (0..10) + env (0..2) + specular (0..6).
+     Diffuse plus env tops out at 12, the brightest bar colour. Step 13
+     mixes that colour with white, and 14 and up is **white**, so only the
+     specular term reaches white.
+   * **Option:** build with `--asm-define FLICKER=1` to also swap each mixed
+     pair every frame. That looks smoother on a sharp LCD or emulator but
+     flickers.
 8. **Bars are drawn back to front.** A 3-element sorting network orders them
    by depth, and the painter's algorithm handles the crossings.
 9. **The screen is blanked (DEN=0).** With the display off there are no
