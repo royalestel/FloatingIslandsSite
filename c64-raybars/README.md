@@ -122,6 +122,47 @@ python3 sim_goldtilt.py      # needs -g -Ln goldtilt.lbl; renders preview_goldti
   on exact cycle timing that only a real C64 or VICE shows. Use `HTUNE` to
   slide them so the first split falls in the horizontal blank.
 
+## GOLDLIGHT: the slanted bar with a visible light
+
+`goldlight.s` adds the light source as a glowing ball sprite that sweeps
+back and forth above the bar. The bar's highlight is thickest in the
+segment nearest the ball.
+
+```sh
+cl65 -t none -C raybars.cfg -o goldlight.prg goldlight.s
+python3 sim_goldlight.py     # needs -g -Ln goldlight.lbl; renders preview_goldlight.gif
+```
+
+* **A sprite without badlines.** With DEN=0 the border covers everything,
+  sprites included. But badlines are only enabled if DEN is set during
+  raster line $30. So a small IRQ at line 44 clears DEN across line $30 and
+  sets it again before line $33, where the display window opens. The window
+  opens with no badlines all frame (idle state, `$3fff` = 0).
+* **Two registers per split.** Inside the window the colour comes from
+  `$d021`, so every split writes both registers:
+  `lda #c / sta $d020 / sta $d021` = 10 cycles = 80 pixels. That gives 5
+  segments with offsets 0..4.
+* **Sprite timing.** A sprite only steals cycles on the lines where it's
+  drawn. The ball stays above the bar and never shares a raster line with
+  the speedcode or its stabilising IRQ (the simulator checks every frame),
+  so every row stays exactly 63 cycles.
+* **The highlight per segment.** For a cylinder along x lit by a point
+  light at horizontal distance *a*,
+  `spec = ((rho / sqrt(rho^2 + a^2)) * cos(2t - p))^n`, so it is strongest
+  under the light and falls off sideways. That is approximated as
+  "subtract |a|/32 levels" per segment. As the light sweeps, the white
+  goes from about 7 lines under the ball down to the gold pattern's own 2.
+* **The ball** is a multicolour sprite: white core, yellow, orange rim. It
+  is copied to `$3F00`, because in VIC bank 0 the range `$1000`-`$1FFF`
+  shows character ROM.
+* **Cost.** The per-frame work uses at most about 59% of the time before
+  the top IRQ.
+* **Untested on hardware.** Exactly where the splits land relative to
+  the sprite's x position depends on cycle timing that only VICE or real
+  hardware shows. The code assumes segment *k* is centred at sprite x
+  `32 + 80k`; adjust `HTUNE` and that constant if the highlight looks
+  offset from the ball.
+
 ## Tuning notes
 
 * PAL only: the loop is 63 cycles per line, and an NTSC frame has too little vblank.
