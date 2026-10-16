@@ -63,10 +63,10 @@ def doubled(f):
     t = [ubyte(f(a)) for a in range(256)]
     return t + t
 
-# diffuse: 0..10 (one per step of the stretched ramps, see RAMPS)
-tables["difftab"] = doubled(lambda a: 10 * max(0.0, math.cos(rad(a))))
-# specular, Phong exponent 24: 0..6
-tables["spectab"] = doubled(lambda a: 6 * max(0.0, math.cos(rad(a))) ** 24)
+# diffuse: 0..14 (one per step of the stretched ramps, see RAMPS)
+tables["difftab"] = doubled(lambda a: 14 * max(0.0, math.cos(rad(a))))
+# specular, Phong exponent 24: 0..8
+tables["spectab"] = doubled(lambda a: 8 * max(0.0, math.cos(rad(a))) ** 24)
 
 # environment map, 1-D: indexed by the angle of the reflected view ray.
 # A chrome-style horizon: sky (up, -y) = 2, a horizon band = 1, ground = 0.
@@ -101,45 +101,47 @@ with open(os.path.join(here, "tables.inc"), "w") as f:
 # Ramps from "Stretching the c64 Palette" (Daniel Krajzewicz,
 # krajzewicz.de/blog/stretching-the-c64-palette.php): "multichrome"
 # gradients that take ONE colour from each of the VIC-II's brightness
-# levels, whatever its hue, so a gradient gets every brightness step the
-# chip has instead of the 3-4 a single hue offers.  The article's white
-# end is dropped here (white is reserved for the specular highlight).
+# levels, whatever its hue.  The article's white end is dropped here:
+# white is reserved for the specular highlight.
 #
-# Between each pair of neighbours there is a MIXED step, as in the
-# article: the two colours on alternating scanlines, which a PAL TV
-# blends.  7 colours -> 13 steps.
+# STYLE 0, "Poor Man's Dithering" on the colour boundaries only: every
+# colour gets two solid shading levels, then one level where it and the
+# next colour alternate on even/odd scanlines (a PAL TV blends them).
+# So most of each colour band is solid and only the boundaries dither.
 #
-# Intensity = diffuse (0..10) + env (0..2) + specular (0..6) = 0..18
-#   0..12  the bar's own colours, alternating with the in-between mixes
-#   13     highlight fringe: brightest bar colour mixed with white
-#   14+    specular core: white
-# Diffuse + env tops out at 12, so only the specular term reaches white.
+# Intensity = diffuse (0..14) + env (0..2) + specular (0..8) = 0..24
+#   0..16  the bar's colours: solid, solid, boundary mix, solid, ...
+#   17     highlight fringe: brightest bar colour mixed with white
+#   18+    specular core: white
+# Diffuse + env tops out at 16, so only the specular term reaches white.
 WHITE = 1
 RAMPS = [                        # the article's multichrome gradients
-    ("fire",   [0, 9, 2, 8, 10, 15, 7]),  # blk brown red orange l.red l.grey yellow
-    ("ocean",  [0, 6, 11, 4, 14, 3, 13]), # blk blue d.grey purple l.blue cyan l.green
-    ("forest", [0, 9, 11, 8, 5, 15, 13]), # blk brown d.grey orange green l.grey l.green
-    ("dusk",   [0, 6, 11, 4, 10, 3, 7]),  # blk blue d.grey purple l.red cyan yellow
+    ("ocean",  [6, 11, 4, 14, 3, 13]),  # blue d.grey purple l.blue cyan l.green
+    ("forest", [9, 11, 8, 5, 15, 13]),  # brown d.grey orange green l.grey l.green
+    ("dusk",   [6, 11, 4, 10, 3, 7]),   # blue d.grey purple l.red cyan yellow
 ]
 RAMPLEN = 32
+NSTEPS = 3 * len(RAMPS[0][1]) - 1     # 17: levels 0..16
 
 def stretch(base):
-    """7 pure colours -> 32 (even, odd) pairs."""
+    """6 colours -> 32 (even, odd) pairs, dithered only at the boundaries."""
     steps = []
-    for i, c in enumerate(base):
-        steps.append((c, c))
-        if i + 1 < len(base):
-            steps.append((c, base[i + 1]))       # the in-between mix
-    steps.append((base[-1], WHITE))              # highlight fringe
+    for lvl in range(NSTEPS):
+        i, r = divmod(lvl, 3)
+        if r < 2:
+            steps.append((base[i], base[i]))          # solid
+        else:
+            steps.append((base[i], base[i + 1]))      # boundary mix
+    steps.append((base[-1], WHITE))                   # highlight fringe
     steps += [(WHITE, WHITE)] * (RAMPLEN - len(steps))
     return steps
 
 def split(base):
-    """STYLE 1, the article's "scaled split": no mixes, so the 13 steps
-    snap to the 7 pure colours; the black lines are drawn by raybars.s.
+    """STYLE 1, the article's "scaled split": no mixes (a boundary level
+    snaps to the brighter colour); the black lines are drawn by raybars.s.
     Same 64-byte slot per bar as the dithered ramps (the 2nd half unused)."""
-    steps = [base[(i + 1) // 2] for i in range(13)]  # 0..12
-    steps.append(base[-1])                               # 13: no fringe mix
+    steps = [base[(lvl + 1) // 3] for lvl in range(NSTEPS)]
+    steps.append(base[-1])                            # no fringe mix
     steps += [WHITE] * (2 * RAMPLEN - len(steps))
     return steps
 

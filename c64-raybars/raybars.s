@@ -36,18 +36,19 @@
 ;
 ;  STRETCHED PALETTE  (after Daniel Krajzewicz, "Stretching the c64 Palette")
 ;  Each bar's ramp takes one colour from each VIC-II brightness level,
-;  whatever its hue, so it gets every brightness step the chip has.
-;  STYLE=1 (default): the article's "scaled split" -- two colour lines,
-;  then one black line, counted outwards from each bar's centre.
-;  STYLE=0: "Poor Man's Dithering" -- between neighbours, a mixed step with
-;  colour A on even scanlines and B on odd ones, which a PAL TV blends:
-;  7 colours -> 13 steps.  The shading loop is unrolled by two so even and
-;  odd lines read their own ramp table at no extra cost per line.
-;  FLICKER=1 also swaps the pair every frame (smoother on sharp screens,
-;  but it flickers).
+;  whatever its hue, so it gets every brightness step the chip has.  The
+;  article's white end is dropped: white is only for the highlight.
+;  STYLE=0 (default): "Poor Man's Dithering" on the colour boundaries
+;  only.  Each colour gets two solid shading levels, then one level where
+;  it and the next colour alternate on even/odd scanlines (a PAL TV blends
+;  them).  The shading loop is unrolled by two so even and odd lines read
+;  their own ramp table at no extra cost per line.  FLICKER=1 also swaps
+;  the pair every frame (smoother on sharp screens, but it flickers).
+;  STYLE=1: the article's "scaled split" -- two colour lines, then one
+;  black line, counted outwards from each bar's centre.
 ;
-;  Intensity per scanline = diffuse(0..10) + env(0..2) + specular(0..6),
-;  looked up in the ramp.  Diffuse+env tops out at 12, the brightest bar
+;  Intensity per scanline = diffuse(0..14) + env(0..2) + specular(0..8),
+;  looked up in the ramp.  Diffuse+env tops out at 16, the brightest bar
 ;  colour, so only the specular term can reach WHITE.
 ;  The bars are depth-sorted and drawn back to front (painter's algorithm).
 ; =============================================================================
@@ -56,15 +57,15 @@
 
 ; ---- tunables ---------------------------------------------------------------
 FIRSTLINE = 50          ; raster line where irq1 fires
-NLINES    = 184         ; scanlines of colour buffer shown (lines 52..235)
+NLINES    = 200         ; scanlines of colour buffer shown (lines 52..251)
 R         = 16          ; bar radius in scanlines
 BARH      = 2*R         ; bar height (must match gen_tables.py)
-NBARS     = 4
+NBARS     = 3
 YMID      = 100         ; orbit axis, in colour-buffer lines
 LZ        = 100         ; light depth: distance in front of the orbit axis
 HTUNE     = 0           ; extra NOPs to slide the colour split into hblank
-.ifndef STYLE           ; 1 = "scaled split": 2 colour lines, 1 black line
-STYLE     = 1           ; 0 = dithered in-between steps (--asm-define STYLE=0)
+.ifndef STYLE           ; 0 = solid colours, dithered only at the boundaries
+STYLE     = 0           ; 1 = "scaled split": 2 colour lines, 1 black line
 .endif
 .ifndef FLICKER         ; STYLE 0 only: also swap the mixed pairs every frame
 FLICKER   = 0           ;     (cl65 ... --asm-define FLICKER=1)
@@ -159,19 +160,19 @@ nmi:    rti                     ; RESTORE key does nothing
 
 ; -----------------------------------------------------------------------------
 ;  shade: the per-scanline "ray tracer".  All operands marked *_op are
-;  patched by update.  Carry stays clear: 10 + 2 + 6 never overflows.
+;  patched by update.  Carry stays clear: 14 + 2 + 8 never overflows.
 ; -----------------------------------------------------------------------------
 .proc shade
         ldy #BARH-1             ; BARH is even: y alternates odd, even, ...
         clc
 line:   ldx theta,y             ; ---- odd y ------------------------------
 dif1 = * + 1
-        lda difftab,x           ; diffuse   0..10
+        lda difftab,x           ; diffuse   0..14
         ldx theta2,y
 env1 = * + 1
         adc envtab,x            ; + env     0..2
 spe1 = * + 1
-        adc spectab,x           ; + specular 0..6
+        adc spectab,x           ; + specular 0..8
         tax
 rampa = * + 1
         lda ramps,x             ; intensity -> colour (one parity's ramp)
@@ -282,17 +283,23 @@ place:  lda orbit
         dex
         bpl place
 
-        ; ---- 4. depth sort, farthest first (4-element sorting network) ------
-        ldx #NBARS-1
+        ; ---- 4. depth sort, farthest first (sorting network) ------------
+        ldx #::NBARS-1
 init:   txa
         sta order,x
         dex
         bpl init
+.if ::NBARS = 4
         cswap 0, 1
         cswap 2, 3
         cswap 0, 2
         cswap 1, 3
         cswap 1, 2
+.else
+        cswap 0, 1
+        cswap 1, 2
+        cswap 0, 1
+.endif
 
         ; ---- 5. light position ---------------------------------------------
         ldy lang
@@ -461,7 +468,7 @@ irq2:   txs                     ; throw away irq2's stack frame
         .assert <spectab = 0, error, "spectab must be page aligned"
         .assert <envtab  = 0, error, "envtab must be page aligned"
 
-phase:  .byte 0, 64, 128, 192    ; bars 90 degrees apart on the orbit
+phase:  .byte 0, 85, 171        ; bars 120 degrees apart on the orbit
 
 ; Stretched colour ramps, 64 bytes per bar: even-line table, odd-line
 ; table, 32 entries each.  Generated from the 6-colour lists in gen_tables.py.

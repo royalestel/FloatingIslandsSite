@@ -1,6 +1,6 @@
 # RAYBARS: ray-traced raster bars for the C64
 
-Four chrome cylinders orbit the screen's X axis. Each one is shaded every
+Three chrome cylinders orbit the screen's X axis. Each one is shaded every
 frame with a diffuse term, a 1-D environment map and a Phong specular
 highlight from a single point light. The CPU only has to write one
 register per scanline, so almost all of its time goes to the shading maths.
@@ -11,7 +11,7 @@ register per scanline, so almost all of its time goes to the shading maths.
 
 ```sh
 python3 gen_tables.py                                   # optional: tables.inc and ramps.inc are committed
-cl65 -t none -C raybars.cfg -o raybars.prg raybars.s   # add --asm-define STYLE=0 for the dithered look
+cl65 -t none -C raybars.cfg -o raybars.prg raybars.s   # add --asm-define STYLE=1 for the black-split look
 x64sc raybars.prg                                        # VICE, PAL machine
 ```
 
@@ -50,35 +50,34 @@ uses VICE's default palette, the one the article uses.
    [Stretching the c64 Palette](https://www.krajzewicz.de/blog/stretching-the-c64-palette.php).
    * **Multichrome ramps.** Each ramp takes one colour from each of the
      VIC-II's brightness levels, whatever its hue, so it gets every
-     brightness step the chip has. These are the article's four
-     multichrome gradients, with their white end dropped:
-     * Fire: black, brown, red, orange, light red, light grey, yellow
-     * Ocean: black, blue, dark grey, purple, light blue, cyan, light green
-     * Forest: black, brown, dark grey, orange, green, light grey, light green
-     * Dusk: black, blue, dark grey, purple, light red, cyan, yellow
-   * **`STYLE=1` (default), the article's "scaled split".** Two lines of
-     colour, then one black line, counted outwards from each bar's centre.
-     The black lines belong to the bar, so they also cover the bars
-     behind it.
-   * **`STYLE=0`, the article's "Poor Man's Dithering" at scale 2.**
-     Between neighbouring colours there is a mixed step: the two colours on
-     alternating scanlines, which a PAL TV blends, so 7 colours give 13
-     steps. The shading loop is unrolled by two, so even and odd lines read
-     their own ramp table. `FLICKER=1` also swaps each pair every frame,
-     which looks smoother on a sharp LCD or emulator but flickers.
+     brightness step the chip has. These are three of the article's
+     gradients, with their white end dropped:
+     * Ocean: blue, dark grey, purple, light blue, cyan, light green
+     * Forest: brown, dark grey, orange, green, light grey, light green
+     * Dusk: blue, dark grey, purple, light red, cyan, yellow
+   * **`STYLE=0` (default): dithering on the colour boundaries only.**
+     Each colour gets two solid shading levels, then one level where it and
+     the next colour alternate on even and odd scanlines (the article's
+     "Poor Man's Dithering"), which a PAL TV blends. Most of each band is
+     solid colour. The shading loop is unrolled by two, so even and odd
+     lines read their own ramp table. `FLICKER=1` also swaps each pair
+     every frame, which looks smoother on a sharp LCD or emulator but
+     flickers.
+   * **`STYLE=1`: the article's "scaled split".** Two lines of colour,
+     then one black line, counted outwards from each bar's centre. The
+     black lines belong to the bar, so they also cover the bars behind it.
    * **Correct widths.** The article notes that hand-made patterns never
      give each brightness its correct width. Here the widths come from the
      cosine shading, so the bars actually look round.
-   * **Intensity** is diffuse (0..10) + env (0..2) + specular (0..6).
-     Diffuse plus env tops out at 12, the brightest bar colour, so only the
+   * **Intensity** is diffuse (0..14) + env (0..2) + specular (0..8).
+     Diffuse plus env tops out at 16, the brightest bar colour, so only the
      specular term reaches **white**.
-8. **Bars are drawn back to front.** A 4-element sorting network orders them
+8. **Bars are drawn back to front.** A 3-element sorting network orders them
    by depth, and the painter's algorithm handles the crossings.
 9. **The screen is blanked (DEN=0).** With the display off there are no
    badlines, so after a double-IRQ stable raster the display is a plain
-   63-cycle loop writing `$d020`, and the whole screen is border. The display
-   is 184 lines tall. The tracer uses about 6,800 of the roughly 7,800
-   vblank cycles (87%).
+   63-cycle loop writing `$d020`, and the whole screen is border. The tracer
+   uses about 5,000 of the roughly 6,800 vblank cycles (73%).
 
 ## Tuning notes
 

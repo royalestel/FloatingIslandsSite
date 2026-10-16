@@ -14,7 +14,7 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = 256
-NLINES = 184
+NLINES = 200
 FIRSTLINE = 50
 # Budget: update starts after the colour loop (~line 252) and must be done
 # before irq1 at line FIRSTLINE of the next frame.  Keep some slack for
