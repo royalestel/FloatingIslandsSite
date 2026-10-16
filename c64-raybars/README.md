@@ -63,8 +63,8 @@ uses VICE's default palette, the one the article uses.
      moves. Only the white specular highlight is traced on top. Where the
      highlight is faint, white replaces gold on every other line
      (yellow/white alternating blends to light yellow). Where it is strong,
-     it's solid white. The black gap lines stay black. This style uses
-     about 53% of the vblank.
+     it's solid white. The highlight covers every line, the black ones
+     included. This style uses about 48% of the vblank.
    * **`STYLE=0`: dithering only where white used to be.** The
      bar's own colours are solid bands. Between the brightest bar colour
      and the white highlight, the two alternate on even and odd scanlines

@@ -180,7 +180,7 @@ nmi:    rti                     ; RESTORE key does nothing
 ;  colour per scanline.  Only the specular highlight is traced: where it
 ;  is faint, white replaces gold on every other screen line (yellow/white
 ;  alternating blends to light yellow); where it is strong, solid white.
-;  The black gap lines stay black.
+;  The highlight covers every line, the black ones included.
 ; -----------------------------------------------------------------------------
 .proc shade
         ldy #BARH-1             ; BARH is even: y alternates odd, even, ...
@@ -188,12 +188,10 @@ line:   ldx theta2,y            ; ---- odd y ------------------------------
 spe1 = * + 1
         lda spectab,x           ; specular 0..8
         tax
-        lda gold,y              ; this line's gold colour
-        beq :+                  ; black gap lines stay black
 mapa = * + 1
         lda hilite,x            ; white here?  (one parity's table)
         bne :+
-        lda gold,y              ; no highlight: gold
+        lda gold,y              ; no: this line's gold colour
 :
 dst1 = * + 1
         sta colbuf,y
@@ -202,12 +200,10 @@ dst1 = * + 1
 spe2 = * + 1
         lda spectab,x
         tax
-        lda gold,y              ; this line's gold colour
-        beq :+                  ; black gap lines stay black
 mapb = * + 1
         lda hilite,x            ; ... the other parity's table
         bne :+
-        lda gold,y              ; no highlight: gold
+        lda gold,y              ; no: this line's gold colour
 :
 dst2 = * + 1
         sta colbuf,y
