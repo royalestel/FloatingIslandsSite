@@ -10,7 +10,7 @@ register per scanline, so almost all of its time goes to the shading maths.
 ## Build and run
 
 ```sh
-python3 gen_tables.py                                   # optional: tables.inc is committed
+python3 gen_tables.py                                   # optional: tables.inc and ramps.inc are committed
 cl65 -t none -C raybars.cfg -o raybars.prg raybars.s
 x64sc raybars.prg                                        # VICE, PAL machine
 ```
@@ -18,14 +18,15 @@ x64sc raybars.prg                                        # VICE, PAL machine
 `simulate.py` runs the real binary's per-frame tracer on an emulated 6502
 (`pip install py65 pillow`, and build with `-g -Ln raybars.lbl`). It checks
 the cycle budget and the 63-cycle raster loop, and renders `preview.gif` and
-`preview.png`.
+`preview.png`. The GIF's left half shows the raw scanlines. The right half
+roughly approximates how a PAL TV blends neighbouring lines.
 
 ## How it works, step by step
 
 1. **A raster bar is a cylinder seen side-on.** In the y/z plane each scanline
    `i` of a bar with radius `R` is a point on a circle, and its normal is at
    angle `t_i` where `sin t_i = (i + 0.5 - R) / R`. That depends only on `i`,
-   so the normals of every bar make up one constant 24-byte table.
+   so the normals of every bar make up one constant 32-byte table.
 2. **The camera is at infinity (orthographic).** The view vector is always
    `(0,0,1)`, so there is no perspective divide and V never needs computing.
 3. **Angles are stored in brads** (256 to a circle). Sums of angles wrap
@@ -38,26 +39,35 @@ the cycle budget and the 63-cycle raster loop, and renders `preview.gif` and
    `LZ = 100`. The bars orbit with |y| ≤ 64 and |z| ≤ 40, and the light bobs
    ±44, so `dy` always fits in a signed byte and `dz` is always 60..140. Then
    `atan(dy/dz) = atan(2^(log2 dy − log2 dz))`, which turns the division into
-   a subtraction. It is evaluated once per bar, at the bar's axis. Because
-   R = 12 is small next to the light distance, the error at the rim stays
-   under 9°.
+   a subtraction. It is evaluated once per bar, at the bar's axis, which
+   works because R = 16 is small next to the light distance.
 6. **Indexing uses doubled, page-aligned tables.** The tables are 512 bytes
    each, so `table[t − p]` becomes `lda table+(−p),x`, with `−p` patched into
    the operand once per bar. The inner loop takes about 39 cycles per
    scanline.
-7. **Colour comes from a 16-entry ramp per bar.** The ramp is indexed by
-   intensity = diffuse (0..4) + env (0..1) + specular (0..4). Diffuse plus
-   env tops out at 5, which is the bar's brightest colour. Only the specular
-   term can push the index to 6 or more, and those entries are **white**.
+7. **Colour uses a stretched palette.** Each bar has 6 colours ranked by
+   luminance. Between each pair of neighbours there is a mixed step: colour A
+   on even scanlines and colour B on odd ones. A PAL TV's delay line and the
+   CRT blur blend the pair into an in-between shade, so each ramp has 11
+   steps instead of 6. That lets the bars grow to 32 lines without visible
+   banding. The shading loop is unrolled by two, so even and odd lines read
+   their own ramp table at no extra cost per line.
+   * Intensity is diffuse (0..8) + env (0..2) + specular (0..5).
+   * Diffuse plus env tops out at 10, the bar's brightest colour.
+   * Step 11 mixes that colour with white, and 12 and up is **white**, so
+     only the specular term reaches white.
    * Fire: black, brown, red, orange, light red, yellow
    * Ocean: black, blue, dark grey, purple, light blue, cyan
    * Toxic: black, dark grey, grey, green, cyan, light green
+   * Build with `--asm-define FLICKER=1` to also swap each mixed pair every
+     frame. That blends the pair over time as well as across lines, which
+     looks smoother on a sharp LCD or emulator but flickers.
 8. **Bars are drawn back to front.** A 3-element sorting network orders them
    by depth, and the painter's algorithm handles the crossings.
 9. **The screen is blanked (DEN=0).** With the display off there are no
    badlines, so after a double-IRQ stable raster the display is a plain
    63-cycle loop writing `$d020`, and the whole screen is border. The tracer
-   uses about 3,900 of the roughly 6,800 vblank cycles (58%).
+   uses about 5,000 of the roughly 6,800 vblank cycles (73%).
 
 ## Tuning notes
 

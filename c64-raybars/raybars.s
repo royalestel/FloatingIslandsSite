@@ -16,7 +16,7 @@
 ;      free in an 8-bit register and every trig function is a 256-byte table.
 ;   3. A cylinder's normal at scanline i depends only on i:
 ;         sin(t_i) = (i + 0.5 - R) / R
-;      so the normals of every bar are ONE constant 24-byte table.
+;      so the normals of every bar are ONE constant 32-byte table.
 ;   4. With the normal at angle t and the light at angle p (both in the y/z
 ;      plane, x doesn't matter for an infinite cylinder):
 ;         diffuse   N.L           = cos(t - p)
@@ -26,18 +26,28 @@
 ;   5. ONE point light at a fixed depth LZ.  Bars orbit within |z| <= 40 and
 ;      |dy| <= 108, so the light vector always fits in a byte, and its angle
 ;      atan(dy/dz) is done with logarithms: a subtraction, not a division.
-;   6. Bar radius R = 12 << light distance (60..140), so the light direction
-;      is computed once per bar (at its axis) instead of once per scanline;
-;      the error is under 9 degrees at the bar's rim.
+;   6. Bar radius R = 16 << light distance (60..140), so the light direction
+;      is computed once per bar (at its axis) instead of once per scanline.
 ;   7. Tables are stored twice (512 bytes) and page aligned, so "table[t-p]"
 ;      becomes "lda table+(-p),x" with -p patched into the operand once per
 ;      bar.  The inner loop is ~39 cycles per scanline, no adds for indexing.
 ;   8. The screen is blanked (DEN=0): no badlines, so the raster loop is a
 ;      plain 63-cycle loop writing $d020, and the border IS the canvas.
 ;
-;  Intensity per scanline = diffuse(0..4) + env(0..1) + specular(0..4),
-;  looked up in a 16-entry colour ramp per bar.  Diffuse+env tops out at 5,
-;  the brightest bar colour; only the specular term can reach 6+ = WHITE.
+;  STRETCHED PALETTE
+;  Each bar's 6 colours are ranked by luminance, and between neighbours we
+;  add a mixed step: colour A on even scanlines, colour B on odd ones,
+;  which a PAL TV blends into an in-between shade.  So each ramp has 11
+;  steps instead of 6, and the bars can be 32 lines tall without banding.
+;  The shading loop is unrolled by two so even and odd lines read their own
+;  ramp table at no extra cost per line.  FLICKER=1 also swaps the pair
+;  every frame, which mixes them over time as well (smoother on sharp
+;  LCD/emulator screens, but it flickers).
+;
+;  Intensity per scanline = diffuse(0..8) + env(0..2) + specular(0..5),
+;  looked up in the ramp.  Diffuse+env tops out at 10, the brightest bar
+;  colour; 11 mixes that with white and 12+ is WHITE, so only the
+;  specular term can reach white.
 ;  The bars are depth-sorted and drawn back to front (painter's algorithm).
 ; =============================================================================
 
@@ -46,12 +56,15 @@
 ; ---- tunables ---------------------------------------------------------------
 FIRSTLINE = 50          ; raster line where irq1 fires
 NLINES    = 200         ; scanlines of colour buffer shown (lines 52..251)
-R         = 12          ; bar radius in scanlines
+R         = 16          ; bar radius in scanlines
 BARH      = 2*R         ; bar height (must match gen_tables.py)
 NBARS     = 3
 YMID      = 100         ; orbit axis, in colour-buffer lines
 LZ        = 100         ; light depth: distance in front of the orbit axis
 HTUNE     = 0           ; extra NOPs to slide the colour split into hblank
+.ifndef FLICKER         ; 1 = also swap the mixed colour pairs every frame
+FLICKER   = 0           ;     (cl65 ... --asm-define FLICKER=1)
+.endif
 
 ; ---- hardware -------------------------------------------------------------
 VIC_CTRL1  = $d011
@@ -80,6 +93,7 @@ oldtop:  .res NBARS     ; ... and last frame's, for erasing
 barz:    .res NBARS     ; bar depth (signed, + = toward camera)
 zkey:    .res NBARS     ; depth ^ $80, for unsigned sorting
 order:   .res NBARS     ; bar numbers, farthest first
+tmp:     .res 1
 save_a:  .res 1
 save_x:  .res 1
 save_y:  .res 1
@@ -141,23 +155,37 @@ nmi:    rti                     ; RESTORE key does nothing
 
 ; -----------------------------------------------------------------------------
 ;  shade: the per-scanline "ray tracer".  All operands marked *_op are
-;  patched by update.  Carry stays clear: 4 + 1 + 4 never overflows.
+;  patched by update.  Carry stays clear: 8 + 2 + 5 never overflows.
 ; -----------------------------------------------------------------------------
 .proc shade
-        ldy #BARH-1
+        ldy #BARH-1             ; BARH is even: y alternates odd, even, ...
         clc
-line:   ldx theta,y             ; normal angle t
-dif_op = * + 1
-        lda difftab,x           ; diffuse   0..4
-        ldx theta2,y            ; 2t
-env_op = * + 1
-        adc envtab,x            ; + env     0..1
-spe_op = * + 1
-        adc spectab,x           ; + specular 0..4
+line:   ldx theta,y             ; ---- odd y ------------------------------
+dif1 = * + 1
+        lda difftab,x           ; diffuse   0..8
+        ldx theta2,y
+env1 = * + 1
+        adc envtab,x            ; + env     0..2
+spe1 = * + 1
+        adc spectab,x           ; + specular 0..5
         tax
-ramp_op = * + 1
-        lda ramp_fire,x         ; intensity -> C64 colour
-dst_op = * + 1
+rampa = * + 1
+        lda ramps,x             ; intensity -> colour (one parity's ramp)
+dst1 = * + 1
+        sta colbuf,y
+        dey
+        ldx theta,y             ; ---- even y -----------------------------
+dif2 = * + 1
+        lda difftab,x
+        ldx theta2,y
+env2 = * + 1
+        adc envtab,x
+spe2 = * + 1
+        adc spectab,x
+        tax
+rampb = * + 1
+        lda ramps,x             ; ... and the other parity's ramp
+dst2 = * + 1
         sta colbuf,y
         dey
         bpl line
@@ -211,7 +239,7 @@ ok:
 
 ; =============================================================================
 ;  update: trace one frame into colbuf.  Runs in the vertical blank,
-;  ~3900 cycles of the ~6800 available (measured with simulate.py).
+;  ~5000 cycles of the ~6800 available (measured with simulate.py).
 ; =============================================================================
 .proc update
         ; ---- 1. erase last frame's bars (unrolled, 5 cycles per line) ------
@@ -285,18 +313,42 @@ next:   stx k
         eor #$ff                ; -p
         clc
         adc #1
-        sta shade::dif_op       ; patch: diffuse  table[t  - p]
-        sta shade::spe_op       ; patch: specular table[2t - p]
+        sta shade::dif1         ; patch: diffuse  table[t  - p]
+        sta shade::dif2
+        sta shade::spe1         ; patch: specular table[2t - p]
+        sta shade::spe2
         lda scroll
-        sta shade::env_op       ; patch: env map  table[2t + scroll]
+        sta shade::env1         ; patch: env map  table[2t + scroll]
+        sta shade::env2
         ldx bar
-        lda ramplo,x
-        sta shade::ramp_op
-        lda ramphi,x
-        sta shade::ramp_op+1
         lda bartop,x
         sta oldtop,x
-        sta shade::dst_op       ; patch: where in colbuf this bar lands
+        sta shade::dst1         ; patch: where in colbuf this bar lands
+        sta shade::dst2
+
+        ; Pick even/odd ramps so the mix pattern follows SCREEN lines, not
+        ; bar lines: the first line shaded is top+BARH-1 (odd y).
+        clc
+        adc #1                  ; parity of top + odd y
+.if ::FLICKER
+        eor orbit               ; swap the pair every frame
+.endif
+        and #1
+        asl
+        asl
+        asl
+        asl                     ; 0 or 16: even or odd table
+        sta tmp
+        txa
+        asl
+        asl
+        asl
+        asl
+        asl                     ; bar * 32
+        ora tmp
+        sta shade::rampa
+        eor #16                 ; the other line uses the other table
+        sta shade::rampb
         jsr shade
 
         ldx k
@@ -380,20 +432,12 @@ irq2:   txs                     ; throw away irq2's stack frame
 
 phase:  .byte 0, 85, 171        ; bars 120 degrees apart on the orbit
 
-ramplo: .lobytes ramp_fire, ramp_ocean, ramp_toxic
-ramphi: .hibytes ramp_fire, ramp_ocean, ramp_toxic
-
-; Intensity ramps.  0-5 are the bar's own colours (no white), 6+ is the
-; specular highlight: white.  C64 colour numbers.
-ramp_fire:      ; black, brown, red, orange, light red, yellow
-        .byte $00,$09,$02,$08,$0a,$07
-        .res 10, $01
-ramp_ocean:     ; black, blue, dark grey, purple, light blue, cyan
-        .byte $00,$06,$0b,$04,$0e,$03
-        .res 10, $01
-ramp_toxic:     ; black, dark grey, grey, green, cyan, light green
-        .byte $00,$0b,$0c,$05,$03,$0d
-        .res 10, $01
+; Stretched colour ramps, 32 bytes per bar: even-line table, odd-line
+; table.  Generated from the 6-colour lists in gen_tables.py.
+.segment "RAMPS"
+ramps:
+        .include "ramps.inc"
+        .assert <ramps = 0, error, "ramps must be page aligned"
 
 ; =============================================================================
 .segment "BSS"
