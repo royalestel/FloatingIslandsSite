@@ -11,7 +11,7 @@ register per scanline, so almost all of its time goes to the shading maths.
 
 ```sh
 python3 gen_tables.py                                   # optional: tables.inc and ramps.inc are committed
-cl65 -t none -C raybars.cfg -o raybars.prg raybars.s   # add --asm-define STYLE=1 for the black-split look
+cl65 -t none -C raybars.cfg -o raybars.prg raybars.s   # STYLE=2 (default) gold; --asm-define STYLE=0 or 1 for the shaded looks
 x64sc raybars.prg                                        # VICE, PAL machine
 ```
 
@@ -55,7 +55,17 @@ uses VICE's default palette, the one the article uses.
      * Ocean: blue, dark grey, purple, light blue, cyan, light green
      * Forest: brown, dark grey, orange, green, light grey, light green
      * Dusk: blue, dark grey, purple, light red, cyan, yellow
-   * **`STYLE=0` (default): dithering only where white used to be.** The
+   * **`STYLE=2` (default): the gold bar.** No shading of the bar colours
+     at all. Each bar is 24 lines with a fixed hand-picked gold pattern, one
+     colour per scanline, top to bottom:
+     `9 8 12 7 7 0 9 8 15 7 7 1 7 1 7 0 0 0 9 12 10 12 8 9`.
+     It works like a fixed environment map, so it doesn't shift as the bar
+     moves. Only the white specular highlight is traced on top. Where the
+     highlight is faint, white replaces gold on every other line
+     (yellow/white alternating blends to light yellow). Where it is strong,
+     it's solid white. The black gap lines stay black. This style uses
+     about 53% of the vblank.
+   * **`STYLE=0`: dithering only where white used to be.** The
      bar's own colours are solid bands. Between the brightest bar colour
      and the white highlight, the two alternate on even and odd scanlines
      (the article's "Poor Man's Dithering"), which a PAL TV blends. The

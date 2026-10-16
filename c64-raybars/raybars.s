@@ -38,7 +38,10 @@
 ;  Each bar's ramp takes one colour from each VIC-II brightness level,
 ;  whatever its hue, so it gets every brightness step the chip has.  The
 ;  article's white end is dropped: white is only for the highlight.
-;  STYLE=0 (default): the bar's colours are solid bands.  "Poor Man's
+;  STYLE=2 (default): no shading of the bar colours at all.  Each bar is
+;  a fixed 24-line gold pattern, one colour per scanline, and only the
+;  white specular highlight is traced on top of it.
+;  STYLE=0: the bar's colours are solid bands.  "Poor Man's
 ;  Dithering" is used only where the article's white used to be: between
 ;  the brightest bar colour and the white highlight, the two alternate on
 ;  even/odd scanlines (a PAL TV blends them).  The shading loop is
@@ -59,15 +62,23 @@
 ; ---- tunables ---------------------------------------------------------------
 FIRSTLINE = 50          ; raster line where irq1 fires
 NLINES    = 200         ; scanlines of colour buffer shown (lines 52..251)
-R         = 16          ; bar radius in scanlines
-BARH      = 2*R         ; bar height (must match gen_tables.py)
 NBARS     = 3
 YMID      = 100         ; orbit axis, in colour-buffer lines
 LZ        = 100         ; light depth: distance in front of the orbit axis
 HTUNE     = 0           ; extra NOPs to slide the colour split into hblank
-.ifndef STYLE           ; 0 = solid colours, dithered only at the boundaries
-STYLE     = 0           ; 1 = "scaled split": 2 colour lines, 1 black line
+.ifndef STYLE           ; 2 = fixed 24-line gold bar + traced highlight
+STYLE     = 2           ; 0 = shaded, dithered only into the white highlight
+.endif                  ; 1 = shaded, "scaled split" (2 colour + 1 black line)
+.if STYLE = 2
+R         = 12          ; bar radius in scanlines: 24 lines, one per gold colour
+theta     = theta_12    ; per-scanline normals (gen_tables.py)
+theta2    = theta2_12
+.else
+R         = 16          ; bar radius in scanlines
+theta     = theta_16
+theta2    = theta2_16
 .endif
+BARH      = 2*R         ; bar height
 .ifndef FLICKER         ; STYLE 0 only: also swap the mixed pairs every frame
 FLICKER   = 0           ;     (cl65 ... --asm-define FLICKER=1)
 .endif
@@ -163,6 +174,48 @@ nmi:    rti                     ; RESTORE key does nothing
 ;  shade: the per-scanline "ray tracer".  All operands marked *_op are
 ;  patched by update.  Carry stays clear: 14 + 2 + 8 never overflows.
 ; -----------------------------------------------------------------------------
+.if STYLE = 2
+; -----------------------------------------------------------------------------
+;  shade (STYLE 2): the bar's colours are a fixed 24-line gold table, one
+;  colour per scanline.  Only the specular highlight is traced: where it
+;  is faint, white replaces gold on every other screen line (yellow/white
+;  alternating blends to light yellow); where it is strong, solid white.
+;  The black gap lines stay black.
+; -----------------------------------------------------------------------------
+.proc shade
+        ldy #BARH-1             ; BARH is even: y alternates odd, even, ...
+line:   ldx theta2,y            ; ---- odd y ------------------------------
+spe1 = * + 1
+        lda spectab,x           ; specular 0..8
+        tax
+        lda gold,y              ; this line's gold colour
+        beq :+                  ; black gap lines stay black
+mapa = * + 1
+        lda hilite,x            ; white here?  (one parity's table)
+        bne :+
+        lda gold,y              ; no highlight: gold
+:
+dst1 = * + 1
+        sta colbuf,y
+        dey
+        ldx theta2,y            ; ---- even y -----------------------------
+spe2 = * + 1
+        lda spectab,x
+        tax
+        lda gold,y              ; this line's gold colour
+        beq :+                  ; black gap lines stay black
+mapb = * + 1
+        lda hilite,x            ; ... the other parity's table
+        bne :+
+        lda gold,y              ; no highlight: gold
+:
+dst2 = * + 1
+        sta colbuf,y
+        dey
+        bpl line
+        rts
+.endproc
+.else
 .proc shade
         ldy #BARH-1             ; BARH is even: y alternates odd, even, ...
         clc
@@ -197,6 +250,7 @@ dst2 = * + 1
         bpl line
         rts
 .endproc
+.endif
 
 ; -----------------------------------------------------------------------------
 ;  atan2: A = atan(dy / dz) in brads, signed.  dz > 0 always.
@@ -326,20 +380,36 @@ next:   stx k
         eor #$ff                ; -p
         clc
         adc #1
-        sta shade::dif1         ; patch: diffuse  table[t  - p]
-        sta shade::dif2
         sta shade::spe1         ; patch: specular table[2t - p]
         sta shade::spe2
+.if ::STYLE <> 2
+        sta shade::dif1         ; patch: diffuse  table[t  - p]
+        sta shade::dif2
         lda scroll
         sta shade::env1         ; patch: env map  table[2t + scroll]
         sta shade::env2
+.endif
         ldx bar
         lda bartop,x
         sta oldtop,x
         sta shade::dst1         ; patch: where in colbuf this bar lands
         sta shade::dst2
 
-.if ::STYLE = 0
+.if ::STYLE = 2
+        ; Highlight dither follows SCREEN lines: pick the even/odd table
+        ; for the first line shaded, top+BARH-1 (odd y).
+        clc
+        adc #1
+        and #1
+        asl
+        asl
+        asl
+        asl                     ; 0 or 16
+        sta shade::mapa
+        eor #16
+        sta shade::mapb
+        jsr shade
+.elseif ::STYLE = 0
         ; Pick even/odd ramps so the mix pattern follows SCREEN lines, not
         ; bar lines: the first line shaded is top+BARH-1 (odd y).
         clc
@@ -474,6 +544,18 @@ phase:  .byte 0, 85, 171        ; bars 120 degrees apart on the orbit
 ; Stretched colour ramps, 64 bytes per bar: even-line table, odd-line
 ; table, 32 entries each.  Generated from the 6-colour lists in gen_tables.py.
 .segment "RAMPS"
+.if STYLE = 2
+; Highlight per specular level 0..8: 0 = keep the gold colour, 1 = white.
+; Levels 2-3 make white on one line parity only (blends to light yellow),
+; 4+ is solid white.
+hilite: .byte 0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1   ; even screen lines
+        .byte 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1   ; odd screen lines
+        .assert <hilite = 0, error, "hilite must be page aligned"
+
+; The gold bar, top to bottom, one C64 colour per scanline (24 lines).
+gold:   .byte 9,8,12,7,7,0,9,8,15,7,7,1,7,1,7,0,0,0,9,12,10,12,8,9
+        .assert * - gold = BARH, error, "gold must have one colour per line"
+.else
 ramps:
 .if STYLE = 0
         .include "ramps_dither.inc"
@@ -481,6 +563,7 @@ ramps:
         .include "ramps_split.inc"
 .endif
         .assert <ramps = 0, error, "ramps must be page aligned"
+.endif
 
 ; =============================================================================
 .segment "BSS"
