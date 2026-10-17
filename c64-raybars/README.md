@@ -369,9 +369,21 @@ cl65 -t none -C raybars.cfg -o goldship.prg goldship.s
 python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldship.gif
 ```
 
-* **The ship** is one multicolour sprite at the centre of the screen, with
-  the light on its nose (`ship.inc`, drawn by `gen_tables.py`). It has 9
-  frames: level and leaning in each of the 8 stick directions.
+* **The ship** is one multicolour sprite at the centre of the screen.
+  Its 9 frames are renders of a small 3D model (`ship3d.py`, called by
+  `gen_tables.py` into `ship.inc`). With the stick centred you see the
+  tail view; otherwise it leans that way, rolled 25 degrees and pitched
+  22. `python3 ship3d.py frames.png` previews them
+  (`preview_ship3d.png`).
+  * The model: a fuselage that tapers to the nose, delta wings with
+    wingtip fins, a tail fin, two engine pods and the light on the nose.
+  * In the tail view the wingspan fills all 24 pixels of the sprite.
+  * Each frame is rendered with a z-buffer at 8 x 4 samples per
+    multicolour pixel and flat-shaded into the sprite's three colours:
+    shadowed hull, lit hull and trim (wingtip fins, engine pods), and
+    glow (the exhausts and the nose light).
+  * Parts thinner than a multicolour pixel (2 screen pixels) vanish at
+    this size, so the fins are modelled thick.
 * **Pitch** (up / down) eases the ship's climb speed toward ±1 unit per
   frame, so pushing up makes the bars sink. Each bar's height is relative
   to the ship's: it is `Y/Z` lines from the centre, above or below.
