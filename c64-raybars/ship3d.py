@@ -6,7 +6,7 @@ attitude is rotated (pitch, then roll), projected orthographically so the
 wingspan fills the sprite's 24 pixels in the tail view, and rasterised with
 a z-buffer at 8 x 4 samples per multicolour pixel.  Faces are flat-shaded
 into the sprite's three colours: %01 hull in shadow, %10 lit hull and trim
-(the winglets and engine slots), %11 the light on the nose.  A pixel takes
+(the engine pods), %11 the light on the nose.  A pixel takes
 %11 if a fifth of its samples glow, otherwise the majority hull colour if a
 third of it is covered; thin slanted parts are kept whole by filling a
 lightly covered pixel between two filled ones.
@@ -72,19 +72,21 @@ def lozenge(w, h, cy=0.0):
             (a * 0.55, cy - b), (-a * 0.55, cy - b), (-a, cy - b * 0.2), (-a, cy + b * 0.2)]
 
 def model():
-    """The Arrow: a flying wing.  x right, y up, z forward: the nose points
-    away from the camera.  A flat body, a broad delta, two engine slots in
-    the tail, small downturned winglets, the light on the nose."""
-    f = []
-    f += loft([(-7, lozenge(6.0, 2.6)), (-2, lozenge(7.0, 3.0)), (5, lozenge(4.0, 2.2)),
-               (10, lozenge(1.2, 0.9))])
+    """The gull: x right, y up, z forward (the nose points away from the
+    camera).  A flat body with the light on its nose; wings that rise from
+    the body to a kink, then fall to the tips (an "M" seen from behind); an
+    engine pod at each kink."""
+    f = loft([(-6, lozenge(4.4, 3.0)), (-1, lozenge(5.0, 3.4)), (6, lozenge(3.0, 2.2)),
+              (10, lozenge(1.2, 1.0))])
     f += sphere(0, 0, 10.6, 1.4, "glow")
     for s in (-1, 1):
-        f += slab([(s * 3.0, 0, 6.0), (s * 11.6, 0, -5.0), (s * 11.6, 0, -7.0),
-                   (s * 3.0, 0, -7.0)], 1.4)
-        f += fin([(s * 11.8, 0.6, -7.0), (s * 11.8, -2.6, -7.4), (s * 11.8, -2.6, -6.0),
-                  (s * 11.8, 0.6, -4.6)], 1.6, "trim")
-        f += loft([(-7.6, lozenge(2.4, 1.4)), (-3, lozenge(2.4, 1.4))], "trim", dx=s * 1.6)
+        # two wing panels, each chord from 4 - 0.75|x| (front) to -6 (back)
+        path = [(s * 2.2, 0.0), (s * 5.2, 1.8), (s * 11.8, -1.6)]
+        for (xa, ya), (xb, yb) in zip(path, path[1:]):
+            f += slab([(xa, ya, 4 - abs(xa) * 0.75), (xb, yb, 4 - abs(xb) * 0.75),
+                       (xb, yb, -6.0), (xa, ya, -6.0)], 1.8)
+        f += loft([(-7.5, octagon(2.6, 2.6, 1.8)), (0, octagon(2.6, 2.6, 1.8)),
+                   (2, octagon(1.0, 1.0, 1.8))], "trim", dx=s * 5.2)
     return f
 
 LIGHT = (-0.45, 0.75, -0.5)            # toward the light: up, left, behind us

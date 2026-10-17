@@ -375,15 +375,15 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   tail view; otherwise it leans that way, rolled 25 degrees and pitched
   30. `python3 ship3d.py frames.png` previews them
   (`preview_ship3d.png`).
-  * The model is the Arrow, a flying wing. It has a flat body, a broad
-    delta, small downturned winglets, two engine slots in the tail and the
-    light on the nose. It was picked from five colour-rendered designs.
-  * In the tail view it is a thin line across the full sprite width. Its
-    climbing and diving frames mirror each other: a "^" with the nose
-    light above, a "v" with it below.
+  * The model is a gull, picked from colour-rendered design variations.
+    It has a flat body with the light on its nose, wings that rise to a
+    kink and fall to the tips, and an engine pod at each kink.
+  * In the tail view it is an "M" across the full sprite width, with no
+    central fins. Its climbing and diving frames mirror each other: the
+    nose light shows above when climbing and below when diving.
   * Each frame is rendered with a z-buffer at 8 x 4 samples per
     multicolour pixel and flat-shaded into the sprite's three colours:
-    shadowed hull, lit hull and trim (winglets, engine slots), and white,
+    shadowed hull, lit hull and trim (the engine pods), and white,
     kept for the light on the nose alone.
   * When a thin slanted part leaves a one-pixel gap between two filled
     pixels, the conversion fills it, so the roll frames stay whole.
