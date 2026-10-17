@@ -358,6 +358,61 @@ python3 sim_goldfly.py       # needs -g -Ln goldfly.lbl; renders preview_goldfly
   * The worst frame uses 97% of the free time. Its budget allows 4 lines
     of IRQ work per block and the sprite's own DMA.
 
+## GOLDSHIP: fly through a forest of raster bars
+
+`goldship.s` turns goldfly into a game. You fly a ship, seen from behind,
+through parallel bars that come at it out of the distance. Joystick in
+port 2.
+
+```sh
+cl65 -t none -C raybars.cfg -o goldship.prg goldship.s
+python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldship.gif
+```
+
+* **The ship** is one multicolour sprite at the centre of the screen, with
+  the light on its nose (`ship.inc`, drawn by `gen_tables.py`). It has 9
+  frames: level and leaning in each of the 8 stick directions.
+* **Pitch** (up / down) eases the ship's climb speed toward ±1 unit per
+  frame, so pushing up makes the bars sink. Each bar's height is relative
+  to the ship's: it is `Y/Z` lines from the centre, above or below.
+* **Roll** (left / right) tilts every bar the other way, one step every
+  other frame, up to 2 lines per segment. Letting go levels out again.
+  All bars are parallel, so the tilt comes from one 17-entry table per
+  segment (`rtilt0..4`).
+* **New bars** appear far away at your current height, plus the next of
+  15 shuffled offsets from -42 to 42. So they always start at the screen
+  centre, and 7 of the 15 offsets are on a collision course.
+* **Collision course.** A bar covers the screen centre exactly when its
+  height is within half its thickness (24 units) of the ship's, at any
+  distance. While any bar ahead does, the ship's palette changes:
+
+  | | hull | trim and light ring | light core |
+  |---|---|---|---|
+  | normal | purple | light blue | white |
+  | collision course | red | orange | yellow |
+
+  A bar that reaches the ship's depth on a collision course flashes the
+  border red.
+* **The engine** is goldfly's. Bars sit close together near the centre,
+  so almost every frame merges bars, often all three. Three things keep
+  that inside the frame:
+  * A light-angle table bounds the highlight loop to the lit rows.
+  * All bars share one tilt, so a farther bar's rows sit at the same
+    offset in every column. Copying them and blacking around the nearest
+    bar both handle all five columns at once.
+  * This program banks out the ROMs, so its zero page can run past $7F
+    (the shared `raybars.cfg` now allows up to $FF).
+* **Simulator.** `sim_goldship.py` flies with an autopilot on `$dc00`. It
+  dives or climbs away from the nearest bar on a collision course and
+  rolls back and forth for show. It runs the program's own display code
+  for every block, and over 3000 frames found:
+  * Every row takes 63 cycles, or 58 on the sprite's lines.
+  * Every displayed cell shows the nearest bar covering it.
+  * The worst frame uses 89% of the free time.
+
+  As in goldfly, the sprite DMA timing (`STEAL`, `BAND0/1`) needs checking
+  in VICE.
+
 ## Tuning notes
 
 * PAL only: the loop is 63 cycles per line, and an NTSC frame has too little vblank.
