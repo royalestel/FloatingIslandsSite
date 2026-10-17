@@ -8,9 +8,10 @@
 ;  the distance, three at a time: each new one appears near the screen
 ;  centre (some at the ship's height, most off it) and grows as it
 ;  approaches.  Joystick in port 2:
-;  up / down pitch the ship (it climbs or dives, so the bars move down or
-;  up), left / right roll it (the bars tilt the other way, up to 3 lines per
-;  segment).  The ship's sprite leans in the 8 directions while pushed.
+;  as a pilot's stick, up pushes the nose down (the ship dives, so the bars
+;  move up) and down pulls it up (it climbs, the bars sink); left / right
+;  roll it (the bars tilt the other way, up to 3 lines per segment).  The
+;  ship's sprite leans in the 8 directions while pushed.
 ;  When a bar ahead is on a collision course (it covers the screen centre,
 ;  which in perspective means it is within half its thickness of the ship's
 ;  height, at any distance) the ship's palette turns from purple / light
@@ -23,6 +24,9 @@
 ;  DISPLAY: POINTER-READ SPEEDCODE
 ;  Each bar's display code is a loop over its rows:
 ;       5 x (lda (pK),y / sta $d021)  =  5 x 9 cycles  (72-pixel segments)
+;  The row can't start early enough for segment 0's store to land in the
+;  left border, so a row stores segments 1-4, then segment 0 of the next
+;  row in the right border (irq2 stores the first row's, from c0).
 ;  pK points into segment K's colour column for this bar, offset by the
 ;  segment's tilt.  The main loop only builds the columns and the
 ;  pointers.  The bars live inside the display window (opened without
@@ -35,8 +39,8 @@
 ;  Each slot has three loops -- normal rows above the light, rows on its
 ;  lines, normal rows below -- chained by patched jumps with padded
 ;  entries, and irq2's stabilising delay is shortened when its line is one
-;  of them.  STEAL (5: the loop's tail only reads) and BAND0/1 need
-;  checking in VICE; the simulator can't emulate sprite DMA.  The sprite
+;  of them.  STEAL (5: the loop's tail only reads) and BAND0/1 are
+;  checked in VICE (the simulator can't emulate sprite DMA).  The sprite
 ;  covers bars behind it; bars nearer than the light keep off its lines.
 ;
 ;  FRAME PIPELINE
@@ -112,6 +116,7 @@ theta2    = theta2_12
 ; =============================================================================
 .segment "ZEROPAGE"
 ptr:     .res NSLOT*SEGS*2      ; live column pointers (read by the bars)
+c0:      .res 1                 ; segment 0's colour on the next block's first row
 frameflag: .res 1               ; top IRQ: start building the next frame
 ready:   .res 1                 ; main loop: next frame is built
 buf:     .res 1                 ; column buffer being built (0/1)
@@ -320,6 +325,8 @@ nmi:    rti
         lda CIA1_PRA            ; port 2, active low
         eor #$ff
         and #$0f
+        tax                     ; pilot's stick: up is nose down (dive),
+        lda udswap,x            ;   down is nose up (climb)
         sta joy
         ; ---- pitch: the climb speed eases toward +-VMAX, or back to 0
         lsr                     ; up?
@@ -1423,6 +1430,10 @@ nextbar:
         iny
         lda sj2hi,x
         sta (lp),y
+        ldy soff,x              ; segment 0's colour on the first row
+        ldx mul10,y
+        lda (ptr,x)
+        sta c0
         lda #<irq1
         sta $fffe
         lda #>irq1
@@ -1437,6 +1448,7 @@ nextbar:
 irq1:   sta save_a
         stx save_x
         sty save_y
+        ldy c0                  ; segment 0 of the first row, stored by irq2
         lda #<irq2
         sta $fffe
         lda #>irq2
@@ -1465,9 +1477,8 @@ dly_op = * + 1
         .repeat HTUNE
         nop
         .endrep
+        sty VIC_BG              ; segment 0 of the first row (left border)
         ldy #0                  ; first row
-        nop
-        nop
         jmp (curvec)
 
 ; N cycles of padding (N = 0 or N >= 2)
@@ -1485,13 +1496,17 @@ dly_op = * + 1
   .endif
 .endmacro
 
-; one row: 5 x (lda (pK),y / sta $d021) = 45 cycles, iny: 47
+; one row: 5 x (lda (pK),y / sta $d021) = 45 cycles, iny: 47.  Segments
+; 1-4 are stored at their left edges; segment 0's store would come a
+; segment late, so the row ends with the next row's, in the right border.
 .macro row SL
-  .repeat SEGS, K
-        lda (ptr + (SL*SEGS + K)*2),y
+  .repeat SEGS - 1, K
+        lda (ptr + (SL*SEGS + K + 1)*2),y
         sta VIC_BG
   .endrep
         iny
+        lda (ptr + (SL*SEGS)*2),y
+        sta VIC_BG
 .endmacro
 
 ; Three loops per slot, rows in screen order: normal rows above the light
@@ -1565,6 +1580,11 @@ bout:   lda save_a
         .include "fly.inc"      ; FLYD, flight tables, dimmed palettes
         .include "ship.inc"     ; ship sprites, roll tilts, spawn heights
 shippal: .byte 4, 14, 1, 2, 8, 7   ; hull, trim, light: normal, collision
+mul10:  .byte 0, SEGS*2, 2*SEGS*2   ; a slot's offset into ptr
+udswap:                         ; joystick bits with up (1) and down (2) swapped
+        .repeat 16, I
+        .byte (I & 12) | ((I & 1) << 1) | ((I & 2) >> 1)
+        .endrep
         .assert <spectab = 0, error, "spectab must be page aligned"
 
 stagger: .byte 0, FLYD/3, 2*FLYD/3

@@ -80,7 +80,7 @@ for f in range(FRAMES):
              if mem[L["st"] + sl] < NEARZ3 and abs(yrel(sl)) < 34]
     if ahead:
         stv, y = max(ahead)
-        stick |= 2 if y >= 0 else 1     # bar above (or level): dive, else climb
+        stick |= 1 if y >= 0 else 2     # bar above (or level): dive (stick up), else climb
     # and roll for show, every 200 frames: level, full left (held 60
     # frames), level, full right
     ph = f % 200

@@ -389,8 +389,9 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     pixels, the conversion fills it, so the roll frames stay whole.
   * Looking straight at the tail, the nose is hidden behind the body, so
     the level frame has no white.
-* **Pitch** (up / down) eases the ship's climb speed toward ±1 unit per
-  frame, so pushing up makes the bars sink. Each bar's height is relative
+* **Pitch** works like a pilot's stick: up pushes the nose down, down pulls
+  it up. It eases the ship's climb speed toward ±1 unit per frame, so
+  pushing up makes the bars rise. Each bar's height is relative
   to the ship's: it is `Y/Z` lines from the centre, above or below.
 * **Roll** (left / right) tilts every bar the other way, one step every
   other frame. Neighbouring segments can be up to 3 lines apart, so at
@@ -457,8 +458,20 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     cycles (about 42 raster lines) of each frame spare.
   * Every bar row holds its profiled colour, or a highlight drawn over it.
 
-  As in goldfly, the sprite DMA timing (`STEAL`, `BAND0/1`) needs checking
-  in VICE.
+* **Checked in VICE** (x64sc, PAL). The 8565's grey dot marks every
+  `$d021` write, so each split's position can be read off a screenshot.
+  * Over 300 sampled frames, every colour change falls on the segment
+    edges, on the sprite's lines too. That includes 102 frames where a
+    block's IRQ line has the DMA (the shortened delay). So `STEAL` = 5 and
+    `BAND0/1` are right as they are, and `HTUNE` stays 0.
+  * The stores were one segment (9 cycles) late: segment K showed in slot
+    K+1, and segment 4 wrapped onto the next line's left edge. The row
+    can't start any earlier, so each row now stores segments 1 to 4, then
+    the next row's segment 0 in the right border. irq2 stores the first
+    row's segment 0 (`c0`, set by `nextbar`) in the left border, using the
+    cycles of two NOPs. The row timing is unchanged.
+  * A screen rebuilt from a VICE snapshot (its RAM run through the
+    program's own `nextbar` and row loops) matches VICE's frame.
 
 ## FLYBY3D: profiling the bars in true perspective
 
