@@ -381,7 +381,10 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   * Each frame is rendered with a z-buffer at 8 x 4 samples per
     multicolour pixel and flat-shaded into the sprite's three colours:
     shadowed hull, lit hull and trim (wingtip fins, engine pods), and
-    glow (the exhausts and the nose light).
+    white, kept for the light on the nose alone.
+  * Looking straight at the tail, the nose is hidden behind the fuselage,
+    so the level frame has no white. Diving tips the nose below the
+    engines, so its light shows there. Climbing hides it behind the fin.
   * Parts thinner than a multicolour pixel (2 screen pixels) vanish at
     this size, so the fins are modelled thick.
 * **Pitch** (up / down) eases the ship's climb speed toward ±1 unit per
@@ -392,8 +395,10 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   All bars are parallel, so the tilt comes from one 17-entry table per
   segment (`rtilt0..4`).
 * **New bars** appear far away at your current height, plus the next of
-  15 shuffled offsets from -42 to 42. So they always start at the screen
-  centre, and 7 of the 15 offsets are on a collision course.
+  16 shuffled offsets (16-bit): 5 near the ship, on a collision course at
+  the screen centre, and 11 off the centre line, up to 200 units away
+  (17 lines out when they appear). Bars above and below make a forest to
+  fly through.
 * **Collision course.** A bar covers the screen centre exactly when its
   height is within half its thickness (24 units) of the ship's, at any
   distance. While any bar ahead does, the ship's palette changes:

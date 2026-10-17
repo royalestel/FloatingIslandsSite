@@ -5,8 +5,9 @@
 ;
 ;  The ship is a multicolour sprite seen from behind, fixed at the centre of
 ;  the screen, with the light on its nose.  Parallel bars come at it out of
-;  the distance, three at a time: each new one appears at the screen centre
-;  (near the ship's height) and grows as it approaches.  Joystick in port 2:
+;  the distance, three at a time: each new one appears near the screen
+;  centre (some at the ship's height, most off it) and grows as it
+;  approaches.  Joystick in port 2:
 ;  up / down pitch the ship (it climbs or dives, so the bars move down or
 ;  up), left / right roll it (the bars tilt the other way, up to 2 lines per
 ;  segment).  The ship's sprite leans in the 8 directions while pushed.
@@ -278,19 +279,16 @@ nmi:    rti
 
 ; -----------------------------------------------------------------------------
 ;  respawn slot x: far away, at the ship's height plus the next spawn
-;  offset (it appears at the centre), with the next palette.
+;  offset (some at the centre, most off it), with the next palette.
 ; -----------------------------------------------------------------------------
 .proc respawn
         ldy yi
-        lda yspawn,y
+        lda yspawnl,y
         clc
         adc shipy
         sta swl,x
-        lda yspawn,y            ; (sign)
-        and #$80
-        beq :+
-        lda #$ff
-:       adc shipy+1
+        lda yspawnh,y
+        adc shipy+1
         sta swh,x
         iny
         cpy #NYSPAWN

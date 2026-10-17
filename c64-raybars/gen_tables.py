@@ -471,10 +471,13 @@ emit2("joyframe", JF)
 # about the middle segment, stored as kb = 8 - off_k (rtilt0..4, index r + 8)
 for k in range(5):
     emit2(f"rtilt{k}", [8 - int(math.floor(4 + (k - 2) * (-r / 4) + 0.5)) for r in range(-8, 9)])
-# spawn height relative to the ship: 15 values -42..42 (|y| < 24 is a
-# collision course: 7 of them), shuffled
-yspawn = cycle([-42 + 6 * i for i in range(15)], lambda a, b: abs(a - b) >= 24)
-emit2("yspawn", yspawn)
+# spawn height relative to the ship, shuffled: 5 near it (|y| < 24 is a
+# collision course: they start at the screen centre) and 11 off the centre
+# line, up to 200 units (17 lines out when they appear).  16 bits.
+yspawn = cycle([-18, -8, 0, 10, 20, -36, 40, -60, 64, -92, 96, -132, 128, -170, 172, 200],
+               lambda a, b: abs(a - b) >= 30)
+emit2("yspawnl", [v & 255 for v in yspawn])
+emit2("yspawnh", [(v >> 8) & 255 for v in yspawn])
 # lit rows: for each spec offset p (spe_op), the 24-row bar's rows with spec
 # level >= HLTHR (3) are one run: litlo[p] .. lithi[p]-1 (0, 0: none)
 lo_, hi_ = [], []

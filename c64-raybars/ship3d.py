@@ -82,7 +82,7 @@ def model():
                   (s * 11.4, -4.2, -3.0)], 2.2, "trim")
         # engine pods under the wing roots: their exhausts glow
         f += loft([(-8, octagon(2.8, 2.6, -3.0)), (-1, octagon(2.8, 2.6, -3.0)),
-                   (1, octagon(1.2, 1.2, -3.0))], "trim", caps=("glow", "trim"), dx=s * 4.6)
+                   (1, octagon(1.2, 1.2, -3.0))], "trim", caps=("trim", "trim"), dx=s * 4.6)
     # tail fin
     f += fin([(0, 2.4, -7.0), (0, 9.4, -7.6), (0, 9.4, -5.6), (0, 2.4, -1.0)], 2.2)
     return f
