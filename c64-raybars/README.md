@@ -373,18 +373,22 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   Its 9 frames are renders of a small 3D model (`ship3d.py`, called by
   `gen_tables.py` into `ship.inc`). With the stick centred you see the
   tail view; otherwise it leans that way, rolled 25 degrees and pitched
-  22. `python3 ship3d.py frames.png` previews them
+  30. `python3 ship3d.py frames.png` previews them
   (`preview_ship3d.png`).
-  * The model: a fuselage that tapers to the nose, delta wings with
-    wingtip fins, a tail fin, two engine pods and the light on the nose.
+  * The model: a fuselage that tapers to the nose, flat delta wings with
+    wingtip fins, a tail fin with a matching ventral fin, two engine pods
+    through the wing roots, and the light on the nose.
+  * The model is nearly symmetric top to bottom, so climbing and diving
+    mirror each other. Climbing shows a "^" with the nose light above.
+    Diving shows a "v" with it below the engines. Only the shading
+    differs, because the light comes from above.
   * In the tail view the wingspan fills all 24 pixels of the sprite.
   * Each frame is rendered with a z-buffer at 8 x 4 samples per
     multicolour pixel and flat-shaded into the sprite's three colours:
     shadowed hull, lit hull and trim (wingtip fins, engine pods), and
     white, kept for the light on the nose alone.
   * Looking straight at the tail, the nose is hidden behind the fuselage,
-    so the level frame has no white. Diving tips the nose below the
-    engines, so its light shows there. Climbing hides it behind the fin.
+    so the level frame has no white.
   * Parts thinner than a multicolour pixel (2 screen pixels) vanish at
     this size, so the fins are modelled thick.
 * **Pitch** (up / down) eases the ship's climb speed toward ±1 unit per

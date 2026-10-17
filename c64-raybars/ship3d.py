@@ -73,18 +73,21 @@ def model():
                (5, octagon(4.6, 3.8)), (10, octagon(1.6, 1.4))])
     # the light on the nose
     f += sphere(0, 0, 10.6, 1.4, "glow")
-    # delta wings, drooping a little toward the tips
+    # flat delta wings on the fuselage's axis
     for s in (-1, 1):
-        f += slab([(s * 3.0, -0.6, 4.0), (s * 11.2, -1.6, -4.0), (s * 11.2, -1.6, -6.2),
-                   (s * 3.0, -0.6, -6.2)], 1.6)
-        # wingtip fins
-        f += fin([(s * 11.4, -4.2, -6.6), (s * 11.4, 2.4, -6.6), (s * 11.4, 2.4, -5.0),
-                  (s * 11.4, -4.2, -3.0)], 2.2, "trim")
-        # engine pods under the wing roots: their exhausts glow
-        f += loft([(-8, octagon(2.8, 2.6, -3.0)), (-1, octagon(2.8, 2.6, -3.0)),
-                   (1, octagon(1.2, 1.2, -3.0))], "trim", caps=("trim", "trim"), dx=s * 4.6)
-    # tail fin
-    f += fin([(0, 2.4, -7.0), (0, 9.4, -7.6), (0, 9.4, -5.6), (0, 2.4, -1.0)], 2.2)
+        f += slab([(s * 3.0, 0.0, 4.0), (s * 11.2, 0.0, -4.0), (s * 11.2, 0.0, -6.2),
+                   (s * 3.0, 0.0, -6.2)], 1.6)
+        # wingtip fins, as tall above the wing as below
+        f += fin([(s * 11.4, -3.3, -6.6), (s * 11.4, 3.3, -6.6), (s * 11.4, 3.3, -4.0),
+                  (s * 11.4, -3.3, -4.0)], 2.2, "trim")
+        # engine pods through the wing roots
+        f += loft([(-8, octagon(2.8, 3.2)), (-1, octagon(2.8, 3.2)),
+                   (1, octagon(1.2, 1.2))], "trim", caps=("trim", "trim"), dx=s * 4.6)
+    # tail fin and a matching ventral fin: the ship is nearly symmetric top
+    # to bottom, so climbing and diving views mirror each other
+    for v in (1, -1):
+        f += fin([(0, v * 2.4, -7.0), (0, v * 8.4, -7.6), (0, v * 8.4, -5.6),
+                  (0, v * 2.4, -1.0)], 2.2)
     return f
 
 LIGHT = (-0.45, 0.75, -0.5)            # toward the light: up, left, behind us
@@ -160,7 +163,7 @@ def render(roll, pitch, scale=0.96):
 # attitudes: level, up, down, left, right, left-up, left-down, right-up,
 # right-down (roll / pitch signs; the angles below)
 ATT = [(0, 0), (0, 1), (0, -1), (-1, 0), (1, 0), (-1, 1), (-1, -1), (1, 1), (1, -1)]
-R, P = 25, 22
+R, P = 25, 30
 
 def sprite(roll, pitch):
     """63 sprite bytes + 1 pad for one attitude (degrees)."""
