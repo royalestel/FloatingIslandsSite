@@ -81,9 +81,6 @@ VICBANK   = $8000
 SPRBUF    = VICBANK + $0000
 SPRPTR    = VICBANK + $0400 + $03f8
 IDLEBYTE  = VICBANK + $3fff
-PEXP      = VICBANK + $0800 ; pre-expanded colour lists (RAM the VIC doesn't use)
-PCLIP     = PEXP + 16*PXBLK ;   and the near clip's
-        .assert PCLIP + 16*CLIPH <= IDLEBYTE, error, "colour lists reach the idle byte"
 SPRX      = 184 - 12    ; ball centred on the screen
 SPRY      = CENTRE - 11
 
@@ -161,7 +158,6 @@ m1:      .res 1                 ; multiplier
 pnp:     .res 2                 ; merge: nearest / farther column pointers
 pfp:     .res 2
 fcl:     .res 1                 ; near-clip rows
-pxs:     .res 2                 ; preexp: palette-level colours
 zp5:     .res 2*SEGS            ; merge: the nearest bar's five columns from
 np:      .res 2*SEGS            ;   line cD / from their start, the farther
 fp:      .res 2*SEGS            ;   bar's (offset to match)
@@ -235,7 +231,6 @@ start:  sei
         dex
         bne @col
         sta $dc02               ; CIA1 port A all inputs: the joystick only
-        jsr preexp
         lda #8                  ; level
         sta rolli
         ldx #NSLOT-1            ; stagger the bars along their flight
@@ -285,77 +280,6 @@ main:   lda frameflag           ; the top IRQ has swapped in the last frame
         jmp main
 
 nmi:    rti
-
-; -----------------------------------------------------------------------------
-;  preexp: at start-up, every palette-level's colours expanded to every bar
-;  height HMIN..HMAX (nnmap: source row and even / odd line per row), one
-;  after the other from PEXP; then the near clip's lists (clipmap) at PCLIP.
-; -----------------------------------------------------------------------------
-.proc preexp
-        lda #<PEXP
-        sta t0
-        lda #>PEXP
-        sta t0+1
-        lda #0
-        sta acc                 ; palette * 4 + level
-pl:     ldx acc
-        lda pdl,x
-        sta pxs
-        lda pdh,x
-        sta pxs+1
-        lda #HMIN
-        sta hh
-hl:     ldx hh
-        lda nnml,x
-        sta rsp
-        lda nnmh,x
-        sta rsp+1
-        jsr one
-        inc hh
-        lda hh
-        cmp #HMAX + 1
-        bne hl
-        inc acc
-        lda acc
-        cmp #16
-        bne pl
-        lda #0                  ; the near clip's: same, with clipmap
-        sta acc
-cl:     ldx acc
-        lda pdl,x
-        sta pxs
-        lda pdh,x
-        sta pxs+1
-        lda #<clipmap
-        sta rsp
-        lda #>clipmap
-        sta rsp+1
-        lda #CLIPH
-        sta hh
-        jsr one
-        inc acc
-        lda acc
-        cmp #16
-        bne cl
-        rts
-one:    ldy #0                  ; hh rows to t0, then t0 += hh
-:       lda (rsp),y
-        sty si
-        tay
-        lda (pxs),y
-        ldy si
-        sta (t0),y
-        iny
-        cpy hh
-        bne :-
-        tya
-        clc
-        adc t0
-        sta t0
-        bcc :+
-        inc t0+1
-:       rts
-.endproc
 
 ; -----------------------------------------------------------------------------
 ;  respawn slot x: far away, at the ship's height plus the next spawn
@@ -707,9 +631,9 @@ clear:
         ; ---- flight state --------------------------------------------------
         ldx s
         ldy st,x
-        lda fh,y
+        lda flyh,y              ; (profiled from true perspective)
         sta h
-        lda flev,y
+        lda flylev,y
         sta lev
         lda fdz,y
         sta dz
@@ -818,27 +742,32 @@ sdy:    jsr atan2
         sta spe_op
         sta phi
 
-        ; ---- its colours, pre-expanded for this palette, level and height --
+        ; ---- its colours: the profiled list for its palette and flight frame
+        ; (flyprof.inc: decimated true-perspective renders, the dimming by
+        ; distance and the shadow past the ship included) ------------------
         ldx s
-        lda spal,x
-        asl
-        asl
-        adc lev
-        tax                     ; palette * 4 + level
+        ldy spal,x
         lda fcl
         beq :+
-        lda pclbl,x             ; near clip: the cut list
+        lda flcll,y             ; near clip: the cut list
         sta exs_op
-        lda pclbh,x
+        lda flclh,y
         sta exs_op+1
         jmp :++
-:       ldy h
-        lda pxbl,x
-        clc
-        adc hoffl,y
+:       lda flpll,y             ; that palette's list addresses
+        sta pl_op
+        lda flplh,y
+        sta pl_op+1
+        lda flphl,y
+        sta ph_op
+        lda flphh,y
+        sta ph_op+1
+        ldy st,x
+pl_op = * + 1
+        lda $ffff,y
         sta exs_op
-        lda pxbh,x
-        adc hoffh,y
+ph_op = * + 1
+        lda $ffff,y
         sta exs_op+1
 :
 
@@ -1655,32 +1584,15 @@ rsl:    .repeat 49, HH
 rsh:    .repeat 49, HH
         .byte >(rowstart + HH*25)
         .endrep
-pxbl:   .repeat 16, P               ; pre-expanded lists, per palette * 4 + level
-        .byte <(PEXP + P*PXBLK)
-        .endrep
-pxbh:   .repeat 16, P
-        .byte >(PEXP + P*PXBLK)
-        .endrep
-pclbl:  .repeat 16, P
-        .byte <(PCLIP + P*CLIPH)
-        .endrep
-pclbh:  .repeat 16, P
-        .byte >(PCLIP + P*CLIPH)
-        .endrep
-pdl:    .repeat 16, P               ; palette * 4 + level
-        .byte <(pdim64 + P*64)
-        .endrep
-pdh:    .repeat 16, P
-        .byte >(pdim64 + P*64)
-        .endrep
-nnml:   .byte 0
-        .repeat 48, HH
-        .byte <(nnmap + (HH + 1)*HH/2)
-        .endrep
-nnmh:   .byte 0
-        .repeat 48, HH
-        .byte >(nnmap + (HH + 1)*HH/2)
-        .endrep
+; the profiled colour lists, per palette: where its address tables are,
+; and its near-clip list
+flpll:  .lobytes flpl0, flpl1, flpl2, flpl3
+flplh:  .hibytes flpl0, flpl1, flpl2, flpl3
+flphl:  .lobytes flph0, flph1, flph2, flph3
+flphh:  .hibytes flph0, flph1, flph2, flph3
+flcll:  .lobytes flclip0, flclip1, flclip2, flclip3
+flclh:  .hibytes flclip0, flclip1, flclip2, flclip3
+        .include "flyprof.inc"  ; profiled heights, highlight levels, colours
 ; per slot: its loops' entries
 n1lo:   .lobytes n1_0, n1_1, n1_2
 n1hi:   .hibytes n1_0, n1_1, n1_2

@@ -405,6 +405,19 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   the screen centre, and 11 off the centre line, up to 200 units away
   (17 lines out when they appear). Bars above and below make a forest to
   fly through.
+* **Bar sizes and colours come from a true-perspective profile**
+  (`flyby3d.py`, below, writes `flyprof.inc`):
+  * Each bar's height per flight frame is its decimated height in a
+    true-perspective render (`flyh`).
+  * Its colours per flight frame are the decimated render's rows, one
+    list per palette per frame: 430 distinct lists, 6.5 KB. Each list
+    includes the dimming: dim far away, full just in front of the ship,
+    then quickly into shadow past it.
+  * The 12-colour palettes get true in-between colours instead of line
+    dithering.
+  * The raster-split highlight is drawn on top as before. Its brightness
+    level follows the same brightness curve (`flylev`), so a bar in the
+    ship's shadow gets a dim highlight.
 * **Collision course.** A bar covers the screen centre exactly when its
   height is within half its thickness (24 units) of the ship's, at any
   distance. While any bar ahead does, the ship's palette changes:
@@ -420,16 +433,14 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   so almost every frame merges bars, often all three. Three things keep
   that inside the frame:
   * A light-angle table bounds the highlight loop to the lit rows.
-  * Colours come pre-expanded. At start-up the program expands every
-    palette and distance level to every bar height (4 to 40 rows) into
-    13 KB at $8800, RAM in the VIC bank that the VIC doesn't use. A bar's
-    rows are then a straight copy: `lda list,y`, 3 stores, `dey / bpl`.
+  * Colours come ready-made: the profiled list for the bar's palette and
+    flight frame is a straight copy (`lda list,y`, 3 stores, `dey / bpl`).
   * Only 3 columns per bar. All bars share the tilt and the highlight is
     symmetric, so segments 0 and 4 read one column and 1 and 3 another,
     each at its own tilt offset. Expansion, highlight and merge copies
     write 3 columns instead of 5. A row costs 24 cycles instead of 43.
-  * The near clip has its own pre-expanded lists, with the cut rows black,
-    so it costs nothing extra.
+  * The near clip has its own profiled lists, with the cut rows black, so
+    it costs nothing extra.
   * All bars share one tilt, so a farther bar's rows sit at the same
     offset in every column. Copying them and blacking around the nearest
     bar both handle all five columns at once.
@@ -438,17 +449,57 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
 * **Simulator.** `sim_goldship.py` flies with an autopilot on `$dc00`. It
   dives or climbs away from the nearest bar on a collision course. Every
   200 frames it also rolls fully left, levels out, and rolls fully right.
-  The preview's still frames are at full roll. It runs the program's own display code
-  for every block, and over 3000 frames found:
+  The preview's still frames are at full roll. It runs the program's own
+  display code for every block, and over 3000 frames found:
   * Every row takes 63 cycles, or 58 on the sprite's lines.
   * Every displayed cell shows the nearest bar covering it.
   * The worst frame uses 79% of the free time, leaving at least 2,600
-    cycles (about 42 raster lines) of each frame spare; the median frame
-    has 6,600.
-  * The display is identical to the 5-column version, frame by frame.
+    cycles (about 42 raster lines) of each frame spare.
+  * Every bar row holds its profiled colour, or a highlight drawn over it.
 
   As in goldfly, the sprite DMA timing (`STEAL`, `BAND0/1`) needs checking
   in VICE.
+
+## FLYBY3D: profiling the bars in true perspective
+
+`flyby3d.py` renders GOLDSHIP's scene for real and decimates it to the C64.
+The profile it takes is what the game's bar sizes and colours are built
+from.
+
+```sh
+python3 flyby3d.py     # preview_flyby.gif, preview_flyby_profile.png,
+                       # flyby_sizes.txt, flyprof.inc
+python3 flyby_spec.py  # preview_flyby_spec*.png / .gif: the highlight
+```
+
+* **The scene.** The camera's focal length is 200 lines, which makes the
+  game's `48/Z` and `Y/Z` exact: bars are 0.24 m thick and Y units are
+  1/200 m.
+  * The ship (`ship3d.py`'s model) sits at Z = 3, its wingspan 24
+    pixels.
+  * Cylinders of radius 0.12 m fly from Z = 12 (4 rows tall) to 1.2 over
+    240 frames.
+  * Each cylinder is painted in 48 bands: its palette's colours with
+    in-between colours mixed in RGB.
+  * Brightness depends on distance only: 25% far away, full just in front
+    of the ship, 30% within 0.8 m past it.
+* **Rendering.** Each frame is rendered at 4 x 4 samples per C64 pixel
+  (ray-cylinder intersections, the ship z-buffered), then averaged and
+  matched to the nearest C64 colour.
+* **The profile.** For each palette and flight frame, the decimated rows
+  of a bar on the screen's middle column. A bar's row count depends on
+  where it sits within a line, so each frame is sampled at 8 sub-line
+  positions and the heights averaged.
+  * `flyby_sizes.txt` counts the frames a bar spends at each height,
+    against the game's old `round(48/Z)`. True perspective leaves 4 rows
+    sooner (16 frames instead of 30), and above 8 rows the counts agree
+    within one frame.
+* **The highlight** (`flyby_spec.py`) is compared with a ground truth:
+  the bars as perfect mirrors of the light on the nose, plus a modest
+  bloom.
+  * The game's highlight sits where the true one does.
+  * The true one shows on the C64 only in the last stretch before the
+    ship.
 
 ## Tuning notes
 
