@@ -27,7 +27,8 @@ Decimation: 4 x 4 samples per C64 pixel are averaged and matched to the
 nearest C64 colour (VICE palette, a perceptual "redmean" distance).
 
     python3 flyby3d.py            # writes preview_flyby.gif,
-                                  # preview_flyby_profile.png, flyprof.inc
+                                  # preview_flyby_profile.png, flyprof.inc,
+                                  # flyby_sizes.txt (frames at each height)
 """
 import math, os
 import numpy as np
@@ -181,23 +182,32 @@ def decimate(img):
     return to_c64(avg)
 
 # ---- the profile: one bar on the centre line, per palette and frame --------
-def profile(yc=0.0):
-    """For each palette and flight frame t: the decimated rows (top to
-    bottom) of a bar at height yc, in the screen's middle column."""
+def column(dx, dy, yc, z, cols):
+    """The decimated rows (top to bottom) of one bar in the sampled column."""
+    zz, c = cylinder(dx, dy, yc, z, cols, bright(z))
+    hit = np.isfinite(zz)
+    c = np.where(hit[..., None], c, 0.0)
+    cov = hit.reshape(H, SS, -1).mean(axis=(1, 2))
+    avg = c.reshape(H, SS, -1, 3).sum(axis=(1, 2)) / hit[0].size / SS
+    idx = to_c64(avg)
+    return [int(idx[r]) for r in range(H) if cov[r] >= 0.5]
+
+def profile(yc=0.0, shifts=8):
+    """For each palette and flight frame t: the decimated rows of a bar at
+    height yc, in the screen's middle column.  A bar's row count depends on
+    where it sits within a line, so each frame is sampled at `shifts`
+    sub-line positions; the height is their average, rounded, and the
+    colours are those of a position giving that height."""
     dx, dy = rays(cols=[W // 2])
     out = {}
     for name, pal in PALETTES:
         cols = bands48(pal)
         lists = []
         for t in range(FLYD):
-            z, c = cylinder(dx, dy, yc, zof(t), cols, bright(zof(t)))
-            hit = np.isfinite(z)
-            c = np.where(hit[..., None], c, 0.0)
-            cov = hit.reshape(H, SS, SS).mean(axis=(1, 2))
-            avg = c.reshape(H, SS, SS, 3).sum(axis=(1, 2)) / (SS * SS)
-            idx = to_c64(avg)
-            rows = [int(idx[r]) for r in range(H) if cov[r] >= 0.5]
-            lists.append(rows)
+            z = zof(t)
+            cand = [column(dx, dy, yc + k / shifts * z / F, z, cols) for k in range(shifts)]
+            h = int(round(sum(len(c) for c in cand) / shifts))
+            lists.append(min(cand, key=lambda c: (abs(len(c) - h), cand.index(c))))
         out[name] = lists
     return out
 
@@ -311,6 +321,32 @@ def report(path, prof, game, fh, prof_off):
     dr.text((130, y0 + 58), "decimated rows (profiled)", fill=(140, 255, 140), font=small)
     im.save(path)
 
+def size_counts(heights):
+    """{height: frames spent at it} over a flight."""
+    c = {}
+    for h in heights:
+        c[h] = c.get(h, 0) + 1
+    return c
+
+def size_report(path, fh, prof, prof_off):
+    """Frames a bar spends at each size on screen: the game now, and the
+    decimated true-perspective bar on the centre line and 0.5 m off it."""
+    now = size_counts(fh)
+    cen = size_counts([len(r) for r in prof["gold"]])
+    off = size_counts([len(r) for r in prof_off["gold"]])
+    hs = sorted(set(now) | set(cen) | set(off))
+    lines = ["Frames a bar spends at each height (rows) over its 240-frame flight",
+             "(Z = 12 -> 1.2 m at constant speed; ship at Z = 3, from frame %d)."
+             % next(t for t in range(FLYD) if zof(t) < ZS), "",
+             "height | game now (48/Z) | profiled, centre line | profiled, 0.5 m off centre",
+             "------ | --------------- | --------------------- | -------------------------"]
+    for h in hs:
+        lines.append(f"{h:6d} | {now.get(h, 0):15d} | {cen.get(h, 0):21d} | {off.get(h, 0):25d}")
+    lines.append(f"{'total':>6} | {sum(now.values()):15d} | {sum(cen.values()):21d} | {sum(off.values()):25d}")
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    return lines
+
 def tables(path, prof):
     """Cached colour tables from the profile: per palette, one list per flight
     frame (identical lists shared)."""
@@ -331,6 +367,9 @@ def tables(path, prof):
         for i in range(0, len(vals), 16):
             out.append("        .byte " + ",".join(f"${v & 255:02x}" for v in vals[i:i + 16]))
     emit("fllen", [n for _, n in addr])
+    # the bar-size animation to match: the profiled height per flight frame
+    # (centre line), like fly.inc's fh
+    emit("flyh", [len(r) for r in prof["gold"]])
     out.append("flpl:")
     for i in range(0, len(addr), 8):
         out.append("        .lobytes " + ",".join(f"flcol+{a}" for a, _ in addr[i:i + 8]))
@@ -348,6 +387,8 @@ if __name__ == "__main__":
     game, fh = game_lists()
     nbytes, nlists = tables(os.path.join(HERE, "flyprof.inc"), prof)
     report(os.path.join(HERE, "preview_flyby_profile.png"), prof, game, fh, prof_off)
+    for ln in size_report(os.path.join(HERE, "flyby_sizes.txt"), fh, prof, prof_off):
+        print(ln)
     animation(os.path.join(HERE, "preview_flyby.gif"))
     d0 = [len(r) for r in prof["gold"]]
     d5 = [len(r) for r in prof_off["gold"]]
