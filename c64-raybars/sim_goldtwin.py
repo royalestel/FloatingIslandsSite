@@ -183,7 +183,7 @@ def render(y, ga, gb, ly, lx, spr):
 imgs = [render(*fr[:6]) for fr in frames[::3]]
 imgs[0].save(os.path.join(HERE, "preview_goldtwin.gif"), save_all=True,
              append_images=imgs[1:], duration=50, loop=0)
-picks = (0, 60, 120, 170, 196, 210)
+picks = (0, 100, 170, 216, 217, 218)
 sheet = Image.new("RGB", (W * SCALE * 3, H * SCALE * 2))
 for i, n in enumerate(picks):
     sheet.paste(render(*frames[n][:6]), ((i % 3) * W * SCALE, (i // 3) * H * SCALE))

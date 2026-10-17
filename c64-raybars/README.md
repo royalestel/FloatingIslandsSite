@@ -223,8 +223,9 @@ python3 sim_goldtwin.py      # needs -g -Ln goldtwin.lbl; renders preview_goldtw
   * full colour from about the top bar's size (22 lines)
 
   The traced highlight is dimmed the same way.
-* **Near-clip.** At the camera, rows are cut from the middle outward (the
-  nearest part first) over 20 frames, then there's a short black pause.
+* **Near-clip.** At the camera it near-clips in two frames: the middle 32
+  of its 48 rows (the nearest part) vanish, then the rest. Then there's a
+  short black pause.
 * **Shared motion and light.** It tilts with the top bar and reflects the
   same orbiting light. Its scene depth runs from 90 behind the light's orbit
   plane to 75 in front of it. Once bar B is nearer the camera than the

@@ -269,16 +269,17 @@ with open(os.path.join(here, "orbit.inc"), "w") as f:
 print("wrote orbit.inc")
 
 # --- goldtwin.s: the approaching bar ------------------------------------------
-# 256-frame cycle.  t 0..199: depth z goes 6 -> 1, height H = 48/z (8 -> 48).
-# t 200..219: near-clip, c = rows cut from the centre outward (1 -> 24).
+# 256-frame cycle.  t 0..217: depth z goes 6 -> 1, height H = 48/z (8 -> 48).
+# t 218, 219: near-clip in two frames: the middle 32 rows go, then the rest
+# (c = rows cut each side of the centre).
 # t 220..255: nothing.  Brightness level 3 (darkest) .. 0 (full) from H.
 bh, bclip, blev, bzoff = [], [], [], []
 for t in range(256):
-    if t < 200:
-        z = 6 - 5 * t / 199
+    if t < 218:
+        z = 6 - 5 * t / 217
         h, c = int(round(48 / z)), 0
     elif t < 220:
-        z, h, c = 1, 48, int(round((t - 199) / 20 * 24))
+        z, h, c = 1, 48, (16, 24)[t - 218]
     else:
         z, h, c = 1, 0, 0
     bh.append(h)

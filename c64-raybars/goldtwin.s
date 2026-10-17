@@ -16,9 +16,9 @@
 ;     first, yellow shows as brown and white as dark grey; then yellow as
 ;     orange and white as light grey; full colour from about bar A's size.
 ;     The traced highlight is dimmed the same way.
-;   * At the camera it near-clips: the near plane cuts it from the middle
-;     outward (the nearest part first) until only black is left; then a
-;     short pause and it comes again.
+;   * At the camera it near-clips in two frames: the large middle section
+;     (the nearest part) vanishes, then the rest; a short pause and it
+;     comes again.
 ;   * It tilts with bar A and reflects the same orbiting light, seen from
 ;     its own depth.
 ;
