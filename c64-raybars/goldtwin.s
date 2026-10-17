@@ -38,19 +38,20 @@
 
         .setcpu "6502"
 
-ROWS      = 29          ; bar A display rows: 24 lines + 4 lines of slant + 1
-ROWSB     = 52          ; bar B display rows: 48 lines + 4 lines of slant
+ROWS      = 33          ; bar A display rows: 24 lines + 8 lines of slant + 1
+ROWSB     = 56          ; bar B display rows: 48 lines + 8 lines of slant
 SEGS      = 5           ; horizontal segments per row
 SEGSIZE   = 8           ; bytes per segment: lda #c (2) sta $d020 (3) sta $d021 (3)
 PADSIZE   = 7           ; bytes of padding per row
 ROWSIZE   = SEGS*SEGSIZE + PADSIZE  ; 47 bytes, both bars
 BARH      = 24          ; gold lines
 BMAX      = 48          ; bar B's largest height
-PAD       = 6           ; black rows above and below the gold
+PAD       = 8           ; black rows above and below the gold (>= max slant)
+COLLEN    = 2*PAD + BARH        ; bar A column length
 YBASE     = 140         ; raster line of bar A's top row when centred
-BARMID    = 14          ; bar A centre, in rows below its top row
-BTOP      = 229         ; raster line of bar B's first display row
-BCENTRE   = BTOP + 2 + BMAX/2   ; bar B's centre line
+BARMID    = 16          ; bar A centre, in rows below its top row
+BTOP      = 231         ; raster line of bar B's first display row
+BCENTRE   = BTOP + 4 + BMAX/2   ; bar B's centre line
 DENLINE   = 44          ; top IRQ: clear DEN before raster line $30
 HTUNE     = 0           ; extra NOPs to line the first split up with hblank
 .ifndef STEAL
@@ -175,10 +176,13 @@ start:  sei
 @zp:    sta $02,x
         dex
         bpl @zp
-        ldx #(2*PAD+BARH)*SEGS-1        ; clear bar A's columns
+        ldx #COLLEN*SEGS-1      ; clear bar A's columns (both halves)
 @col:   sta cols,x
+        sta cols + COLLEN*SEGS,x
         dex
-        bpl @col
+        bne @col
+        sta cols
+        sta cols + COLLEN*SEGS
         ldx #BCOLSIZE-1                 ; and bar B's
 @colb:  sta bcol,x
         dex
@@ -287,7 +291,7 @@ done:   rts
         sta y0
         ldy tilt
         .repeat ::SEGS, K
-        lda .ident(.sprintf("lkbase%d", K)),y
+        lda .ident(.sprintf("tkbase%d", K)),y
         sta kb+K
         .endrep
 
@@ -361,8 +365,8 @@ spe_op = * + 1
         jmp lit
 dark:   lda gold,y              ; no highlight anywhere on this line
         .repeat ::SEGS, K
-        sta cols + (2*K)*36 + ::PAD,y
-        sta cols + (2*K+1)*36 + ::PAD,y
+        sta cols + (2*K)*::COLLEN + ::PAD,y
+        sta cols + (2*K+1)*::COLLEN + ::PAD,y
         .endrep
         dey
         bmi :+
@@ -375,13 +379,13 @@ lit:    sta sb
         lda #1                  ; white (flags from cmp kept)
         bcs :+
         lda gold,y
-:       sta cols + (2*K)*36 + ::PAD,y
+:       sta cols + (2*K)*::COLLEN + ::PAD,y
         lda sb
         cmp thr1+K
         lda #1
         bcs :+
         lda gold,y
-:       sta cols + (2*K+1)*36 + ::PAD,y
+:       sta cols + (2*K+1)*::COLLEN + ::PAD,y
         .endrep
         dey
         bmi patch
@@ -392,7 +396,7 @@ patch:
         .repeat ::SEGS, K
         ldx kb+K
           .repeat ::ROWS, RR
-        lda cols + (2*K + (RR .mod 2))*36 + RR,x
+        lda cols + (2*K + (RR .mod 2))*::COLLEN + RR,x
         sta block + RR*::ROWSIZE + K*::SEGSIZE + 1
           .endrep
         .endrep
@@ -464,9 +468,9 @@ setdst: sta dst+1
         inx
         cpx #::SEGS-1
         bne :-
-:       lda #6
+:       lda #::PAD
         sec
-        sbc kb,x                ; off = 6 - kb
+        sbc kb,x                ; off = PAD - kb
         clc
         adc y0
         sec
@@ -906,7 +910,7 @@ blockbend:
 .segment "TABLES"
 
         .include "tables.inc"   ; spectab etc. (page aligned, see gen_tables)
-        .include "light.inc"    ; lkbase0..4, lx4tab
+        .include "light.inc"    ; lx4tab
         .include "orbit.inc"    ; orby, orbz, orbsize, balls
         .include "twin.inc"     ; bar B: height, clip, brightness, depth, steps
         .assert <spectab = 0, error, "spectab must be page aligned"
@@ -936,11 +940,11 @@ rowhi:  .repeat ROWSB, RR
 
 ; =============================================================================
 .segment "BSS"
-; Bar A: 2 columns per segment (even / odd display rows), 36 entries each:
-; 6 black, 24 gold-or-white, 6 black.
-cols:   .res 2*SEGS*(2*PAD+BARH)
-; Bar B: one column: 6 black, up to 48 bar rows, black after.
-BCOLSIZE = PAD + ROWSB + 6
+; Bar A: 2 columns per segment (even / odd display rows), COLLEN entries
+; each: PAD black, 24 gold-or-white, PAD black.
+cols:   .res 2*SEGS*COLLEN
+; Bar B: one column: PAD black, up to 48 bar rows, black after.
+BCOLSIZE = PAD + ROWSB + 2
 bcol:   .res BCOLSIZE
 srccol: .res BARH               ; bar B's 24 source lines, dimmed
 specb:  .res BARH               ; ... and their specular levels

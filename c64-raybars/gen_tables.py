@@ -298,6 +298,16 @@ for name, data in (("bhtab", bh), ("bcliptab", bclip), ("blevtab", blev),
     out.append(f"{name}:")
     for i in range(0, len(data), 16):
         out.append("        .byte " + ",".join(f"${b:02x}" for b in data[i:i + 16]))
+# goldtwin's steeper tilt: neighbouring segments up to 2 lines apart.
+# off_k = round(4 + (k - 2) * 2 * sin(tilt)), 0..8; stored as 8 - off_k.
+for k in range(5):
+    col = []
+    for a in range(256):
+        off = int(math.floor(4 + (k - 2) * 2 * math.sin(rad(a)) + 0.5))
+        col.append(8 - max(0, min(8, off)))
+    out.append(f"tkbase{k}:")
+    for i in range(0, 256, 16):
+        out.append("        .byte " + ",".join(f"${b:02x}" for b in col[i:i + 16]))
 with open(os.path.join(here, "twin.inc"), "w") as f:
     f.write("\n".join(out) + "\n")
 print("wrote twin.inc")

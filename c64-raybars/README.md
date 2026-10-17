@@ -209,6 +209,12 @@ cl65 -t none -C raybars.cfg -o goldtwin.prg goldtwin.s
 python3 sim_goldtwin.py      # needs -g -Ln goldtwin.lbl; renders preview_goldtwin.gif
 ```
 
+* **Steeper tilt.** Neighbouring segments can be up to 2 lines apart:
+  `off_k = round(4 + (k - 2) * 2 * sin(tilt))`, 0..8 across the 5
+  segments. The padding grows to 8 black rows, bar A to 33 display rows
+  and bar B to 56. Bar B starts at line 231 so the ball, now reaching line
+  228, still never touches it. Bar B's last row is line 286, at the bottom
+  edge of PAL's visible area.
 * **Perspective.** The bar's depth z goes linearly from 6 to 1, and its
   height on screen is 48/z. It appears 8 lines tall, speeds up as it
   nears, and reaches 48 lines.
@@ -240,11 +246,11 @@ python3 sim_goldtwin.py      # needs -g -Ln goldtwin.lbl; renders preview_goldtw
   line feeds each row, and only lit rows are visited. The white is written
   straight into bar B's speedcode through a table of row addresses.
 * **Main loop instead of IRQs.** The interrupts only draw: the badline
-  trick at line 44, bar A, and bar B from line 229. The main loop starts
+  trick at line 44, bar A, and bar B from line 231. The main loop starts
   the next sprite and bar A as soon as bar A has been drawn (bar B's IRQ
   cuts in), and the next bar B once bar B has been drawn. Worst cases are
-  18% (sprite, before line 44), 56% (bar A, before its IRQ) and 74% (bar B,
-  before line 227) of each deadline window.
+  18% (sprite, before line 44), 60% (bar A, before its IRQ) and 81% (bar B,
+  before line 229) of each deadline window.
 * **No timing patch for bar B.** The ball never goes below line 226, so it
   never steals cycles inside bar B.
 * **VIC bank 2.** The program outgrew VIC bank 0's free space, so the VIC

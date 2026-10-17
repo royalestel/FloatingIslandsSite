@@ -15,10 +15,10 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = 512
-ROWS, ROWSB, SEGS, SEGSIZE, ROWSIZE = 29, 52, 5, 8, 47
+ROWS, ROWSB, SEGS, SEGSIZE, ROWSIZE = 33, 56, 5, 8, 47
 BMAXROWS = 48
-SEGW, DENLINE, STEAL, BTOP = 80, 44, 4, 229
-TOP, BOTTOM = 50, 290
+SEGW, DENLINE, STEAL, BTOP = 80, 44, 4, 231
+TOP, BOTTOM = 50, 300
 OP_BCS, OP_BCC = 0xB0, 0x90
 LINE = 63
 IRQTOP_LINES = 6                # top IRQ: line 44 until DEN is back at 49
@@ -138,7 +138,7 @@ front, behind = [], []
 for fr in frames:
     gb, bh, dzb, hl = fr[2], fr[6], fr[9], fr[10]
     if bh >= 8 and hl:
-        top = (BMAXROWS - bh) // 2
+        top = (BMAXROWS - bh) // 2 + 4   # + the average slant offset
         c = sum((r - top) / bh for r, k in hl) / len(hl)
         (front if dzb > 0 else behind).append(c)
 print(f"bar B highlight centre (0 = top, 1 = bottom): light in front of it "
