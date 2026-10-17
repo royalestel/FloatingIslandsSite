@@ -24,9 +24,10 @@
 ;
 ;  ORGANISATION
 ;  The interrupts only draw: the top IRQ (the badline trick), bar A, bar B.
-;  The main loop computes the next frame after bar B, in deadline order:
-;  the sprite (needed at line DENLINE), bar A (needed before bar A's IRQ),
-;  then bar B (needed before line BTOP-2).  The sprite never comes below
+;  The main loop builds the next sprite and bar A as soon as bar A has
+;  been drawn (bar B's IRQ cuts in), and the next bar B once bar B has been
+;  drawn: the sprite is ready by line DENLINE, bar A before its IRQ, bar B
+;  before line BTOP-2.  The sprite never comes below
 ;  line 226, so it never steals cycles inside bar B, which therefore needs
 ;  no timing patch.
 ;
@@ -99,7 +100,7 @@ tilt:    .res 1         ; see-saw angle (both bars)
 lxa:     .res 1         ; light sideways drift angle
 q:       .res 1         ; light orbit angle
 fcount:  .res 1         ; frame counter
-frame:   .res 1         ; set by bar B's IRQ: time to build the next frame
+frame:   .res 1         ; set by bar A's IRQ: time to build the next sprite + bar A
 y0:      .res 1         ; raster line of bar A's top row (next frame)
 ly:      .res 1         ; sprite Y register (next frame)
 lx4:     .res 1         ; sprite X register / 4 (next frame)
@@ -121,6 +122,12 @@ bidx:    .res 1         ; bar B's first row in bcol
 jlo:     .res 1         ; rows jlo..jhi-1 are near-clipped
 jhi:     .res 1
 acc:     .res 1         ; nearest-neighbour source row, fraction
+bthr:    .res SEGS      ; bar B: white if the spec level >= bthr
+minthr:  .res 1         ; the lowest of those
+wcol:    .res 1         ; the highlight's white, dimmed for bar B's distance
+clo:     .res 1         ; near-clip zone, in bcol positions
+chi:     .res 1
+frameb:  .res 1         ; set by bar B's IRQ: time to build bar B
 save_a:  .res 1
 save_x:  .res 1
 save_y:  .res 1
@@ -198,12 +205,16 @@ start:  sei
         jsr updateb
         cli
 
-main:   lda frame               ; wait until bar B has been drawn
-        beq main
+main:   lda frame               ; bar A has been drawn: build the next
+        beq main                ; sprite and bar A (bar B's IRQ may cut in)
         lda #0
         sta frame
-        jsr update              ; sprite + bar A: needed first
-        jsr updateb             ; bar B: needed last
+        jsr update
+:       lda frameb              ; bar B has been drawn: build the next bar B
+        beq :-
+        lda #0
+        sta frameb
+        jsr updateb
         jmp main
 
 nmi:    rti                     ; RESTORE key does nothing
@@ -325,6 +336,7 @@ done:   rts
         sta thr0+K
         adc #2
         sta thr1+K
+        sta bthr+K              ; bar B: solid white from drop + 3
         .endrep
         lda y0
         and #1
@@ -548,12 +560,18 @@ nextrow:
         clc
         adc #1
         sta dy                  ; light - bar B: negative (above)
-        ; depth: bar B sits further back, by bzoff
+        ; depth: light z - bar B z.  Bar B comes from 90 behind the light's
+        ; orbit plane to 75 in front of it; once it is nearer the camera
+        ; than the light, dz < 0 and the highlight rides to the top rows.
         lda ldz
         clc
         adc bzofftab,y
         bvc :+
-        lda #127                ; clamp (only positive overflow is possible)
+        lda bzofftab,y          ; overflow: clamp toward the offset's sign
+        bmi neg
+        lda #127
+        bne :+
+neg:    lda #$81
 :       sta dz
         jsr atan2
         eor #$ff
@@ -561,21 +579,24 @@ nextrow:
         adc #1
         sta bspe_op
 
-        ; ---- colour the 24 source lines: highlight, then distance dimming ----
+        ; ---- the 24 source lines: specular level, dimmed gold ---------------
+        ; (the highlight is laid on per segment afterwards, see overlay)
         ldy #::BARH-1
 sl:     ldx theta2,y
 bspe_op = * + 1
         lda spectab,x
-        cmp #3                  ; highlight: white
-        lda #1
-        bcs :+
-        lda gold,y
-:       tax
+        sta specb,y
+        ldx gold,y
 dim_op = * + 1
         lda dims,x              ; dimmed by distance
         sta srccol,y
         dey
         bpl sl
+        lda dim_op              ; the highlight's white, dimmed the same way
+        ora #1
+        tax
+        lda dims,x
+        sta wcol
 
         ; ---- nearest-neighbour expand to bh rows ---------------------------
         ; row j shows source line acc.hi; acc += 24/bh (8.8) per row
@@ -601,6 +622,8 @@ dim_op = * + 1
         clc                     ; stays clear: acc.hi never passes 24
 el:     lda srccol,y            ; 4
         sta bcol,x              ; 5
+        tya                     ; 2
+        sta rsrc,x              ; 5   which source line this row shows
         inx                     ; 2
         lda acc                 ; 3
 steplo_op = * + 1
@@ -612,18 +635,23 @@ stephi_op = * + 1
         tay                     ; 2
 end_op = * + 1
         cpx #0                  ; 2   (carry: x < end, so clear)
-        bne el                  ; 3   = 30 cycles per row
+        bne el                  ; 3   = 37 cycles per row
 
         ; ---- near-clip: rows jlo..jhi-1 go black -------------------------------
+        lda bidx                ; clip zone in bcol positions, for the overlay
+        clc
+        adc jlo
+        sta clo
+        lda bidx
+        clc
+        adc jhi
+        sta chi
         lda jhi
         sec
         sbc jlo
         beq patchb
         tay                     ; how many
-        lda bidx
-        clc
-        adc jlo
-        tax
+        ldx clo
         lda #0
 :       sta bcol,x
         inx
@@ -639,7 +667,58 @@ patchb:
         sta blockb + RR*::ROWSIZE + K*::SEGSIZE + 1
           .endrep
         .endrep
+        lda bh
+        bne :+
         rts
+:
+
+        ; ---- the highlight, per segment ------------------------------------------
+        ; Segment k shows white where the row's specular level reaches its
+        ; threshold bthr_k = drop_k + 3: thickest nearest the light.  Only
+        ; rows where the lowest threshold is met are visited; the white goes
+        ; straight into the speedcode (row r = bcol position - kb_k).
+        lda bthr
+        .repeat ::SEGS-1, K
+        cmp bthr+K+1
+        bcc :+
+        lda bthr+K+1
+:
+        .endrep
+        sta minthr
+        ldx bidx
+ov:     cpx clo                 ; near-clipped rows stay black
+        bcc test
+        cpx chi
+        bcs test
+        jmp next
+test:   ldy rsrc,x
+        lda specb,y
+        cmp minthr
+        bcs lit
+        jmp next
+lit:    sta sb
+        .repeat ::SEGS, K
+        lda sb
+        cmp bthr+K
+        bcc :+
+        txa
+        sec
+        sbc kb+K                ; display row
+        tay
+        lda rowlo,y
+        sta dst
+        lda rowhi,y
+        sta dst+1
+        ldy #K*::SEGSIZE
+        lda wcol
+        sta (dst),y
+:
+        .endrep
+next:   inx
+        cpx end_op
+        beq :+
+        jmp ov
+:       rts
 .endproc
 
 ; =============================================================================
@@ -737,6 +816,7 @@ blockend:
         lda #BTOP - 2
         sta VIC_RASTER
         asl VIC_IRQ
+        inc frame               ; main loop: build the next sprite + bar A
         lda save_a
         ldx save_x
         ldy save_y
@@ -801,7 +881,7 @@ blockbend:
         lda #DENLINE
         sta VIC_RASTER
         asl VIC_IRQ
-        inc frame               ; main loop: build the next frame
+        inc frameb              ; main loop: build the next bar B
         lda save_a
         ldx save_x
         ldy save_y
@@ -829,6 +909,13 @@ dims:   ;      0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
 ; The gold bar, top to bottom, one C64 colour per scanline (24 lines).
 gold:   .byte 9,8,12,7,7,0,9,8,15,7,7,1,7,1,7,0,0,0,9,12,10,12,8,9
         .assert * - gold = BARH, error, "gold must have one colour per line"
+; Bar B's display rows: address of each row's first lda #immediate
+rowlo:  .repeat ROWSB, RR
+        .byte <(blockb + RR*ROWSIZE + 1)
+        .endrep
+rowhi:  .repeat ROWSB, RR
+        .byte >(blockb + RR*ROWSIZE + 1)
+        .endrep
 
 ; =============================================================================
 .segment "BSS"
@@ -838,5 +925,7 @@ cols:   .res 2*SEGS*(2*PAD+BARH)
 ; Bar B: one column: 6 black, up to 48 bar rows, black after.
 BCOLSIZE = PAD + ROWSB + 6
 bcol:   .res BCOLSIZE
-srccol: .res BARH               ; bar B's 24 source lines, lit and dimmed
+srccol: .res BARH               ; bar B's 24 source lines, dimmed
+specb:  .res BARH               ; ... and their specular levels
+rsrc:   .res BCOLSIZE           ; source line of each bcol position
         .assert * <= VICBANK, error, "program runs into the VIC bank"

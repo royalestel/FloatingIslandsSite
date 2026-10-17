@@ -226,12 +226,22 @@ python3 sim_goldtwin.py      # needs -g -Ln goldtwin.lbl; renders preview_goldtw
 * **Near-clip.** At the camera, rows are cut from the middle outward (the
   nearest part first) over 20 frames, then there's a short black pause.
 * **Shared motion and light.** It tilts with the top bar and reflects the
-  same orbiting light, seen from its own depth.
+  same orbiting light. Its scene depth runs from 90 behind the light's orbit
+  plane to 75 in front of it. Once bar B is nearer the camera than the
+  light, the light shines from behind and above, and the highlight rides up
+  to the very top rows. In the simulator, the highlight's average centre
+  moves from 0.44 of the bar height to 0.21.
+* **Thickest nearest the light.** The plain dimmed gold is expanded once.
+  Then the highlight is laid on per segment, each with its own
+  distance-from-the-light threshold. The expansion records which source
+  line feeds each row, and only lit rows are visited. The white is written
+  straight into bar B's speedcode through a table of row addresses.
 * **Main loop instead of IRQs.** The interrupts only draw: the badline
-  trick at line 44, bar A, and bar B from line 229. The main loop builds
-  the next frame in deadline order: the sprite (before line 44), bar A
-  (before its IRQ), then bar B (before line 227). Worst cases are 36%, 71%
-  and 86% of each deadline.
+  trick at line 44, bar A, and bar B from line 229. The main loop starts
+  the next sprite and bar A as soon as bar A has been drawn (bar B's IRQ
+  cuts in), and the next bar B once bar B has been drawn. Worst cases are
+  18% (sprite, before line 44), 56% (bar A, before its IRQ) and 74% (bar B,
+  before line 227) of each deadline window.
 * **No timing patch for bar B.** The ball never goes below line 226, so it
   never steals cycles inside bar B.
 * **VIC bank 2.** The program outgrew VIC bank 0's free space, so the VIC

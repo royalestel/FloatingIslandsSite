@@ -16,11 +16,11 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = 512
 ROWS, ROWSB, SEGS, SEGSIZE, ROWSIZE = 29, 52, 5, 8, 47
+BMAXROWS = 48
 SEGW, DENLINE, STEAL, BTOP = 80, 44, 4, 229
 TOP, BOTTOM = 50, 290
 OP_BCS, OP_BCC = 0xB0, 0x90
 LINE = 63
-BEND = BTOP + ROWSB + 1         # main loop starts after bar B
 IRQTOP_LINES = 6                # top IRQ: line 44 until DEN is back at 49
 SPRITE_DMA = 21 * 5             # worst case cycles the sprite takes per frame
 
@@ -61,7 +61,11 @@ for r in range(ROWS):
 ok &= all(c == LINE for c in time_rows(blockb, ROWSB))
 print(f"rows: bar A 63 (59 on sprite lines), bar B 63: {'OK' if ok else 'WRONG'}")
 
-# --- 2. the main loop's frame work ------------------------------------------------
+# --- 2. the main loop's frame work, on a timeline ----------------------------------
+# The main loop starts the next sprite + bar A when bar A has been drawn, and
+# the next bar B when bar B has been drawn.  Interrupts take the lines they
+# draw on; the work runs in the remaining time.  Deadlines: the sprite before
+# the top IRQ, bar A before its IRQ, bar B before its IRQ.
 TRAMP = 0xC000
 def call(addr, stop=None):
     mem[TRAMP:TRAMP + 4] = [0x20, addr & 255, addr >> 8, 0x00]
@@ -73,37 +77,83 @@ def call(addr, stop=None):
         mpu.step()
     return mpu.processorCycles - c, mark
 
+def advance(line, cycles, blocked):
+    """Run `cycles` of main-loop work from `line`, skipping blocked lines."""
+    lines = (cycles + 150) / LINE + SPRITE_DMA / LINE
+    while lines > 0:
+        for lo, hi in blocked:
+            if lo <= line < hi:
+                line = hi
+                break
+        step = min(lines, 1)
+        line += step
+        lines -= step
+    return line
+
 call(labels["update"]); call(labels["updateb"])
 frames, worst = [], {"sprite": 0, "A": 0, "B": 0}
 clear = True
+BSTART, BEND = BTOP - 2, BTOP + ROWSB + 1
 for f in range(FRAMES):
+    y_cur = mem[Z["y0"]]
     ca, cball = call(labels["update"], labels["ballready"])
     cb, _ = call(labels["updateb"])
     y = mem[Z["y0"]]
-    # deadlines, counted from the end of bar B (BEND), minus the IRQs in between
-    sprite_budget = ((312 - BEND) + DENLINE) * LINE - 150
-    a_budget = ((312 - BEND) + (y - 2) - IRQTOP_LINES) * LINE - 150 - SPRITE_DMA
-    b_budget = ((312 - BEND) + (BTOP - 2) - IRQTOP_LINES - (ROWS + 3)) * LINE \
-               - 150 - SPRITE_DMA
-    for k, used, bud in (("sprite", cball, sprite_budget), ("A", ca, a_budget),
-                         ("B", ca + cb, b_budget)):
-        worst[k] = max(worst[k], 100 * used / bud)
-        ok &= used <= bud
+    a_end = y_cur + ROWS + 2
+    blocked = [(BSTART, BEND), (312 + DENLINE, 312 + DENLINE + IRQTOP_LINES),
+               (312 + y - 2, 312 + y + ROWS + 2)]
+    t_ball = advance(a_end, cball, blocked)
+    t_a = advance(a_end, ca, blocked)
+    t_b = advance(max(t_a, BEND), cb, blocked)
+    for k, t, start, dl in (("sprite", t_ball, a_end, 312 + DENLINE),
+                            ("A", t_a, a_end, 312 + y - 2),
+                            ("B", t_b, BEND, 312 + BTOP - 2)):
+        worst[k] = max(worst[k], 100 * (t - start) / (dl - start))
+        ok &= t <= dl
     ly = mem[Z["ly"]]
-    clear &= ly + 22 < BTOP - 2     # no sprite DMA on bar B's IRQ lines or rows
+    clear &= ly + 22 < BTOP - 2
     ga = [[mem[block + r * ROWSIZE + k * SEGSIZE + 1] for k in range(SEGS)]
           for r in range(ROWS)]
     gb = [[mem[blockb + r * ROWSIZE + k * SEGSIZE + 1] for k in range(SEGS)]
           for r in range(ROWSB)]
     spr = list(mem[0x8000 + mem[Z["lptr"]] * 64: 0x8000 + mem[Z["lptr"]] * 64 + 63])
-    frames.append((y, ga, gb, ly, mem[Z["lx4"]] * 4, spr, mem[Z["bh"]], ca, cb))
+    dzv = mem[labels["dz"]]
+    kbv = [mem[labels["kb"] + k] for k in range(SEGS)]
+    bcol = labels["bcol"]
+    hl = [(r, k) for r in range(ROWSB) for k in range(SEGS)
+          if gb[r][k] != mem[bcol + r + kbv[k]]]
+    frames.append((y, ga, gb, ly, mem[Z["lx4"]] * 4, spr, mem[Z["bh"]], ca, cb,
+                   dzv - 256 * (dzv > 127), hl))
 ok &= clear
 print(f"main loop: update {min(f[7] for f in frames)}-{max(f[7] for f in frames)}, "
       f"updateb {min(f[8] for f in frames)}-{max(f[8] for f in frames)} cycles")
-print("worst use of each deadline: " +
+print("worst use of each deadline window: " +
       ", ".join(f"{k} {v:.0f}%" for k, v in worst.items()))
 print("sprite never on bar B's lines:", clear)
-print("bar B heights seen:", sorted({f[6] for f in frames}))
+
+# --- 2b. the two highlight fixes, measured -----------------------------------------
+# where bar B's highlight sits (0 = top row, 1 = bottom): rows where the
+# speedcode differs from bar B's plain dimmed column are the highlight.
+front, behind = [], []
+for fr in frames:
+    gb, bh, dzb, hl = fr[2], fr[6], fr[9], fr[10]
+    if bh >= 8 and hl:
+        top = (BMAXROWS - bh) // 2
+        c = sum((r - top) / bh for r, k in hl) / len(hl)
+        (front if dzb > 0 else behind).append(c)
+print(f"bar B highlight centre (0 = top, 1 = bottom): light in front of it "
+      f"{sum(front)/max(1,len(front)):.2f} ({len(front)} frames), "
+      f"bar nearer than the light {sum(behind)/max(1,len(behind)):.2f} ({len(behind)} frames)")
+thick = []
+for fr in frames:
+    gb, bh, lx = fr[2], fr[6], fr[4]
+    if bh >= 30:
+        counts = [sum(1 for r in range(ROWSB) if gb[r][k] == 1) for k in range(SEGS)]
+        if max(counts) >= 2:
+            near = min(range(SEGS), key=lambda k: abs(lx + 12 - (32 + 80 * k)))
+            thick.append((lx, counts, near))
+for lx, counts, near in thick[:: max(1, len(thick) // 5)]:
+    print(f"  light x {lx:3d}: bar B white rows per segment {counts} (nearest segment {near})")
 
 # --- 3. render -------------------------------------------------------------------
 W, H, SCALE = SEGS * SEGW, BOTTOM - TOP, 2
