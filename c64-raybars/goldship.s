@@ -9,7 +9,7 @@
 ;  centre (some at the ship's height, most off it) and grows as it
 ;  approaches.  Joystick in port 2:
 ;  up / down pitch the ship (it climbs or dives, so the bars move down or
-;  up), left / right roll it (the bars tilt the other way, up to 2 lines per
+;  up), left / right roll it (the bars tilt the other way, up to 3 lines per
 ;  segment).  The ship's sprite leans in the 8 directions while pushed.
 ;  When a bar ahead is on a collision course (it covers the screen centre,
 ;  which in perspective means it is within half its thickness of the ship's
@@ -59,7 +59,7 @@
 
 NSLOT     = 3           ; bars in flight
 SEGS      = 5
-PAD       = 8           ; black rows above / below a bar's rows (>= max slant)
+PAD       = 12          ; black rows above / below a bar's rows (>= max slant)
 BASE      = 96          ; a bar's first row in its column; the rest of the
                         ; page is room for a merged bar above or below
 BARH      = 24          ; source rows per palette
@@ -727,7 +727,7 @@ sdy:    jsr atan2
         lda pdh,x
         sta src_op+1
 
-        ; ---- 8 black rows before the bar: only stale after a merge or a
+        ; ---- PAD black rows before the bar: only stale after a merge or a
         ; respawn ---------------------------------------------------------
         lda buf
         beq :+
@@ -766,13 +766,21 @@ zt4 = * + 1
 clean:
 
         ; ---- nearest-neighbour expansion into all 5 columns ----------------
-        ; nnmap gives each expanded row's cache index (source row, parity)
+        ; nnmap gives each expanded row's cache index (source row, parity).
+        ; Near clip: clipmap sends the middle rows to black (entry 48).
         ldx h
-        lda nnml,x
+        lda fcl
+        beq :+
+        lda #<clipmap
+        sta rsp
+        lda #>clipmap
+        sta rsp+1
+        jmp :++
+:       lda nnml,x
         sta rsp
         lda nnmh,x
         sta rsp+1
-        stx endy_op
+:       stx endy_op
         ldy #0
 exl:    lda (rsp),y
         tax
@@ -792,9 +800,9 @@ ex4 = * + 1
 endy_op = * + 1
         cpy #0
         bne exl
-        ; ---- 8 black rows after the bar.  Within a flight a bar only
+        ; ---- PAD black rows after the bar.  Within a flight a bar only
         ; grows, so only rows not black last time (in this buffer) need it:
-        ; from max(h, last h + 8); all 8 after a merge or a respawn.
+        ; from max(h, last h + PAD); all of them after a merge or a respawn.
         ldx bsx
         lda dirty,x
         bne zfull
@@ -838,7 +846,10 @@ zdone:  lda h
         ; each one covers.  Colour per segment: hlcol[min(e, 2) + 3 - level],
         ; e = how far the row's spec level exceeds the segment's threshold
         ; (thickest nearest the light, never darker than medium grey).
-        ldx lev                 ; highlight table base for this distance
+        lda fcl                 ; (none while near-clipping)
+        beq :+
+        jmp ovdone
+:       ldx lev                 ; highlight table base for this distance
         lda lev45,x
         sta lb
         ldx h
@@ -890,44 +901,6 @@ ovskip: cpy llo
         jmp ovi
 ovdone:
 
-        ; ---- near clip: the middle rows go first ---------------------------
-        lda fcl
-        beq noclip
-        lda s                   ; patch the stores: this slot's columns
-        asl
-        asl
-        adc s
-        tay
-        .repeat ::SEGS, K
-        lda vcp+K,y
-        sta .ident(.sprintf("zm%d", K))+1
-        .endrep
-        lda h
-        lsr
-        sta acc
-        sec
-        sbc fcl
-        tay                     ; rows h/2 - c .. h/2 + c - 1
-        lda acc
-        clc
-        adc fcl
-        sta rend
-        lda #0
-clipl:
-zm0 = * + 1
-        sta $ff00 + BASE,y
-zm1 = * + 1
-        sta $ff00 + BASE,y
-zm2 = * + 1
-        sta $ff00 + BASE,y
-zm3 = * + 1
-        sta $ff00 + BASE,y
-zm4 = * + 1
-        sta $ff00 + BASE,y
-        iny
-        cpy rend
-        bne clipl
-noclip:
 
         ; ---- for compose: lines, height, column index of the first line shown
         ; pl_K = BASE - off_K + ys (kb_K = PAD - off_K)
@@ -1597,10 +1570,10 @@ rsh:    .repeat 49, HH
         .byte >(rowstart + HH*25)
         .endrep
 pdl:    .repeat 16, P               ; palette * 4 + level
-        .byte <(pdim + P*2*BARH)
+        .byte <(pdim64 + P*64)
         .endrep
 pdh:    .repeat 16, P
-        .byte >(pdim + P*2*BARH)
+        .byte >(pdim64 + P*64)
         .endrep
 nnml:   .byte 0
         .repeat 48, HH

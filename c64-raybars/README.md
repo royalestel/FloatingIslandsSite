@@ -393,9 +393,13 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   frame, so pushing up makes the bars sink. Each bar's height is relative
   to the ship's: it is `Y/Z` lines from the centre, above or below.
 * **Roll** (left / right) tilts every bar the other way, one step every
-  other frame, up to 2 lines per segment. Letting go levels out again.
-  All bars are parallel, so the tilt comes from one 17-entry table per
-  segment (`rtilt0..4`).
+  other frame. Neighbouring segments can be up to 3 lines apart, so at
+  full roll a bar drops 12 lines from one edge to the other. Letting go
+  levels out again.
+  * All bars are parallel, so the tilt comes from one 17-entry table per
+    segment (`rtilt0..4`).
+  * Each bar has 12 black padding rows above and below it (`PAD`), one
+    for each line of the steepest slant.
 * **New bars** appear far away at your current height, plus the next of
   16 shuffled offsets (16-bit): 5 near the ship, on a collision course at
   the screen centre, and 11 off the centre line, up to 200 units away
@@ -416,18 +420,22 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   so almost every frame merges bars, often all three. Three things keep
   that inside the frame:
   * A light-angle table bounds the highlight loop to the lit rows.
+  * The near clip costs nothing extra. Its row map sends the cut rows to
+    black entries in the palette tables, which are padded to 64 bytes
+    for this.
   * All bars share one tilt, so a farther bar's rows sit at the same
     offset in every column. Copying them and blacking around the nearest
     bar both handle all five columns at once.
   * This program banks out the ROMs, so its zero page can run past $7F
     (the shared `raybars.cfg` now allows up to $FF).
 * **Simulator.** `sim_goldship.py` flies with an autopilot on `$dc00`. It
-  dives or climbs away from the nearest bar on a collision course and
-  rolls back and forth for show. It runs the program's own display code
+  dives or climbs away from the nearest bar on a collision course. Every
+  200 frames it also rolls fully left, levels out, and rolls fully right.
+  The preview's still frames are at full roll. It runs the program's own display code
   for every block, and over 3000 frames found:
   * Every row takes 63 cycles, or 58 on the sprite's lines.
   * Every displayed cell shows the nearest bar covering it.
-  * The worst frame uses 89% of the free time.
+  * The worst frame uses 93% of the free time.
 
   As in goldfly, the sprite DMA timing (`STEAL`, `BAND0/1`) needs checking
   in VICE.

@@ -467,10 +467,12 @@ for j in range(16):
     JF.append([[0, 1, 2], [3, 5, 6], [4, 7, 8]][side][vert])
 emit2("joyframe", JF)
 # roll r = -8 (left) .. 8 (right): the world turns the other way, so the bars'
-# slope is m = -r/4 lines per segment; off_k = floor(4 + (k - 2) * m + 0.5)
-# about the middle segment, stored as kb = 8 - off_k (rtilt0..4, index r + 8)
+# slope is m = -3r/8 lines per segment (up to 3 between neighbours); off_k =
+# floor(6 + (k - 2) * m + 0.5) about the middle segment, 0..12, stored as
+# kb = 12 - off_k (goldship's PAD) (rtilt0..4, index r + 8)
 for k in range(5):
-    emit2(f"rtilt{k}", [8 - int(math.floor(4 + (k - 2) * (-r / 4) + 0.5)) for r in range(-8, 9)])
+    emit2(f"rtilt{k}", [12 - int(math.floor(6 + (k - 2) * (-3 * r / 8) + 0.5))
+                        for r in range(-8, 9)])
 # spawn height relative to the ship, shuffled: 5 near it (|y| < 24 is a
 # collision course: they start at the screen centre) and 11 off the centre
 # line, up to 200 units (17 lines out when they appear).  16 bits.
@@ -490,6 +492,20 @@ for p_ in range(256):
 emit2("litlo", lo_)
 emit2("lithi", hi_)
 emit2("ydiv10", [int(round(v / 10)) for v in range(256)])
+# the dimmed palettes again, 64 bytes apart: entries 48..63 are black in
+# every one, for the near clip's cut rows
+emit2("pdim64", [x for p in PALS for lv in range(4)
+                 for x in [DIMS[lv][c] for e, o in p for c in (e, o)] + [0] * 16])
+# the near clip's row map (frame FLYD - 2, height CLIPH): nnmap's, with the
+# middle rows (fclip each side of the centre) pointing at black (48)
+ch, cc = fh[FLYD - 2], fclip[FLYD - 2]
+stp, acc = int(24 * 256 / ch), 0
+cm = []
+for j in range(ch):
+    cm.append(48 if ch // 2 - cc <= j < ch // 2 + cc else 2 * (acc >> 8) + (j & 1))
+    acc += stp
+emit2("clipmap", cm)
+out.insert(2, f"CLIPH = {ch}")
 out.insert(2, f"NYSPAWN = {len(yspawn)}")
 with open(os.path.join(here, "ship.inc"), "w") as f:
     f.write("\n".join(out) + "\n")

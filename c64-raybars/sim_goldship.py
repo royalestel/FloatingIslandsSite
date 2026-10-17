@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fly goldship.prg on an emulated 6502 (py65), with an autopilot on the
-joystick port: it dodges bars on a collision course and rolls back and forth.
+joystick port: it dodges bars on a collision course, and every 200 frames
+rolls fully left, levels, rolls fully right.
 
 Every frame, each scheduled IRQ block is set up by the program's own nextbar
 and its row loops are run; the colours they read are what gets rendered,
@@ -80,7 +81,10 @@ for f in range(FRAMES):
     if ahead:
         stv, y = max(ahead)
         stick |= 2 if y >= 0 else 1     # bar above (or level): dive, else climb
-    stick |= (0, 4, 0, 8)[(f // 70) % 4]  # and roll for show
+    # and roll for show, every 200 frames: level, full left (held 60
+    # frames), level, full right
+    ph = f % 200
+    stick |= 4 if 40 <= ph < 100 else 8 if 140 <= ph < 200 else 0
     mem[0xDC00] = 0xFF ^ stick
     hit0 = mem[L["hitfl"]]
     cyc = call(L["build"])
@@ -198,7 +202,7 @@ imgs = [render(f) for f in range(100, FRAMES, 2)]
 imgs[0].save(os.path.join(HERE, "preview_goldship.gif"), save_all=True,
              append_images=imgs[1:], duration=40, loop=0)
 sheet = Image.new("RGB", (W * SCALE * 3, H * SCALE * 2))
-for i, n in enumerate((120, 170, 220, 300, 380, 460)):
+for i, n in enumerate((90, 290, 490, 190, 390, 590)):   # full left; full right
     sheet.paste(render(n), ((i % 3) * W * SCALE, (i // 3) * H * SCALE))
 sheet.save(os.path.join(HERE, "preview_goldship.png"))
 print("wrote preview_goldship.gif, preview_goldship.png")
