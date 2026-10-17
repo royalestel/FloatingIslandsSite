@@ -506,6 +506,17 @@ for j in range(ch):
     acc += stp
 emit2("clipmap", cm)
 out.insert(2, f"CLIPH = {ch}")
+# goldship pre-expands every palette-level's colours for each bar height
+# HMIN..HMAX at start-up; hoff[h] = the list's offset in a palette-level's
+# block of PXBLK bytes
+HMIN, HMAX = min(fh), max(fh)
+ho, acc_ = [0] * 49, 0
+for hh_ in range(HMIN, HMAX + 1):
+    ho[hh_] = acc_
+    acc_ += hh_
+emit2("hoffl", [v & 255 for v in ho])
+emit2("hoffh", [v >> 8 for v in ho])
+out.insert(2, f"HMIN = {HMIN}\nHMAX = {HMAX}\nPXBLK = {acc_}")
 out.insert(2, f"NYSPAWN = {len(yspawn)}")
 with open(os.path.join(here, "ship.inc"), "w") as f:
     f.write("\n".join(out) + "\n")

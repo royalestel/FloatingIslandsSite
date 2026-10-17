@@ -59,6 +59,10 @@
 
 NSLOT     = 3           ; bars in flight
 SEGS      = 5
+NCOL      = 3           ; columns per bar: centre, middle, outer.  All bars
+                        ; share the tilt and the highlight is symmetric, so
+                        ; segments 0 and 4 read one column, 1 and 3 another
+                        ; (each at its own tilt offset)
 PAD       = 12          ; black rows above / below a bar's rows (>= max slant)
 BASE      = 96          ; a bar's first row in its column; the rest of the
                         ; page is room for a merged bar above or below
@@ -77,6 +81,9 @@ VICBANK   = $8000
 SPRBUF    = VICBANK + $0000
 SPRPTR    = VICBANK + $0400 + $03f8
 IDLEBYTE  = VICBANK + $3fff
+PEXP      = VICBANK + $0800 ; pre-expanded colour lists (RAM the VIC doesn't use)
+PCLIP     = PEXP + 16*PXBLK ;   and the near clip's
+        .assert PCLIP + 16*CLIPH <= IDLEBYTE, error, "colour lists reach the idle byte"
 SPRX      = 184 - 12    ; ball centred on the screen
 SPRY      = CENTRE - 11
 
@@ -154,6 +161,7 @@ m1:      .res 1                 ; multiplier
 pnp:     .res 2                 ; merge: nearest / farther column pointers
 pfp:     .res 2
 fcl:     .res 1                 ; near-clip rows
+pxs:     .res 2                 ; preexp: palette-level colours
 zp5:     .res 2*SEGS            ; merge: the nearest bar's five columns from
 np:      .res 2*SEGS            ;   line cD / from their start, the farther
 fp:      .res 2*SEGS            ;   bar's (offset to match)
@@ -218,7 +226,7 @@ start:  sei
         tay
         lda #>cols
         sta ptr+1
-        ldx #2*NSLOT*SEGS
+        ldx #2*NSLOT*NCOL
         tya
 @col:   sta (ptr),y
         iny
@@ -227,6 +235,7 @@ start:  sei
         dex
         bne @col
         sta $dc02               ; CIA1 port A all inputs: the joystick only
+        jsr preexp
         lda #8                  ; level
         sta rolli
         ldx #NSLOT-1            ; stagger the bars along their flight
@@ -276,6 +285,77 @@ main:   lda frameflag           ; the top IRQ has swapped in the last frame
         jmp main
 
 nmi:    rti
+
+; -----------------------------------------------------------------------------
+;  preexp: at start-up, every palette-level's colours expanded to every bar
+;  height HMIN..HMAX (nnmap: source row and even / odd line per row), one
+;  after the other from PEXP; then the near clip's lists (clipmap) at PCLIP.
+; -----------------------------------------------------------------------------
+.proc preexp
+        lda #<PEXP
+        sta t0
+        lda #>PEXP
+        sta t0+1
+        lda #0
+        sta acc                 ; palette * 4 + level
+pl:     ldx acc
+        lda pdl,x
+        sta pxs
+        lda pdh,x
+        sta pxs+1
+        lda #HMIN
+        sta hh
+hl:     ldx hh
+        lda nnml,x
+        sta rsp
+        lda nnmh,x
+        sta rsp+1
+        jsr one
+        inc hh
+        lda hh
+        cmp #HMAX + 1
+        bne hl
+        inc acc
+        lda acc
+        cmp #16
+        bne pl
+        lda #0                  ; the near clip's: same, with clipmap
+        sta acc
+cl:     ldx acc
+        lda pdl,x
+        sta pxs
+        lda pdh,x
+        sta pxs+1
+        lda #<clipmap
+        sta rsp
+        lda #>clipmap
+        sta rsp+1
+        lda #CLIPH
+        sta hh
+        jsr one
+        inc acc
+        lda acc
+        cmp #16
+        bne cl
+        rts
+one:    ldy #0                  ; hh rows to t0, then t0 += hh
+:       lda (rsp),y
+        sty si
+        tay
+        lda (pxs),y
+        ldy si
+        sta (t0),y
+        iny
+        cpy hh
+        bne :-
+        tya
+        clc
+        adc t0
+        sta t0
+        bcc :+
+        inc t0+1
+:       rts
+.endproc
 
 ; -----------------------------------------------------------------------------
 ;  respawn slot x: far away, at the ship's height plus the next spawn
@@ -581,24 +661,47 @@ ahead:  lda #1                  ; still ahead of it: collision course
 clear:
 
         ; ---- this slot's columns in the back buffer: patch the stores -------
-        ; column page = >cols + buf*15 + s*5 + k
+        ; column page = >cols + buf*9 + s*3 + c (c: 0 centre, 1 middle,
+        ; 2 outer); segment k reads column CLS(k)
         lda buf
         beq :+
-        lda #15
+        lda #9
 :       sta acc
         txa
         asl
-        asl
-        adc s                   ; s*5
-        tay
+        adc s                   ; s*3
         adc acc
         adc #>cols
-        .repeat ::SEGS, K
-        sta .ident(.sprintf("ex%d", K))+1
-        sta .ident(.sprintf("ov%d", K))+1
-        sta .ident(.sprintf("zc%d", K))+1
-        sta vcp+K,y             ; for compose
+        .repeat ::NCOL, C
+        sta .ident(.sprintf("ex%d", C))+1
+        sta .ident(.sprintf("ov%d", C))+1
+        sta .ident(.sprintf("zc%d", C))+1
         adc #1
+        .endrep
+        sbc #::NCOL - 1         ; (carry clear: back to the centre column)
+        sta acc
+        txa                     ; vcp per segment, for compose
+        asl
+        asl
+        adc s
+        tay
+        lda acc
+        .repeat ::SEGS, K
+        .if K = 0 .or K = 4
+        clc
+        adc #2
+        sta vcp+K,y
+        sec
+        sbc #2
+        .elseif K = 1 .or K = 3
+        clc
+        adc #1
+        sta vcp+K,y
+        sec
+        sbc #1
+        .else
+        sta vcp+K,y
+        .endif
         .endrep
 
         ; ---- flight state --------------------------------------------------
@@ -715,17 +818,29 @@ sdy:    jsr atan2
         sta spe_op
         sta phi
 
-        ; ---- the bar's palette at this distance: one of 16 tables ----------
+        ; ---- its colours, pre-expanded for this palette, level and height --
         ldx s
         lda spal,x
         asl
         asl
         adc lev
-        tax
-        lda pdl,x
-        sta src_op
-        lda pdh,x
-        sta src_op+1
+        tax                     ; palette * 4 + level
+        lda fcl
+        beq :+
+        lda pclbl,x             ; near clip: the cut list
+        sta exs_op
+        lda pclbh,x
+        sta exs_op+1
+        jmp :++
+:       ldy h
+        lda pxbl,x
+        clc
+        adc hoffl,y
+        sta exs_op
+        lda pxbh,x
+        adc hoffh,y
+        sta exs_op+1
+:
 
         ; ---- PAD black rows before the bar: only stale after a merge or a
         ; respawn ---------------------------------------------------------
@@ -743,10 +858,12 @@ sdy:    jsr atan2
         asl
         adc s
         tay
-        .repeat ::SEGS, K
-        lda vcp+K,y
-        sta .ident(.sprintf("zt%d", K))+1
-        .endrep
+        lda vcp+2,y             ; (segments 2, 1, 0: columns 0, 1, 2)
+        sta zt0+1
+        lda vcp+1,y
+        sta zt1+1
+        lda vcp+0,y
+        sta zt2+1
         lda #0
         ldx #BASE - PAD
 ztop:
@@ -756,50 +873,25 @@ zt1 = * + 1
         sta $ff00,x
 zt2 = * + 1
         sta $ff00,x
-zt3 = * + 1
-        sta $ff00,x
-zt4 = * + 1
-        sta $ff00,x
         inx
         cpx #BASE
         bne ztop
 clean:
 
-        ; ---- nearest-neighbour expansion into all 5 columns ----------------
-        ; nnmap gives each expanded row's cache index (source row, parity).
-        ; Near clip: clipmap sends the middle rows to black (entry 48).
-        ldx h
-        lda fcl
-        beq :+
-        lda #<clipmap
-        sta rsp
-        lda #>clipmap
-        sta rsp+1
-        jmp :++
-:       lda nnml,x
-        sta rsp
-        lda nnmh,x
-        sta rsp+1
-:       stx endy_op
-        ldy #0
-exl:    lda (rsp),y
-        tax
-src_op = * + 1
-        lda $ffff,x
+        ; ---- the bar's rows into its 3 columns: a straight copy -----------
+        ldy h
+        dey
+exl:
+exs_op = * + 1
+        lda $ffff,y
 ex0 = * + 1
         sta $ff00 + BASE,y
 ex1 = * + 1
         sta $ff00 + BASE,y
 ex2 = * + 1
         sta $ff00 + BASE,y
-ex3 = * + 1
-        sta $ff00 + BASE,y
-ex4 = * + 1
-        sta $ff00 + BASE,y
-        iny
-endy_op = * + 1
-        cpy #0
-        bne exl
+        dey
+        bpl exl
         ; ---- PAD black rows after the bar.  Within a flight a bar only
         ; grows, so only rows not black last time (in this buffer) need it:
         ; from max(h, last h + PAD); all of them after a merge or a respawn.
@@ -827,10 +919,6 @@ zc0 = * + 1
 zc1 = * + 1
         sta $ff00 + BASE,y
 zc2 = * + 1
-        sta $ff00 + BASE,y
-zc3 = * + 1
-        sta $ff00 + BASE,y
-zc4 = * + 1
         sta $ff00 + BASE,y
         iny
         cpy rend
@@ -886,11 +974,9 @@ spe_op = * + 1
         cpx rend
         beq ovnext
         ldy hidx
-rowl:   hlrow 0, ov0
+rowl:   hlrow 2, ov0                ; (segment 2's colour: the centre column)
         hlrow 1, ov1
-        hlrow 2, ov2
-        hlrow 3, ov3
-        hlrow 4, ov4
+        hlrow 0, ov2
         inx
         cpx rend
         bne rowl
@@ -1187,12 +1273,12 @@ merge:  lda buf                 ; its top pad needs re-blacking next time
 
         ldy ni                  ; copy targets: the nearest bar's columns
         lda #0                  ; from their start, y = column index
-        .repeat ::SEGS, K
-        sta np + K*2
+        .repeat ::NCOL, C
+        sta np + C*2
         .endrep
-        .repeat ::SEGS, K
-        lda vcp+K,y
-        sta np + K*2 + 1
+        .repeat ::NCOL, C
+        lda vcp+2-C,y           ; (segments 2, 1, 0: columns 0, 1, 2)
+        sta np + C*2 + 1
         .endrep
         lda #::BASE             ; its rows: BASE .. nbe-1
         clc
@@ -1226,13 +1312,13 @@ far:    ldy mem,x
         lda #0
         sbc #0
         sta dhi
-        .repeat ::SEGS, K       ; read pointers: its columns + d
+        .repeat ::NCOL, C       ; read pointers: its columns + d
         lda dlo
-        sta fp + K*2
-        lda vcp+K,x
+        sta fp + C*2
+        lda vcp+2-C,x
         clc
         adc dhi
-        sta fp + K*2 + 1
+        sta fp + C*2 + 1
         .endrep
         lda #::BASE             ; its rows: BASE - d .. + its height - 1
         sec
@@ -1279,12 +1365,12 @@ nextf:  dec fj
         jmp far
 :       rts
 
-copy5:  sta ce                  ; rows y .. A-1 in all five columns
+copy5:  sta ce                  ; rows y .. A-1 in all three columns
         cpy ce
         bcs c5done
-c5:     .repeat ::SEGS, K
-        lda (fp + K*2),y
-        sta (np + K*2),y
+c5:     .repeat ::NCOL, C
+        lda (fp + C*2),y
+        sta (np + C*2),y
         .endrep
         iny
         cpy ce
@@ -1569,6 +1655,18 @@ rsl:    .repeat 49, HH
 rsh:    .repeat 49, HH
         .byte >(rowstart + HH*25)
         .endrep
+pxbl:   .repeat 16, P               ; pre-expanded lists, per palette * 4 + level
+        .byte <(PEXP + P*PXBLK)
+        .endrep
+pxbh:   .repeat 16, P
+        .byte >(PEXP + P*PXBLK)
+        .endrep
+pclbl:  .repeat 16, P
+        .byte <(PCLIP + P*CLIPH)
+        .endrep
+pclbh:  .repeat 16, P
+        .byte >(PCLIP + P*CLIPH)
+        .endrep
 pdl:    .repeat 16, P               ; palette * 4 + level
         .byte <(pdim64 + P*64)
         .endrep
@@ -1652,6 +1750,6 @@ lo:     .res 1
 hi:     .res 1
 
 .segment "RAMPS"
-cols:   .res 2*NSLOT*SEGS*256   ; a page per column, 2 buffers
+cols:   .res 2*NSLOT*NCOL*256   ; a page per column, 2 buffers
         .assert <cols = 0, error, "cols must be page aligned"
         .assert * <= VICBANK, error, "program runs into the VIC bank"

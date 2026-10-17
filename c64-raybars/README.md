@@ -420,9 +420,16 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   so almost every frame merges bars, often all three. Three things keep
   that inside the frame:
   * A light-angle table bounds the highlight loop to the lit rows.
-  * The near clip costs nothing extra. Its row map sends the cut rows to
-    black entries in the palette tables, which are padded to 64 bytes
-    for this.
+  * Colours come pre-expanded. At start-up the program expands every
+    palette and distance level to every bar height (4 to 40 rows) into
+    13 KB at $8800, RAM in the VIC bank that the VIC doesn't use. A bar's
+    rows are then a straight copy: `lda list,y`, 3 stores, `dey / bpl`.
+  * Only 3 columns per bar. All bars share the tilt and the highlight is
+    symmetric, so segments 0 and 4 read one column and 1 and 3 another,
+    each at its own tilt offset. Expansion, highlight and merge copies
+    write 3 columns instead of 5. A row costs 24 cycles instead of 43.
+  * The near clip has its own pre-expanded lists, with the cut rows black,
+    so it costs nothing extra.
   * All bars share one tilt, so a farther bar's rows sit at the same
     offset in every column. Copying them and blacking around the nearest
     bar both handle all five columns at once.
@@ -435,7 +442,10 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   for every block, and over 3000 frames found:
   * Every row takes 63 cycles, or 58 on the sprite's lines.
   * Every displayed cell shows the nearest bar covering it.
-  * The worst frame uses 93% of the free time.
+  * The worst frame uses 79% of the free time, leaving at least 2,600
+    cycles (about 42 raster lines) of each frame spare; the median frame
+    has 6,600.
+  * The display is identical to the 5-column version, frame by frame.
 
   As in goldfly, the sprite DMA timing (`STEAL`, `BAND0/1`) needs checking
   in VICE.
