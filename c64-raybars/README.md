@@ -198,6 +198,46 @@ python3 sim_goldorbit.py     # needs -g -Ln goldorbit.lbl; renders preview_goldo
 * **Cost.** The per-frame work uses at most about 54% of the time before
   the top IRQ.
 
+## GOLDTWIN: a second bar from the distance
+
+`goldtwin.s` keeps the orbiting light and its bar, and adds a second gold
+bar low on the screen that comes from the distance, brightens, grows to
+twice the size, and near-clips away. Then it comes again.
+
+```sh
+cl65 -t none -C raybars.cfg -o goldtwin.prg goldtwin.s
+python3 sim_goldtwin.py      # needs -g -Ln goldtwin.lbl; renders preview_goldtwin.gif
+```
+
+* **Perspective.** The bar's depth z goes linearly from 6 to 1, and its
+  height on screen is 48/z. It appears 8 lines tall, speeds up as it
+  nears, and reaches 48 lines.
+* **Nearest-neighbour rows.** Screen row *j* shows source row
+  `floor(j * 24 / H)` of the gold pattern. The 24 source lines are coloured
+  first; then a 30-cycle-per-row loop expands them with an 8.8 fixed-point
+  step (no division).
+* **Brightness by distance.** There are 4 colour remaps:
+  * farthest: yellow is brown and white is dark grey
+  * then yellow becomes orange and white becomes grey
+  * then yellow orange and white light grey
+  * full colour from about the top bar's size (22 lines)
+
+  The traced highlight is dimmed the same way.
+* **Near-clip.** At the camera, rows are cut from the middle outward (the
+  nearest part first) over 20 frames, then there's a short black pause.
+* **Shared motion and light.** It tilts with the top bar and reflects the
+  same orbiting light, seen from its own depth.
+* **Main loop instead of IRQs.** The interrupts only draw: the badline
+  trick at line 44, bar A, and bar B from line 229. The main loop builds
+  the next frame in deadline order: the sprite (before line 44), bar A
+  (before its IRQ), then bar B (before line 227). Worst cases are 36%, 71%
+  and 86% of each deadline.
+* **No timing patch for bar B.** The ball never goes below line 226, so it
+  never steals cycles inside bar B.
+* **VIC bank 2.** The program outgrew VIC bank 0's free space, so the VIC
+  uses bank 2 ($8000-$BFFF): sprites at $8000 and $8040, screen at $8400,
+  idle byte at $BFFF.
+
 ## Tuning notes
 
 * PAL only: the loop is 63 cycles per line, and an NTSC frame has too little vblank.
