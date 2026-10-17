@@ -257,6 +257,51 @@ python3 sim_goldtwin.py      # needs -g -Ln goldtwin.lbl; renders preview_goldtw
   uses bank 2 ($8000-$BFFF): sprites at $8000 and $8040, screen at $8400,
   idle byte at $BFFF.
 
+## GOLDFLY: bars flying out of the distance
+
+`goldfly.s` puts the light, a ball sprite, at the centre of the screen.
+Three bars at a time fly toward the camera out of the distance and past it,
+through the top or bottom of the window.
+
+```sh
+cl65 -t none -C raybars.cfg -o goldfly.prg goldfly.s
+python3 sim_goldfly.py       # needs -g -Ln goldfly.lbl; renders preview_goldfly.gif
+```
+
+* **Each bar** spawns with a random palette and a random tilt (neighbouring
+  segments up to 2 lines apart), which it keeps for its whole flight. It
+  also gets a random distance from the centre line, and the sides
+  alternate above and below the light.
+* **Perspective.** 1/Z grows linearly, so a bar grows at a steady rate:
+  `48/Z` lines tall and `Yc/Z` from the centre (Yc = 170..200). It starts
+  8 lines tall near the middle and leaves the window at about 34. It dims
+  with distance and reflects the light, thickest nearest it. The highlight
+  rides to the bar's edge once the bar is nearer the camera than the light
+  (depth 3).
+* **Palettes:** the gold one; `8 12 7 8 11 8 15 7 1 7 1 7 7 15 8 11 9 9 11 8
+  12 10 12 8`; and two 12-colour lists, `6 11 14 15 1 0 9 11 8 12 10 15`
+  and `8 10 7 10 10 15 10 8 2 9 9 11`, dithered up to 24 rows. Each colour
+  is followed by a row of (this colour, next colour) on alternating lines,
+  so scaling up gives poor man's dithering between them.
+* **Pointer-read speedcode.** Each bar's display code is a 63-cycle loop:
+  5 x `lda (pK),y / sta $d021` (9 cycles, 72-pixel segments), `iny`,
+  padding, `dex / bne`. `pK` points into segment K's column, offset by the
+  tilt, so nothing is patched per frame. The bars are drawn inside the
+  display window (badline trick as in goldlight), so the side borders stay
+  black. The columns are 64-byte aligned, so `(pK),y` never crosses a page.
+* **Pipeline.** The main loop builds frame N+1 into back buffers (columns,
+  pointers, the IRQ schedule) while frame N is shown. The top IRQ swaps
+  them in. If a build ever ran late, the swap would simply wait a frame.
+* **Speed tricks.** Each bar caches its dimmed palette rows (recoloured only
+  when its distance level changes). A row-start table lets the highlight
+  visit only lit rows. A static table gives each segment's highlight colour,
+  and 8 black rows after each bar replace clearing. The worst frame uses 89%
+  of the free time.
+* **Spacing.** Bars are spaced so they never share lines with each other
+  (12+ lines apart) or with the light's sprite, which the simulator checks
+  every frame. If the spacing is tightened so bars cross, a far bar's
+  colours would be written into the near bar's padding rows.
+
 ## Tuning notes
 
 * PAL only: the loop is 63 cycles per line, and an NTSC frame has too little vblank.
