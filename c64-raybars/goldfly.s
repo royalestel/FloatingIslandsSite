@@ -5,12 +5,13 @@
 ;
 ;  The light is a ball sprite fixed at the centre of the screen.  Three
 ;  bars at a time fly toward the camera from the distance, alternating
-;  above / below the light.  Each new bar takes the next entry of three
-;  shuffled cycles (fly.inc): a tilt (32 slopes, neighbouring segments up
-;  to 2 lines apart), a distance from the centre line (15 values: some start
-;  right next to the light, some well out) and a palette (gold, a second
-;  24-colour one, and two 12-colour ones dithered up to 24).  The tilt never
-;  changes in flight.  In perspective they start small near the middle, grow
+;  above / below the light.  Each new bar draws one of 53 tilts
+;  (staircases, neighbouring segments up to 2 lines apart) that has not
+;  been shown for at least 40 bars.  It takes the next entry of
+;  two shuffled cycles (fly.inc) for its distance from the centre line (15
+;  values: some start right next to the light, some well out) and palette
+;  (gold, a second 24-colour one, and two 12-colour ones dithered up to
+;  24).  The tilt never changes in flight.  In perspective they start small near the middle, grow
 ;  and fly out through the top or bottom edge.  They dim with distance and
 ;  reflect the light: thickest nearest it, and riding to the bar's edge once
 ;  a bar is nearer the camera than the light.
@@ -90,8 +91,11 @@ frameflag: .res 1               ; top IRQ: start building the next frame
 ready:   .res 1                 ; main loop: next frame is built
 buf:     .res 1                 ; column buffer being built (0/1)
 spawn:   .res 1                 ; bars spawned so far
-angi:    .res 1                 ; spawn cycle positions: tilt,
-yi:      .res 1                 ;   distance,
+thead:   .res 1                 ; tilt ring: oldest entry
+tr:      .res 1
+tlast:   .res 1                 ; the last tilt drawn
+seed:    .res 1                 ; random bytes
+yi:      .res 1                 ; spawn cycle positions: distance,
 pali:    .res 1                 ;   palette
 sidx:    .res 1                 ; schedule entry being shown
 curn:    .res 1                 ; rows / first row / code of the next bar
@@ -99,7 +103,7 @@ cury:    .res 1
 curvec:  .res 2
 st:      .res NSLOT             ; per slot: flight time
 spal:    .res NSLOT             ;           palette
-stilt:   .res NSLOT             ;           tilt angle
+stilt:   .res NSLOT             ;           tilt (staircase)
 sY:      .res NSLOT             ;           lateral distance
 sydy:    .res NSLOT             ;           its dy toward the light
 sside:   .res NSLOT             ;           0 = above the light, 1 = below
@@ -180,6 +184,15 @@ start:  sei
         inc ptr+1
         dex
         bne @col
+        lda #$a5                ; random seed
+        sta seed
+        ldx #NTILT-1            ; the tilt ring, in a shuffled order
+@bag:   lda tbag0,x
+        sta tbag,x
+        dex
+        bpl @bag
+        lda #$80
+        sta tlast
         ldx #NSLOT-1            ; stagger the bars along their flight
 @stg:   lda stagger,x
         sta st,x
@@ -236,18 +249,12 @@ main:   lda frameflag           ; the top IRQ has swapped in the last frame
 nmi:    rti
 
 ; -----------------------------------------------------------------------------
-;  respawn slot x: the next tilt, distance and palette from the cycles;
-;  sides alternate spawn by spawn.
+;  respawn slot x: a tilt from the bag, the next distance and palette from
+;  the cycles; sides alternate spawn by spawn.
 ; -----------------------------------------------------------------------------
 .proc respawn
-        ldy angi
-        lda angcyc,y
+        jsr drawtilt
         sta stilt,x
-        iny
-        cpy #NANG
-        bcc :+
-        ldy #0
-:       sty angi
         ldy yi
         lda ycyc,y
         sta sY,x
@@ -274,9 +281,83 @@ nmi:    rti
 .endproc
 
 ; -----------------------------------------------------------------------------
-;  mulhi: A = round(A * acc / 256).  Uses X.
+;  drawtilt: A = a tilt not shown for at least 40 bars.  tbag is a ring of
+;  all 53 tilts in the order they were last shown; the TAV oldest (from
+;  thead on) are available.  A random one of those is taken and moved to
+;  the back.  If it looks too much like the last one (TSIM: indices are
+;  ordered by slope), the one half the window away is taken instead.
+; -----------------------------------------------------------------------------
+TAV  = 13
+TSIM = 6
+.proc drawtilt
+        stx save_t
+        lda #TAV
+        sta acc
+        jsr rand
+        jsr mul8                ; A = random * TAV / 256: 0 .. TAV-1
+        sta tr
+        jsr at
+        lda tbag,y
+        sec
+        sbc tlast
+        bcs :+
+        eor #$ff
+        adc #1
+:       cmp #TSIM
+        bcs take
+        lda tr                  ; too alike: half the window away instead
+        clc
+        adc #TAV/2
+        cmp #TAV
+        bcc :+
+        sbc #TAV
+:       jsr at
+take:   ldx thead               ; swap it with the oldest, then step past it:
+        lda tbag,y              ; it is now the newest, at the back
+        pha
+        lda tbag,x
+        sta tbag,y
+        pla
+        sta tbag,x
+        sta tlast
+        inx
+        cpx #NTILT
+        bcc :+
+        ldx #0
+:       stx thead
+        ldx save_t
+        rts
+
+at:     clc                     ; y = (thead + A) mod NTILT
+        adc thead
+        cmp #NTILT
+        bcc :+
+        sbc #NTILT
+:       tay
+        rts
+.endproc
+
+; rand: A = next byte of an 8-bit LFSR (never 0)
+.proc rand
+        lda seed
+        asl
+        bcc :+
+        eor #$1d
+:       sta seed
+        rts
+.endproc
+
+; -----------------------------------------------------------------------------
+;  mulhi: A = round(A * acc / 256).  mul8: A:m1 = A * acc.  Both use X.
 ; -----------------------------------------------------------------------------
 .proc mulhi
+        jsr mul8
+        asl m1                  ; round
+        adc #0
+        rts
+.endproc
+
+.proc mul8
         sta m1
         lda #0
         ldx #8
@@ -288,8 +369,6 @@ l:      bcc :+
         ror m1
         dex
         bne l
-        asl m1                  ; round
-        adc #0
         rts
 .endproc
 
@@ -478,7 +557,7 @@ visible:
         ; ---- tilt -----------------------------------------------------------------
         ldy stilt,x
         .repeat ::SEGS, K
-        lda .ident(.sprintf("tkbase%d", K)),y
+        lda .ident(.sprintf("tilt%d", K)),y
         sta kb+K
         .endrep
 
@@ -1089,7 +1168,6 @@ bout:   lda save_a
 .segment "TABLES"
         .include "tables.inc"   ; spectab, theta2_12, log2/atan
         .include "orbit.inc"    ; balls
-        .include "twin.inc"     ; tkbase0..4
         .assert <spectab = 0, error, "spectab must be page aligned"
 
 stagger: .byte 0, FLYD/3, 2*FLYD/3
@@ -1129,6 +1207,8 @@ blkvhi: .hibytes blk0, blk1, blk2
 
 ; =============================================================================
 .segment "BSS"
+tbag:   .res NTILT              ; tilt ring, oldest shown first
+save_t: .res 1
 dirty:  .res 2*NSLOT            ; per buffer and slot: merged into, pad stale
 nbuf:   .res 1
 nptr:   .res NSLOT*SEGS*2

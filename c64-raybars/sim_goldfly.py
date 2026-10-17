@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run goldfly.prg's frame building on an emulated 6502 (py65).
 
-Checks: every bar row loop is exactly 63 cycles; no column read crosses a
+Checks: tilts never repeat within 40 bars; every bar row loop is exactly 63 cycles; no column read crosses a
 page; scheduled blocks (overlapping bars merged into one) never share lines
 with each other or with the light's sprite; the first bar's IRQ comes after
 the top IRQ; and the build fits in the frame's free time.  Renders preview_goldfly.gif / .png.
@@ -144,6 +144,22 @@ print(f"page-crossing reads {pagecross}, overlapping bars {overlap}, "
       f"bars on the light's lines {sprite_hit}, bars before line 58 {early}")
 print("blocks per frame:", sorted({len(e) for e in frames}),
       f"- frames with two bars merged {merged}, with a bar dropped {dropped}")
+
+# --- tilts: 3000 draws with the program's own drawtilt ----------------------
+NT = 53
+draws = []
+for i in range(3000):
+    call(L["drawtilt"])
+    draws.append(mpu.a)
+last, gap = {}, 999
+for i, t in enumerate(draws):
+    if t in last:
+        gap = min(gap, i - last[t])
+    last[t] = i
+alike = sum(abs(a - b) < 6 for a, b in zip(draws, draws[1:]))
+print(f"tilts: {len(set(draws))} of {NT} used, closest repeat {gap} bars apart, "
+      f"{alike} of {len(draws) - 1} neighbours alike")
+ok &= len(set(draws)) == NT and gap > 40
 
 # --- 3. render ---------------------------------------------------------------------
 W, H, SCALE = 384, BOTTOM - TOP, 2

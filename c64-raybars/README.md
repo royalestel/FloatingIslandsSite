@@ -268,18 +268,27 @@ cl65 -t none -C raybars.cfg -o goldfly.prg goldfly.s
 python3 sim_goldfly.py       # needs -g -Ln goldfly.lbl; renders preview_goldfly.gif
 ```
 
-* **Spawn cycles.** Each new bar takes the next entry of three shuffled
-  tables in `fly.inc`, and keeps its tilt for the whole flight:
-  * a tilt: 32 slopes spread evenly from -1 to 1, so neighbouring segments
-    are up to 2 lines apart. Consecutive bars differ by at least half the
-    range.
+* **Tilts that don't repeat.** A tilt is a staircase across the 5
+  segments. Each segment can only move by whole lines, so the 32 angles
+  used before only made 13 different-looking tilts. Varying where the
+  steps fall as well as the slope gives 53 distinct staircases, with
+  neighbouring segments up to 2 lines apart (`tilt0..4` in `fly.inc`).
+  * The tilts sit in a ring, in the order they were last shown. A new bar
+    picks at random among the 13 that have waited longest, and that tilt
+    moves to the back of the ring. So no tilt comes back within 40 bars,
+    and every one keeps coming round.
+  * If the pick looks too much like the previous bar's tilt, the one half
+    the window away is taken instead.
+  * The simulator calls `drawtilt` 3000 times: all 53 are used, and the
+    closest repeat is 41 bars apart.
+* **Spawn cycles.** Each bar keeps its tilt for the whole flight. It takes
+  the next entry of two shuffled tables in `fly.inc`:
   * a distance from the centre line: 15 values from 124 to 250. The nearest
     start 13 lines from the centre, just clear of the light. The farthest
     start 30 lines out.
   * a palette: 13 entries, never the same one twice running.
 
-  The lengths 32, 15 and 13 are coprime, so the combination only repeats
-  every 6240 bars. Sides alternate above and below the light.
+  Sides alternate above and below the light.
 * **Perspective.** 1/Z grows linearly, so a bar grows at a steady rate.
   It is `48/Z` lines tall and `Y/Z` from the centre, where the asm
   multiplies Y by a `256/Z` table. A bar starts 8 lines tall and leaves the
@@ -325,7 +334,7 @@ python3 sim_goldfly.py       # needs -g -Ln goldfly.lbl; renders preview_goldfly
   * 8 black rows follow each bar, so columns are never cleared. The 8 rows
     above are only re-blacked after a merge has used them.
 
-  The worst frame, merged ones included, uses 97% of the free time over
+  The worst frame, merged ones included, uses 92% of the free time over
   4000 simulated frames. Bars never reach the light's sprite lines, which
   the simulator also checks every frame.
 
