@@ -283,46 +283,60 @@ python3 sim_goldfly.py       # needs -g -Ln goldfly.lbl; renders preview_goldfly
     closest repeat is 41 bars apart.
 * **Spawn cycles.** Each bar keeps its tilt for the whole flight. It takes
   the next entry of two shuffled tables in `fly.inc`:
-  * a distance from the centre line: 15 values from 124 to 250. The nearest
-    start 13 lines from the centre, just clear of the light. The farthest
-    start 30 lines out.
+  * a distance from the centre line: 15 values from 76 to 244. Far away,
+    that puts a bar 6 to 20 lines from the centre, right by the light.
   * a palette: 13 entries, never the same one twice running.
 
   Sides alternate above and below the light.
-* **Perspective.** 1/Z grows linearly, so a bar grows at a steady rate.
-  It is `48/Z` lines tall and `Y/Z` from the centre, where the asm
-  multiplies Y by a `256/Z` table. A bar starts 8 lines tall and leaves the
-  window at about 34. It dims with distance and reflects the light,
-  thickest nearest it. The highlight rides to the bar's edge once the bar
-  is nearer the camera than the light (depth 3).
+* **Perspective.** A bar flies at constant speed from depth 12 to 1.2
+  over 240 frames. It is `48/Z` lines tall and `Y/Z` from the centre,
+  where the asm multiplies Y by a `256/Z` table. So it starts 4 lines tall
+  beside the light, stays small there for about 3 seconds, then swells to
+  40 lines and rushes out through the top or bottom edge.
+  * A bar still on screen at the end near-clips at the camera: in one
+    frame its middle rows go, then the rest.
+  * It dims with distance and reflects the light, thickest nearest it. The
+    highlight rides to the bar's edge once the bar is nearer the camera
+    than the light (depth 3).
 * **Palettes:** the gold one; `8 12 7 8 11 8 15 7 1 7 1 7 7 15 8 11 9 9 11 8
   12 10 12 8`; and two 12-colour lists, `6 11 14 15 1 0 9 11 8 12 10 15`
   and `8 10 7 10 10 15 10 8 2 9 9 11`, dithered up to 24 rows. Each colour
   is followed by a row of (this colour, next colour) on alternating lines,
   so scaling up gives poor man's dithering between them.
-* **Pointer-read speedcode.** Each bar's display code is a 63-cycle loop:
-  5 x `lda (pK),y / sta $d021` (9 cycles, 72-pixel segments), `iny`,
-  padding, `dex / bne`. `pK` points into segment K's column, offset by the
-  tilt, so nothing is patched per frame. The bars are drawn inside the
-  display window (badline trick as in goldlight), so the side borders stay
-  black. Each column is one page, so `(pK),y` never crosses a page.
+* **Pointer-read speedcode.** Each bar row is 5 x `lda (pK),y / sta $d021`
+  (9 cycles, 72-pixel segments), then `iny` and loop control. `pK` points
+  into segment K's column, offset by the tilt. The bars are drawn inside
+  the display window (badline trick as in goldlight), so the side borders
+  stay black. Each column is one page, so `(pK),y` never crosses a page.
+* **Bars behind the light.** Far bars pass right behind the light's
+  sprite, and on the 21 lines where the sprite is fetched the VIC halts
+  the CPU for cycles 55-59.
+  * Rows on those lines run `63 - STEAL` cycles instead of 63. Each slot
+    has three loops: normal rows above the light, rows on its lines, and
+    normal rows below.
+  * The loops are chained by jumps that `nextbar` patches for each block,
+    and their entries are padded so every row keeps its exact length.
+  * The stable-raster IRQ's delay is one turn (5 cycles) shorter when its
+    line has the DMA.
+  * The sprite is drawn over the bar's colour, so it covers bars behind
+    it. Bars nearer than the light keep off its lines (Y >= 76).
+  * `STEAL` (5, because the loop's tail only reads) and the band lines
+    `BAND0`/`BAND1` are worked out from the VIC's timing, not measured.
+    The simulator can't emulate sprite DMA, so they need checking in VICE.
 * **Pipeline.** The main loop builds frame N+1 into back buffers (columns,
   pointers, the IRQ schedule) while frame N is shown. The top IRQ swaps
   them in. If a build ever ran late, the swap would simply wait a frame.
-* **Overlaps.** Two bars on the same side can cross, for example a far one
-  starting well out while a near one flies close to the centre. Bars fewer
-  than 4 lines apart can't each have their own IRQ, so they are merged:
-  * The block of the nearer bar (further along its flight) grows to cover
-    both bars.
-  * The farther bar's colours, padding included, are copied into the nearer
-    bar's column above and below its own rows. Any gap between the two is
-    made black.
+* **Overlaps.** Bars closer than 6 lines can't each have their own IRQ.
+  Far bars above and below the light meet at the centre, and bars on one
+  side can cross. Such bars share one block, up to all three:
+  * The nearest bar (furthest along its flight) draws the block, which
+    grows to cover them all.
+  * Its column is blacked outside its own lines. Then the other bars' rows
+    are copied in around its own rows, farthest first, so nearer bars
+    cover farther ones, segment by segment, tilt and all.
 
-  The nearer bar is drawn in front, segment by segment, tilt and all. Its
-  bar rows sit at row 72 of a 256-byte column, which leaves room for a
-  merged bar on either side. At most two bars share a side, so a third
-  never needs merging. The simulator checks every merged line against the
-  two bars' own columns.
+  Its bar rows sit at row 96 of a 256-byte column, which leaves room for
+  merged bars above and below.
 * **Speed tricks.**
   * Palettes come pre-dimmed: 4 palettes x 4 distance levels, 48 bytes
     each.
@@ -331,12 +345,18 @@ python3 sim_goldfly.py       # needs -g -Ln goldfly.lbl; renders preview_goldfly
   * The spec level is computed inside the highlight loop, which only does
     work for lit rows. A row-start table gives each lit row's expanded
     rows, and a static table gives each segment's highlight colour.
-  * 8 black rows follow each bar, so columns are never cleared. The 8 rows
-    above are only re-blacked after a merge has used them.
+  * Bars only grow within a flight, so each frame only blacks the rows
+    newly exposed below a bar. The 8 rows above, and all 8 below, are only
+    re-blacked after a merge or a respawn.
+  * The merge loops copy and black two rows at a time.
 
-  The worst frame, merged ones included, uses 92% of the free time over
-  4000 simulated frames. Bars never reach the light's sprite lines, which
-  the simulator also checks every frame.
+  The simulator runs the program's own display code for every block of
+  every frame. Over 4000 frames it found:
+  * Every row takes 63 cycles, or 58 on the light's lines.
+  * Every displayed cell shows the nearest bar covering it.
+  * Blocks leave room for the next IRQ.
+  * The worst frame uses 97% of the free time. Its budget allows 4 lines
+    of IRQ work per block and the sprite's own DMA.
 
 ## Tuning notes
 
