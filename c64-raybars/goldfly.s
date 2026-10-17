@@ -4,14 +4,16 @@
 ; =============================================================================
 ;
 ;  The light is a ball sprite fixed at the centre of the screen.  Three
-;  bars at a time fly toward the camera from the distance, each with a
-;  random palette (gold, a second 24-colour one, and two 12-colour ones
-;  dithered up to 24), a random fixed tilt (neighbouring segments up to 2
-;  lines apart), a random distance from the centre line, and alternating
-;  above / below the light.  In perspective they start small near the
-;  middle, grow and fly out through the top or bottom edge.  They dim with
-;  distance and reflect the light: thickest nearest it, and riding to the
-;  bar's edge once a bar is nearer the camera than the light.
+;  bars at a time fly toward the camera from the distance, alternating
+;  above / below the light.  Each new bar takes the next entry of three
+;  shuffled cycles (fly.inc): a tilt (32 slopes, neighbouring segments up
+;  to 2 lines apart), a distance from the centre line (15 values: some start
+;  right next to the light, some well out) and a palette (gold, a second
+;  24-colour one, and two 12-colour ones dithered up to 24).  The tilt never
+;  changes in flight.  In perspective they start small near the middle, grow
+;  and fly out through the top or bottom edge.  They dim with distance and
+;  reflect the light: thickest nearest it, and riding to the bar's edge once
+;  a bar is nearer the camera than the light.
 ;
 ;  DISPLAY: POINTER-READ SPEEDCODE
 ;  Each bar's display code is a 63-cycle loop over its rows:
@@ -20,24 +22,31 @@
 ;  segment's tilt.  Nothing is patched per frame: the main loop only builds
 ;  the columns and the pointers.  The bars live inside the display window
 ;  (opened without badlines, see goldlight.s), so only $d021 is written;
-;  the side borders stay black.  The columns are 64-byte aligned, so
-;  (pK),y never crosses a page (that would cost a cycle).
+;  the side borders stay black.  Each column is one page, so (pK),y never
+;  crosses a page (that would cost a cycle).
 ;
 ;  FRAME PIPELINE
 ;  The main loop builds frame N+1 (columns into the back buffer, pointers
 ;  and the IRQ schedule into "next" copies) while frame N is shown.  The
-;  top IRQ swaps them in when ready.  Bars are placed so they never share
-;  lines with each other (12+ lines apart) or with the light's sprite.
+;  top IRQ swaps them in when ready.  Bars never reach the light's sprite
+;  lines (no DMA steal to allow for).
+;
+;  OVERLAPS
+;  Two bars on the same side can cross.  Bars too close for an IRQ each are
+;  merged: the nearer bar's block grows to cover both lines ranges and the
+;  farther bar's colours are copied into the nearer bar's padding, around
+;  its own rows -- so the nearer bar is drawn in front.
 ; =============================================================================
 
         .setcpu "6502"
 
-        .include "fly.inc"      ; FLYD, flight tables, palettes, dims, rnd
+        .include "fly.inc"      ; FLYD, flight tables, spawn cycles, dimmed palettes
 
 NSLOT     = 3           ; bars in flight
 SEGS      = 5
-PAD       = 8           ; black rows above each bar's column (>= max slant)
-COLSZ     = 64          ; one column; 64-aligned so (p),y never crosses a page
+PAD       = 8           ; black rows above / below a bar's rows (>= max slant)
+BASE      = 72          ; a bar's first row in its column; the rest of the
+                        ; page is room for a merged bar above or below
 BARH      = 24          ; source rows per palette
 CENTRE    = 150         ; centre line of the screen: the light
 WTOP      = 62          ; bars are drawn on lines WTOP..WBOT
@@ -81,7 +90,9 @@ frameflag: .res 1               ; top IRQ: start building the next frame
 ready:   .res 1                 ; main loop: next frame is built
 buf:     .res 1                 ; column buffer being built (0/1)
 spawn:   .res 1                 ; bars spawned so far
-rndi:    .res 1                 ; random table index
+angi:    .res 1                 ; spawn cycle positions: tilt,
+yi:      .res 1                 ;   distance,
+pali:    .res 1                 ;   palette
 sidx:    .res 1                 ; schedule entry being shown
 curn:    .res 1                 ; rows / first row / code of the next bar
 cury:    .res 1
@@ -89,7 +100,8 @@ curvec:  .res 2
 st:      .res NSLOT             ; per slot: flight time
 spal:    .res NSLOT             ;           palette
 stilt:   .res NSLOT             ;           tilt angle
-sycl:    .res NSLOT             ;           lateral distance class
+sY:      .res NSLOT             ;           lateral distance
+sydy:    .res NSLOT             ;           its dy toward the light
 sside:   .res NSLOT             ;           0 = above the light, 1 = below
 s:       .res 1                 ; slot being built
 h:       .res 1                 ; its height, distance level, offset
@@ -100,13 +112,13 @@ dz:      .res 1
 sb:      .res 1
 acc:     .res 1
 kb:      .res SEGS              ; tilt: column start per segment
-top:     .res 1                 ; schedule entry being made
+top:     .res 1                 ; first line shown, end line
+bend:    .res 1
+m1:      .res 1                 ; multiplier
 n:       .res 1
 ys:      .res 1
 hh:      .res 1
 lb:      .res 1         ; highlight brightness base
-sr:      .res 1         ; source row
-lev16:   .res 1         ; distance level * 16
 rsp:     .res 2         ; rowstart row for this bar height
 si:      .res 1         ; source row
 rend:    .res 1
@@ -156,32 +168,27 @@ start:  sei
 @zp:    sta $02,x
         dex
         bpl @zp
-        ldx #0                  ; clear all columns (2 buffers)
-@col:   .repeat 8, P
-        sta cols + P*256,x
-        .endrep
-        inx
+        sta ptr                 ; clear all columns (2 buffers)
+        tay
+        lda #>cols
+        sta ptr+1
+        ldx #2*NSLOT*SEGS
+        tya
+@col:   sta (ptr),y
+        iny
+        bne @col
+        inc ptr+1
+        dex
         bne @col
         ldx #NSLOT-1            ; stagger the bars along their flight
 @stg:   lda stagger,x
         sta st,x
-        txa
-        sta sside,x             ; sides alternate
-        and #1
-        sta sside,x
-        lda #$ff
-        sta clev,x
-        lda rnd,x
-        and #3
-        sta spal,x
-        lda rnd+8,x
-        sta stilt,x
-        lda #1
-        sta sycl,x
+        jsr respawn
+        lda #0
+        sta dirty,x
+        sta dirty+NSLOT,x
         dex
         bpl @stg
-        lda #NSLOT
-        sta spawn
 
         ldx #62                 ; the light: the largest ball, centred
 @spr:   lda balls + 7*64,x
@@ -229,6 +236,64 @@ main:   lda frameflag           ; the top IRQ has swapped in the last frame
 nmi:    rti
 
 ; -----------------------------------------------------------------------------
+;  respawn slot x: the next tilt, distance and palette from the cycles;
+;  sides alternate spawn by spawn.
+; -----------------------------------------------------------------------------
+.proc respawn
+        ldy angi
+        lda angcyc,y
+        sta stilt,x
+        iny
+        cpy #NANG
+        bcc :+
+        ldy #0
+:       sty angi
+        ldy yi
+        lda ycyc,y
+        sta sY,x
+        lda ydy,y
+        sta sydy,x
+        iny
+        cpy #NYC
+        bcc :+
+        ldy #0
+:       sty yi
+        ldy pali
+        lda palcyc,y
+        sta spal,x
+        iny
+        cpy #NPALC
+        bcc :+
+        ldy #0
+:       sty pali
+        lda spawn
+        and #1
+        sta sside,x
+        inc spawn
+        rts
+.endproc
+
+; -----------------------------------------------------------------------------
+;  mulhi: A = round(A * acc / 256).  Uses X.
+; -----------------------------------------------------------------------------
+.proc mulhi
+        sta m1
+        lda #0
+        ldx #8
+        lsr m1
+l:      bcc :+
+        clc
+        adc acc
+:       ror
+        ror m1
+        dex
+        bne l
+        asl m1                  ; round
+        adc #0
+        rts
+.endproc
+
+; -----------------------------------------------------------------------------
 ;  atan2: A = angle of (dy, dz) in brads, all four quadrants.
 ; -----------------------------------------------------------------------------
 .proc atan2
@@ -274,7 +339,7 @@ done:   rts
         lda hltab + K,y         ; this segment's colour (0 = none)
         beq skip
 opname = * + 1
-        sta $ffff,x
+        sta $ff00,x
 skip:
 .endmacro
 
@@ -282,15 +347,13 @@ skip:
 ;  build: the next frame -- every bar's columns, pointers, and the schedule
 ; =============================================================================
 .proc build
-        lda #0
-        sta ncount
         ldx #NSLOT-1
 slot:   stx s
         jsr doslot
         ldx s
         dex
         bpl slot
-        jsr sortsched
+        jsr compose
         lda buf                 ; built into this buffer: show it next
         sta nbuf
         lda #1
@@ -310,32 +373,11 @@ slot:   stx s
         bcc alive
         lda #0
         sta st,x
-        ldy rndi                ; random palette, tilt, lateral distance
-        lda rnd,y
-        and #3
-        sta spal,x
-        lda rnd+1,y
-        sta stilt,x
-        lda rnd+2,y
-        and #3
-        cmp #3
-        bcc :+
-        lda #1
-:       sta sycl,x
-        lda rndi
-        clc
-        adc #3
-        sta rndi
-        lda spawn               ; sides alternate spawn by spawn
-        and #1
-        sta sside,x
-        inc spawn
-        lda #$ff                ; new palette: recolour its rows
-        sta clev,x
+        jsr respawn
 alive:
 
         ; ---- this slot's columns in the back buffer: patch the stores -------
-        ; column index m = buf*15 + s*5 + k
+        ; column page = >cols + buf*15 + s*5 + k
         lda buf
         beq :+
         lda #15
@@ -344,20 +386,17 @@ alive:
         asl
         asl
         adc s                   ; s*5
+        tay
         adc acc
-        tay                     ; m for k = 0
+        adc #>cols
         .repeat ::SEGS, K
-        lda collo+K,y
-        sta .ident(.sprintf("ex%d", K))
-        sta .ident(.sprintf("ov%d", K))
-        sta .ident(.sprintf("zc%d", K))
-        lda colhi+K,y
+        sta .ident(.sprintf("zt%d", K))+1
         sta .ident(.sprintf("ex%d", K))+1
         sta .ident(.sprintf("ov%d", K))+1
         sta .ident(.sprintf("zc%d", K))+1
+        sta vcp+K,y             ; for compose
+        adc #1
         .endrep
-
-
 
         ; ---- flight state --------------------------------------------------
         ldx s
@@ -368,18 +407,13 @@ alive:
         sta lev
         lda fdz,y
         sta dz
-        lda sycl,x
-        beq c0
-        cmp #1
-        beq c1
-        lda foff2,y
-        jmp coff
-c0:     lda foff0,y
-        jmp coff
-c1:     lda foff1,y
-coff:   sta off
+        lda finvz,y             ; offset from the centre line = Y / Z
+        sta acc
+        lda sY,x
+        jsr mulhi
+        sta off
 
-        ; ---- where it goes on screen ----------------------------------------
+        ; ---- where it goes on screen: lines top .. bend-1 ------------------
         lda h
         lsr
         clc
@@ -390,44 +424,40 @@ coff:   sta off
         adc #PAD
         sta n                   ; block rows
         lda #0
-        sta ys
+        sta ys                  ; block rows clipped at the top
         ldx s
         lda sside,x
         bne lower
-        ; above the light: centre = CENTRE - off (off <= 143: >= 7)
-        lda #CENTRE
-        sec
-        sbc off
-        sta top                 ; centre line
-        lda #WTOP
+        ; above the light: block top = CENTRE - (off + hh)
+        lda off
         clc
-        adc hh
-        cmp top
-        bcc nottop              ; centre - hh > WTOP: no clipping
-        sec
-        sbc top                 ; rows above WTOP
+        adc hh                  ; u <= 205
+        cmp #CENTRE - WTOP + 1
+        bcc notclip
+        sbc #CENTRE - WTOP      ; rows above WTOP
         sta ys
         cmp n
-        bcs hidden                ; all clipped
-        lda n
-        sec
-        sbc ys
-        sta n
+        bcs hidden              ; all clipped
         lda #WTOP
         sta top
-        jmp add
-nottop: lda top
+        jmp aend
+notclip: eor #$ff
         sec
-        sbc hh
+        adc #CENTRE             ; CENTRE - u
         sta top
-        jmp add
-lower:  ; below the light: centre = CENTRE + off
-        lda #CENTRE
-        clc
-        adc off
-        bcs hidden                ; past line 255
+aend:   clc
+        adc n
+        sec
+        sbc ys
+        sta bend
+        jmp visible
+lower:  ; below the light: block top = CENTRE + off - hh (off - hh >= 13)
+        lda off
         sec
         sbc hh
+        clc
+        adc #CENTRE
+        bcs hidden              ; past line 255
         cmp #WBOT
         bcs hidden
         sta top
@@ -435,14 +465,14 @@ lower:  ; below the light: centre = CENTRE + off
         adc n
         bcs clipb
         cmp #WBOT + 1
-        bcc add
-clipb:
-        lda #WBOT + 1           ; clip at the bottom of the window
-        sec
-        sbc top
-        sta n
-add:    jmp visible         ; on screen: build it, then enter it
-hidden: rts
+        bcc :+
+clipb:  lda #WBOT + 1           ; clip at the bottom of the window
+:       sta bend
+        jmp visible
+hidden: ldx s
+        lda #0
+        sta vis,x
+        rts
 visible:
 
         ; ---- tilt -----------------------------------------------------------------
@@ -453,8 +483,7 @@ visible:
         .endrep
 
         ; ---- the light seen from this bar ---------------------------------------
-        ldy sycl,x
-        lda fdy,y               ; lateral distance, toward the centre
+        lda sydy,x              ; lateral distance, toward the centre
         ldy sside,x
         bne below
         sta dy                  ; bar above: the light is below it (+)
@@ -469,133 +498,88 @@ sdy:    jsr atan2
         adc #1
         sta spe_op
 
-        ; ---- 24 source rows: spec levels ---------------------------------------
-        ldy #BARH-1
-spl:    ldx theta2,y
-spe_op = * + 1
-        lda spectab,x
-        sta specs,y
-        dey
-        bpl spl
-
-        ; ---- the bar's dimmed palette rows: cached per slot ---------------------
+        ; ---- the bar's palette at this distance: one of 16 tables ----------
         ldx s
-        lda srcbe,x             ; this slot's cache: csrce/csrco + s*24
-        sta se_op
-        lda srcbo,x
-        sta so_op
-        lda lev
-        cmp clev,x
-        beq cached
-        sta clev,x
+        lda spal,x
         asl
         asl
-        asl
-        asl
-        sta lev16
-        lda spal,x              ; palette offset = pal * 24
-        asl
-        asl
-        asl
-        sta acc
-        asl
-        clc
-        adc acc
-        sta pal_op
-        lda srcbe,x
-        sta cw_op
-        lda srcbo,x
-        sta cwo_op
-        ldy #BARH-1
-srow:   sty acc
-        tya
-        clc
-pal_op = * + 1
-        adc #0
-        tax                     ; palette * 24 + row
-        lda pale,x
-        clc
-        adc lev16
-        tay
-        lda dims4,y             ; dimmed by distance
-        ldy acc
-cw_op = * + 1
-        sta csrce,y
-        lda palo,x
-        clc
-        adc lev16
-        tay
-        lda dims4,y
-        ldy acc
-cwo_op = * + 1
-        sta csrco,y
-        dey
-        bpl srow
-cached:
+        adc lev
+        tax
+        lda pdl,x
+        sta src_op
+        lda pdh,x
+        sta src_op+1
+
+        ; ---- 8 black rows before the bar: only stale after a merge -------
+        lda buf
+        beq :+
+        lda #NSLOT
+:       clc
+        adc s
+        tax
+        lda dirty,x
+        beq clean
+        lda #0
+        sta dirty,x
+        ldx #BASE - PAD
+ztop:
+zt0 = * + 1
+        sta $ff00,x
+zt1 = * + 1
+        sta $ff00,x
+zt2 = * + 1
+        sta $ff00,x
+zt3 = * + 1
+        sta $ff00,x
+zt4 = * + 1
+        sta $ff00,x
+        inx
+        cpx #BASE
+        bne ztop
+clean:
 
         ; ---- nearest-neighbour expansion into all 5 columns ----------------
+        ; nnmap gives each expanded row's cache index (source row, parity)
         ldx h
-        lda nnsteplo,x
-        sta stl_op
-        lda nnstephi,x
-        sta sth_op
-        lda #PAD
-        clc
-        adc h
-        sta endx_op
-        ldx #PAD
-        lda #0
-        sta acc
-        tay                     ; source row
-        clc
-exl:    txa                     ; even or odd row of the bar
-        lsr
-        bcs odd
-se_op = * + 1
-        lda csrce,y
-        jmp put
-odd:
-so_op = * + 1
-        lda csrco,y
-put:
+        lda nnml,x
+        sta rsp
+        lda nnmh,x
+        sta rsp+1
+        stx endy_op
+        ldy #0
+exl:    lda (rsp),y
+        tax
+src_op = * + 1
+        lda $ffff,x
 ex0 = * + 1
-        sta $ffff,x
+        sta $ff00 + BASE,y
 ex1 = * + 1
-        sta $ffff,x
+        sta $ff00 + BASE,y
 ex2 = * + 1
-        sta $ffff,x
+        sta $ff00 + BASE,y
 ex3 = * + 1
-        sta $ffff,x
+        sta $ff00 + BASE,y
 ex4 = * + 1
-        sta $ffff,x
-        inx
-        lda acc
-        clc
-stl_op = * + 1
-        adc #0
-        sta acc
-        tya
-sth_op = * + 1
-        adc #0
-        tay
-endx_op = * + 1
-        cpx #0
+        sta $ff00 + BASE,y
+        iny
+endy_op = * + 1
+        cpy #0
         bne exl
-        lda #0                  ; 8 black rows after the bar (no clearing needed:
-        ldy #PAD                ; rows further down are never read)
+        lda #0                  ; 8 black rows after the bar
+        ldx #PAD
 z8:
 zc0 = * + 1
-        sta $ffff,x
+        sta $ff00 + BASE,y
 zc1 = * + 1
-        sta $ffff,x
+        sta $ff00 + BASE,y
 zc2 = * + 1
-        sta $ffff,x
+        sta $ff00 + BASE,y
 zc3 = * + 1
-        sta $ffff,x
+        sta $ff00 + BASE,y
 zc4 = * + 1
-        sta $ffff,x
-        inx
-        dey
+        sta $ff00 + BASE,y
+        iny
+        dex
         bne z8
 
         ; ---- the highlight, per segment ------------------------------------
@@ -611,29 +595,29 @@ zc4 = * + 1
         sta rsp
         lda rsh,x
         sta rsp+1
-        lda #0
-        sta si
-ovi:    ldy si
-        lda specs,y
+        ldy #BARH-1
+ovi:    ldx theta2,y            ; this source row's spec level
+spe_op = * + 1
+        lda spectab,x
         cmp #HLTHR
-        bcs :+
-        jmp ovskip
-:       tax
+        bcc ovskip
+        sty si
+        tax
         lda mul5,x
         clc
         adc lb
         sta hidx                ; hltab row for this spec level
         lda (rsp),y             ; rows rowstart[i] .. rowstart[i+1]-1
         clc
-        adc #PAD
+        adc #BASE
         tax
         iny
         lda (rsp),y
         clc
-        adc #PAD
+        adc #BASE
         sta rend
         cpx rend
-        beq ovskip
+        beq ovnext
         ldy hidx
 rowl:   hlrow 0, ov0
         hlrow 1, ov1
@@ -643,138 +627,309 @@ rowl:   hlrow 0, ov0
         inx
         cpx rend
         bne rowl
-ovskip: inc si
-        lda si
-        cmp #BARH
-        beq :+
-        jmp ovi
-:
+ovnext: ldy si
+ovskip: dey
+        bpl ovi
 
-        ; ---- next pointers for this bar -------------------------------------
-        ; pK = column K + kb_K (row r of the block reads column[r + kb_K])
-        lda s
+        ; ---- for compose: lines, height, column index of the first line shown
+        ; pl_K = BASE - off_K + ys (kb_K = PAD - off_K)
+        ldx s
+        lda #1
+        sta vis,x
+        lda top
+        sta vD,x
+        lda bend
+        sta vE,x
+        lda h
+        sta vh,x
+        txa
         asl
         asl
-        clc
-        adc s                   ; s*5
-        asl                     ; *2: pointer pairs
+        adc s
         tax
         .repeat ::SEGS, K
-        lda .ident(.sprintf("ex%d", K))
+        lda kb+K
         clc
-        adc kb+K
-        sta nptr + K*2,x
-        lda .ident(.sprintf("ex%d", K))+1
-        adc #0
-        sta nptr + K*2 + 1,x
+        adc ys
+        adc #BASE - PAD
+        sta vpl+K,x
         .endrep
-
-        ldx ncount              ; schedule entry
-        lda top
-        sec
-        sbc #2
-        sta nline,x
-        lda s
-        sta nslot,x
-        lda n
-        sta nnrows,x
-        lda ys
-        sta nystart,x
-        inc ncount
         rts
 .endproc
 
 ; -----------------------------------------------------------------------------
-;  sortsched: order the next schedule by line; drop a bar that would start
-;  before the previous one has finished (never happens with these flights,
-;  but it keeps the IRQ chain safe).
+;  compose: the next frame's pointers and IRQ schedule from the visible bars,
+;  in screen order.  Bars too close for an IRQ each (fewer than 4 lines
+;  apart) are merged: the block of the nearer one (further along its flight)
+;  grows to cover both, and the farther bar's colours are copied into its
+;  column around its own rows.  A third bar on the same lines would be
+;  dropped (two bars at most share a side, so it never happens).
 ; -----------------------------------------------------------------------------
-.proc sortsched
-        ldx ncount
-        cpx #2
-        bcc check
-        ; 3-element sort network on (nline, nslot, nnrows, nystart)
+.proc compose
         ldx #0
-        ldy #1
-        jsr cswap
-        ldx ncount
-        cpx #3
-        bcc check
+        ldy #0
+gath:   lda vis,y
+        beq :+
+        tya
+        sta ord,x
+        inx
+:       iny
+        cpy #NSLOT
+        bne gath
+        stx cnt
+        lda #0
+        sta ncount
+        cpx #0
+        bne :+
+        rts
+:       cpx #2                  ; sort by first line (3-element network)
+        bcc sorted
+        ldx #0
+        jsr oswap
+        lda cnt
+        cmp #3
+        bcc sorted
         ldx #1
-        ldy #2
-        jsr cswap
+        jsr oswap
         ldx #0
-        ldy #1
-        jsr cswap
-check:  ldx #1
-cl:     cpx ncount
-        bcs done
-        lda nline-1,x           ; previous end = line + 2 + rows
+        jsr oswap
+sorted: ldx ord
+        jsr begin
+        lda #1
+        sta oi
+nxt:    ldx oi
+        cpx cnt
+        bcs fin
+        ldy ord,x               ; the next bar down
+        lda cE
         clc
-        adc #2
-        clc
-        adc nnrows-1,x
-        clc
-        adc #2                  ; room for the IRQ
-        cmp nline,x
-        bcc ok
-        beq ok
-        ; drop entry x: shift the rest down
-        txa
-        tay
-dl:     iny
-        cpy ncount
-        bcs dropped
-        lda nline,y
-        sta nline-1,y
-        lda nslot,y
-        sta nslot-1,y
-        lda nnrows,y
-        sta nnrows-1,y
-        lda nystart,y
-        sta nystart-1,y
-        jmp dl
-dropped:
-        dec ncount
-        jmp cl
-ok:     inx
-        jmp cl
-done:   rts
+        adc #4                  ; room for its IRQ?
+        bcs close
+        cmp vD,y
+        bcc apart
+        beq apart
+close:  lda fr
+        bpl adv                 ; already merged: drop a third bar
+        ldx nr
+        lda st,y                ; nearer = further along its flight
+        cmp st,x
+        bcc yfar
+        sty nr
+        stx fr
+        jmp grow
+yfar:   sty fr
+grow:   lda vE,y
+        cmp cE
+        bcc adv
+        sta cE
+        jmp adv
+apart:  tya
+        pha
+        jsr emit
+        pla
+        tax
+        jsr begin
+adv:    inc oi
+        jmp nxt
+fin:    ; the last block
 
-cswap:  lda nline,y             ; swap x/y if line[y] < line[x]
-        cmp nline,x
-        bcs :+
-        .repeat 4, F
-        .if F = 0
-        lda nline,x
-        pha
-        lda nline,y
+; emit: schedule block nr (lines cD .. cE-1), merging bar fr into it
+emit:   ldx ncount
+        lda cD
+        sec
+        sbc #2
         sta nline,x
-        pla
-        sta nline,y
-        .elseif F = 1
-        lda nslot,x
-        pha
-        lda nslot,y
+        lda nr
         sta nslot,x
-        pla
-        sta nslot,y
-        .elseif F = 2
-        lda nnrows,x
-        pha
-        lda nnrows,y
+        lda cE
+        sec
+        sbc cD
         sta nnrows,x
-        pla
-        sta nnrows,y
-        .else
-        lda nystart,x
-        pha
-        lda nystart,y
+        lda #0
         sta nystart,x
+        inc ncount
+        ldx nr                  ; near pointers: pl_K - (D - cD)
+        lda vD,x
+        sec
+        sbc cD
+        sta dn
+        txa
+        asl
+        asl
+        adc nr
+        sta ni
+        asl
+        tax
+        ldy ni
+        lda #SEGS
+        sta k
+ptrs:   lda vpl,y
+        sec
+        sbc dn
+        sta nptr,x
+        lda vcp,y
+        sta nptr+1,x
+        inx
+        inx
+        iny
+        dec k
+        bne ptrs
+        lda fr
+        bpl merge
+        rts
+
+merge:  ; the far bar's lines, relative to cD: df .. ef-1
+        tax
+        lda vD,x
+        sec
+        sbc cD
+        sta df
+        lda vE,x
+        sec
+        sbc cD
+        sta ef
+        txa
+        asl
+        asl
+        adc fr
+        sta fi
+        ldx nr                  ; near bar rows (kept): BASE .. nbe-1
+        lda vh,x
+        clc
+        adc #BASE
+        sta nbe
+        lda vE,x                ; near lines: dn .. en-1
+        sec
+        sbc cD
+        sta en
+        lda #0                  ; lines in neither block: g0 .. g1-1
+        sta g0
+        sta g1
+        lda en
+        cmp df
+        bcs :+
+        sta g0                  ; near above far
+        lda df
+        sta g1
+:       lda ef
+        cmp dn
+        bcs :+
+        sta g0                  ; far above near
+        lda dn
+        sta g1
+:       lda buf                 ; its top pad needs clearing next time
+        beq :+
+        lda #NSLOT
+:       clc
+        adc nr
+        tax
+        lda #1
+        sta dirty,x
+        lda #0
+        sta k
+seg:    lda ni                  ; near column index of line cD
+        clc
+        adc k
+        tax
+        lda vpl,x
+        sec
+        sbc dn
+        sta pn
+        lda vcp,x
+        sta cpd+1
+        sta zd+1
+        lda fi                  ; far column, read with the near index
+        clc
+        adc k
+        tax
+        lda vpl,x
+        sec
+        sbc df                  ; far index of line cD
+        sec
+        sbc pn
+        sta cps
+        lda vcp,x
+        sbc #0
+        sta cps+1
+        lda pn                  ; far lines as near indices: ca .. cb-1
+        clc
+        adc df
+        sta ca
+        lda pn
+        clc
+        adc ef
+        sta cb
+        ldy ca                  ; copy above the near bar's rows
+        cmp #BASE
+        bcc :+
+        lda #BASE
+:       jsr copy
+        ldy ca                  ; ... and below them
+        cpy nbe
+        bcs :+
+        ldy nbe
+:       lda cb
+        jsr copy
+        lda pn                  ; black in the gap
+        clc
+        adc g0
+        tay
+        lda pn
+        clc
+        adc g1
+        jsr zero
+        inc k
+        lda k
+        cmp #SEGS
+        beq :+
+        jmp seg
+:       rts
+
+copy:   sta ce                  ; copy rows y .. A-1
+        cpy ce
+        bcs cdone
+cl:
+cps = * + 1
+        lda $ffff,y
+cpd = * + 1
+        sta $ff00,y
+        iny
+        cpy ce
+        bne cl
+cdone:  rts
+
+zero:   sta ce                  ; zero rows y .. A-1
+        cpy ce
+        bcs zdone
+        lda #0
+zl:
+zd = * + 1
+        sta $ff00,y
+        iny
+        cpy ce
+        bne zl
+zdone:  rts
+
+begin:  stx nr                  ; a new block: bar x
+        lda vD,x
+        sta cD
+        lda vE,x
+        sta cE
+        lda #$ff
+        sta fr
+        rts
+
+oswap:  ldy ord+1,x             ; swap ord x, x+1 if out of order
+        lda vD,y
+        ldy ord,x
+        cmp vD,y
+        bcs :+
+        lda ord,x
+        pha
+        lda ord+1,x
+        sta ord,x
         pla
-        sta nystart,y
-        .endif
-        .endrep
+        sta ord+1,x
 :       rts
 .endproc
 
@@ -934,7 +1089,7 @@ bout:   lda save_a
 .segment "TABLES"
         .include "tables.inc"   ; spectab, theta2_12, log2/atan
         .include "orbit.inc"    ; balls
-        .include "twin.inc"     ; tkbase0..4, nnsteplo/hi
+        .include "twin.inc"     ; tkbase0..4
         .assert <spectab = 0, error, "spectab must be page aligned"
 
 stagger: .byte 0, FLYD/3, 2*FLYD/3
@@ -949,31 +1104,32 @@ DROP4 = 4
 lev45:  .byte 0, 45, 90, 135     ; hltab: (lev*9 + spec)*5 + segment
 mul5:   .byte 0, 5, 10, 15, 20, 25, 30, 35, 40
 
-; column addresses: index m = buf*15 + slot*5 + segment
-collo:  .repeat 2*NSLOT*SEGS, M
-        .byte <(cols + M*COLSZ)
-        .endrep
-colhi:  .repeat 2*NSLOT*SEGS, M
-        .byte >(cols + M*COLSZ)
-        .endrep
 rsl:    .repeat 49, HH
         .byte <(rowstart + HH*25)
         .endrep
 rsh:    .repeat 49, HH
         .byte >(rowstart + HH*25)
         .endrep
-srcbe:  .byte <csrce, <(csrce + BARH), <(csrce + 2*BARH)  ; per-slot colour caches
-srcbo:  .byte <csrco, <(csrco + BARH), <(csrco + 2*BARH)
+pdl:    .repeat 16, P               ; palette * 4 + level
+        .byte <(pdim + P*2*BARH)
+        .endrep
+pdh:    .repeat 16, P
+        .byte >(pdim + P*2*BARH)
+        .endrep
+nnml:   .byte 0
+        .repeat 48, HH
+        .byte <(nnmap + (HH + 1)*HH/2)
+        .endrep
+nnmh:   .byte 0
+        .repeat 48, HH
+        .byte >(nnmap + (HH + 1)*HH/2)
+        .endrep
 blkvlo: .lobytes blk0, blk1, blk2
 blkvhi: .hibytes blk0, blk1, blk2
 
 ; =============================================================================
 .segment "BSS"
-csrce:  .res NSLOT*BARH         ; per slot: dimmed palette rows, even lines
-csrco:  .res NSLOT*BARH         ;           ... odd lines (one page with csrce)
-        .assert >csrce = >(csrco + NSLOT*BARH - 1), error, "colour caches must share a page"
-specs:  .res BARH
-clev:   .res NSLOT              ; cached distance level per slot ($ff: stale)
+dirty:  .res 2*NSLOT            ; per buffer and slot: merged into, pad stale
 nbuf:   .res 1
 nptr:   .res NSLOT*SEGS*2
 ncount: .res 1
@@ -986,9 +1142,35 @@ sline:  .res NSLOT
 sslot:  .res NSLOT
 snrows: .res NSLOT
 systart: .res NSLOT
+vis:    .res NSLOT              ; per slot, from doslot: shown?
+vD:     .res NSLOT              ;   first line, end line, bar height
+vE:     .res NSLOT
+vh:     .res NSLOT
+vpl:    .res NSLOT*SEGS         ;   column index of the first line, per segment
+vcp:    .res NSLOT*SEGS         ;   column page, per segment
+ord:    .res NSLOT              ; compose: visible slots in screen order
+cnt:    .res 1
+oi:     .res 1
+nr:     .res 1                  ; block's (nearer) bar, merged far bar ($ff: none)
+fr:     .res 1
+cD:     .res 1                  ; block lines
+cE:     .res 1
+dn:     .res 1                  ; merge: near / far lines relative to cD
+en:     .res 1
+df:     .res 1
+ef:     .res 1
+ni:     .res 1                  ; near / far slot * 5
+fi:     .res 1
+nbe:    .res 1
+g0:     .res 1
+g1:     .res 1
+k:      .res 1
+pn:     .res 1
+ca:     .res 1
+cb:     .res 1
+ce:     .res 1
 
 .segment "RAMPS"
-; dims4 lives in fly.inc
-cols:   .res 2*NSLOT*SEGS*COLSZ ; 1920 bytes of 64-aligned columns
+cols:   .res 2*NSLOT*SEGS*256   ; a page per column, 2 buffers
         .assert <cols = 0, error, "cols must be page aligned"
         .assert * <= VICBANK, error, "program runs into the VIC bank"

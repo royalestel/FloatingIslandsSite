@@ -268,16 +268,24 @@ cl65 -t none -C raybars.cfg -o goldfly.prg goldfly.s
 python3 sim_goldfly.py       # needs -g -Ln goldfly.lbl; renders preview_goldfly.gif
 ```
 
-* **Each bar** spawns with a random palette and a random tilt (neighbouring
-  segments up to 2 lines apart), which it keeps for its whole flight. It
-  also gets a random distance from the centre line, and the sides
-  alternate above and below the light.
-* **Perspective.** 1/Z grows linearly, so a bar grows at a steady rate:
-  `48/Z` lines tall and `Yc/Z` from the centre (Yc = 170..200). It starts
-  8 lines tall near the middle and leaves the window at about 34. It dims
-  with distance and reflects the light, thickest nearest it. The highlight
-  rides to the bar's edge once the bar is nearer the camera than the light
-  (depth 3).
+* **Spawn cycles.** Each new bar takes the next entry of three shuffled
+  tables in `fly.inc`, and keeps its tilt for the whole flight:
+  * a tilt: 32 slopes spread evenly from -1 to 1, so neighbouring segments
+    are up to 2 lines apart. Consecutive bars differ by at least half the
+    range.
+  * a distance from the centre line: 15 values from 124 to 250. The nearest
+    start 13 lines from the centre, just clear of the light. The farthest
+    start 30 lines out.
+  * a palette: 13 entries, never the same one twice running.
+
+  The lengths 32, 15 and 13 are coprime, so the combination only repeats
+  every 6240 bars. Sides alternate above and below the light.
+* **Perspective.** 1/Z grows linearly, so a bar grows at a steady rate.
+  It is `48/Z` lines tall and `Y/Z` from the centre, where the asm
+  multiplies Y by a `256/Z` table. A bar starts 8 lines tall and leaves the
+  window at about 34. It dims with distance and reflects the light,
+  thickest nearest it. The highlight rides to the bar's edge once the bar
+  is nearer the camera than the light (depth 3).
 * **Palettes:** the gold one; `8 12 7 8 11 8 15 7 1 7 1 7 7 15 8 11 9 9 11 8
   12 10 12 8`; and two 12-colour lists, `6 11 14 15 1 0 9 11 8 12 10 15`
   and `8 10 7 10 10 15 10 8 2 9 9 11`, dithered up to 24 rows. Each colour
@@ -288,19 +296,38 @@ python3 sim_goldfly.py       # needs -g -Ln goldfly.lbl; renders preview_goldfly
   padding, `dex / bne`. `pK` points into segment K's column, offset by the
   tilt, so nothing is patched per frame. The bars are drawn inside the
   display window (badline trick as in goldlight), so the side borders stay
-  black. The columns are 64-byte aligned, so `(pK),y` never crosses a page.
+  black. Each column is one page, so `(pK),y` never crosses a page.
 * **Pipeline.** The main loop builds frame N+1 into back buffers (columns,
   pointers, the IRQ schedule) while frame N is shown. The top IRQ swaps
   them in. If a build ever ran late, the swap would simply wait a frame.
-* **Speed tricks.** Each bar caches its dimmed palette rows (recoloured only
-  when its distance level changes). A row-start table lets the highlight
-  visit only lit rows. A static table gives each segment's highlight colour,
-  and 8 black rows after each bar replace clearing. The worst frame uses 89%
-  of the free time.
-* **Spacing.** Bars are spaced so they never share lines with each other
-  (12+ lines apart) or with the light's sprite, which the simulator checks
-  every frame. If the spacing is tightened so bars cross, a far bar's
-  colours would be written into the near bar's padding rows.
+* **Overlaps.** Two bars on the same side can cross, for example a far one
+  starting well out while a near one flies close to the centre. Bars fewer
+  than 4 lines apart can't each have their own IRQ, so they are merged:
+  * The block of the nearer bar (further along its flight) grows to cover
+    both bars.
+  * The farther bar's colours, padding included, are copied into the nearer
+    bar's column above and below its own rows. Any gap between the two is
+    made black.
+
+  The nearer bar is drawn in front, segment by segment, tilt and all. Its
+  bar rows sit at row 72 of a 256-byte column, which leaves room for a
+  merged bar on either side. At most two bars share a side, so a third
+  never needs merging. The simulator checks every merged line against the
+  two bars' own columns.
+* **Speed tricks.**
+  * Palettes come pre-dimmed: 4 palettes x 4 distance levels, 48 bytes
+    each.
+  * A row map per bar height gives each expanded row's palette entry, so
+    there is no stepping in the loop.
+  * The spec level is computed inside the highlight loop, which only does
+    work for lit rows. A row-start table gives each lit row's expanded
+    rows, and a static table gives each segment's highlight colour.
+  * 8 black rows follow each bar, so columns are never cleared. The 8 rows
+    above are only re-blacked after a merge has used them.
+
+  The worst frame, merged ones included, uses 97% of the free time over
+  4000 simulated frames. Bars never reach the light's sprite lines, which
+  the simulator also checks every frame.
 
 ## Tuning notes
 

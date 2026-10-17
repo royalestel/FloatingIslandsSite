@@ -2,9 +2,9 @@
 """Run goldfly.prg's frame building on an emulated 6502 (py65).
 
 Checks: every bar row loop is exactly 63 cycles; no column read crosses a
-page; bars never share lines with each other or with the light's sprite;
-the first bar's IRQ comes after the top IRQ; and the build fits in the
-frame's free time.  Renders preview_goldfly.gif / .png.
+page; scheduled blocks (overlapping bars merged into one) never share lines
+with each other or with the light's sprite; the first bar's IRQ comes after
+the top IRQ; and the build fits in the frame's free time.  Renders preview_goldfly.gif / .png.
 
     cl65 -g -t none -C raybars.cfg -Ln goldfly.lbl -o goldfly.prg goldfly.s
     python3 sim_goldfly.py
@@ -14,7 +14,7 @@ from py65.devices.mpu6502 import MPU
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FRAMES, NSLOT, SEGS, LINE = 600, 3, 5, 63
+FRAMES, NSLOT, SEGS, LINE = int(os.environ.get("FRAMES", 600)), 3, 5, 63
 SPRY, SPRX = 150 - 11, 184 - 12
 TOP, BOTTOM = 40, 270
 
@@ -37,7 +37,7 @@ mem = mpu.memory
 ok = True
 for sl in range(NSLOT):
     for k in range(SEGS):                       # point every pointer at a column
-        p = L["cols"] + k * 64
+        p = L["cols"] + k * 256
         mem[L["ptr"] + (sl * SEGS + k) * 2] = p & 255
         mem[L["ptr"] + (sl * SEGS + k) * 2 + 1] = p >> 8
     blk = L[f"blk{sl}"]
@@ -69,9 +69,13 @@ mem[L["buf"]] = mem[L["nbuf"]] ^ 1
 mem[L["ready"]] = 0
 
 frames, worst, pagecross, overlap, sprite_hit, early = [], 0, 0, 0, 0, 0
+merged, dropped, badmerge = 0, 0, 0
 for f in range(FRAMES):
     cyc = call(L["build"])
     cnt = mem[L["ncount"]]
+    nvis = sum(mem[L["vis"] + i] for i in range(NSLOT))
+    merged += nvis - cnt == 1
+    dropped += nvis - cnt > 1
     ents = []
     for i in range(cnt):
         line, slot = mem[L["nline"] + i], mem[L["nslot"] + i]
@@ -92,6 +96,35 @@ for f in range(FRAMES):
         if line <= SPRY + 21 and line + 2 + n > SPRY - 1:
             sprite_hit += 1
         early += line < 58
+    # merged blocks: every line must match the two bars' own columns, the
+    # nearer bar's rows in front
+    vis = [s_ for s_ in range(NSLOT) if mem[L["vis"] + s_]]
+    for i in range(cnt):
+        near = mem[L["nslot"] + i]
+        line, n, rows = ents[i]
+        D0 = line + 2
+        for far in vis:
+            if far == near or far in [mem[L["nslot"] + j] for j in range(cnt)]:
+                continue
+            if not (mem[L["vD"] + far] < D0 + n and mem[L["vE"] + far] > D0):
+                continue
+            BASE = 72
+            for r in range(n):
+                ln = D0 + r
+                for k in range(SEGS):
+                    def cell(sl):
+                        idx = mem[L["vpl"] + sl * SEGS + k] + ln - mem[L["vD"] + sl]
+                        return mem[mem[L["vcp"] + sl * SEGS + k] * 256 + idx], idx
+                    cn, ni = cell(near)
+                    if BASE <= ni < BASE + mem[L["vh"] + near]:
+                        want = cn
+                    elif mem[L["vD"] + far] <= ln < mem[L["vE"] + far]:
+                        want = cell(far)[0]
+                    elif mem[L["vD"] + near] <= ln < mem[L["vE"] + near]:
+                        want = 0
+                    else:
+                        want = 0
+                    badmerge += rows[r][k] != want
     for (l1, n1, _), (l2, n2, _) in zip(ents, ents[1:]):
         if l2 < l1 + 2 + n1 + 2:
             overlap += 1
@@ -104,10 +137,13 @@ for f in range(FRAMES):
     mem[L["buf"]] = mem[L["nbuf"]] ^ 1
     mem[L["ready"]] = 0
 ok &= pagecross == 0 and overlap == 0 and sprite_hit == 0 and early == 0
+ok &= dropped == 0 and badmerge == 0
+print('merged cells not matching the two bars:', badmerge)
 print(f"build(): worst {worst:.0f}% of the frame's free time")
 print(f"page-crossing reads {pagecross}, overlapping bars {overlap}, "
       f"bars on the light's lines {sprite_hit}, bars before line 58 {early}")
-print("bars per frame:", sorted({len(e) for e in frames}))
+print("blocks per frame:", sorted({len(e) for e in frames}),
+      f"- frames with two bars merged {merged}, with a bar dropped {dropped}")
 
 # --- 3. render ---------------------------------------------------------------------
 W, H, SCALE = 384, BOTTOM - TOP, 2
