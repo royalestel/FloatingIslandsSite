@@ -142,22 +142,48 @@ def render(roll, pitch, scale=0.96):
                     if z < zb[yy][xx]:
                         zb[yy][xx] = z
                         cls[yy][xx] = c
-    rows = []
+    counts = []
     for r in range(21):
-        row = []
+        crow = []
         for cx in range(12):
             cnt = [0, 0, 0, 0]
             for yy in range(r * SY, r * SY + SY):
                 for xx in range(cx * SX, cx * SX + SX):
                     cnt[cls[yy][xx]] += 1
-            tot = SX * SY
+            crow.append(cnt)
+        counts.append(crow)
+    tot = SX * SY
+    def pick(cnt):
+        return 2 if cnt[2] >= cnt[1] else 1
+    rows = []
+    for r in range(21):
+        row = []
+        for cx in range(12):
+            cnt = counts[r][cx]
             if cnt[3] * 5 >= tot:
                 row.append(3)
             elif cnt[1] + cnt[2] + cnt[3] >= tot * 0.34:
-                row.append(2 if cnt[2] >= cnt[1] else 1)
+                row.append(pick(cnt))
             else:
                 row.append(0)
         rows.append(row)
+    # bridge one-pixel gaps: an empty pixel a part passes through is filled
+    # when it sits between two filled ones (thin slanted parts break up)
+    def at(r, c):
+        return rows[r][c] if 0 <= r < 21 and 0 <= c < 12 else 0
+    add = []
+    for r in range(21):
+        for cx in range(12):
+            cnt = counts[r][cx]
+            if rows[r][cx] or cnt[1] + cnt[2] + cnt[3] < tot * 0.08:
+                continue
+            for (a1, b1), (a2, b2) in (((0, -1), (0, 1)), ((-1, 0), (1, 0)),
+                                       ((-1, -1), (1, 1)), ((-1, 1), (1, -1))):
+                if at(r + a1, cx + b1) and at(r + a2, cx + b2):
+                    add.append((r, cx, 3 if cnt[3] > max(cnt[1], cnt[2]) else pick(cnt)))
+                    break
+    for r, cx, v in add:
+        rows[r][cx] = v
     return rows
 
 # attitudes: level, up, down, left, right, left-up, left-down, right-up,
