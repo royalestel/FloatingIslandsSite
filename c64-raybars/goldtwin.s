@@ -15,7 +15,8 @@
 ;   * It brightens as it nears: 4 levels of 16-entry colour remaps.  At
 ;     first, yellow shows as brown and white as dark grey; then yellow as
 ;     orange and white as light grey; full colour from about bar A's size.
-;     The traced highlight is dimmed the same way.
+;     The traced highlight is never darker than medium grey, and its
+;     strongest rows brighten first: grey -> light grey -> white.
 ;   * At the camera it near-clips in two frames: the large middle section
 ;     (the nearest part) vanishes, then the rest; a short pause and it
 ;     comes again.
@@ -124,7 +125,8 @@ jhi:     .res 1
 acc:     .res 1         ; nearest-neighbour source row, fraction
 bthr:    .res SEGS      ; bar B: white if the spec level >= bthr
 minthr:  .res 1         ; the lowest of those
-wcol:    .res 1         ; the highlight's white, dimmed for bar B's distance
+lbase:   .res 1         ; bar B highlight brightness: 3 - distance level
+hc:      .res 1         ; ... and the colour being written
 clo:     .res 1         ; near-clip zone, in bcol positions
 chi:     .res 1
 frameb:  .res 1         ; set by bar B's IRQ: time to build bar B
@@ -592,11 +594,11 @@ dim_op = * + 1
         sta srccol,y
         dey
         bpl sl
-        lda dim_op              ; the highlight's white, dimmed the same way
-        ora #1
-        tax
-        lda dims,x
-        sta wcol
+        ldy bt                  ; highlight brightness base: 3 - distance level
+        lda #3
+        sec
+        sbc blevtab,y
+        sta lbase
 
         ; ---- nearest-neighbour expand to bh rows ---------------------------
         ; row j shows source line acc.hi; acc += 24/bh (8.8) per row
@@ -697,10 +699,23 @@ test:   ldy rsrc,x
         bcs lit
         jmp next
 lit:    sta sb
+        ; the highlight's colour: medium grey at least, brighter where the
+        ; row's level exceeds this segment's threshold by more, and with
+        ; nearness; so the thick core turns white before the thin edges.
+        ; colour = hlcol[min(e, 2) + 3 - level], e = level excess
         .repeat ::SEGS, K
         lda sb
-        cmp bthr+K
+        sec
+        sbc bthr+K
+        bcc :++
+        cmp #2
         bcc :+
+        lda #2
+:       clc
+        adc lbase
+        tay
+        lda hlcol,y
+        sta hc
         txa
         sec
         sbc kb+K                ; display row
@@ -710,7 +725,7 @@ lit:    sta sb
         lda rowhi,y
         sta dst+1
         ldy #K*::SEGSIZE
-        lda wcol
+        lda hc
         sta (dst),y
 :
         .endrep
@@ -909,6 +924,8 @@ dims:   ;      0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
 ; The gold bar, top to bottom, one C64 colour per scanline (24 lines).
 gold:   .byte 9,8,12,7,7,0,9,8,15,7,7,1,7,1,7,0,0,0,9,12,10,12,8,9
         .assert * - gold = BARH, error, "gold must have one colour per line"
+; Bar B's highlight colours by brightness: medium grey at least.
+hlcol:  .byte 12, 12, 15, 1, 1, 1
 ; Bar B's display rows: address of each row's first lda #immediate
 rowlo:  .repeat ROWSB, RR
         .byte <(blockb + RR*ROWSIZE + 1)

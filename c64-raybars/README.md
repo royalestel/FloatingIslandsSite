@@ -222,7 +222,9 @@ python3 sim_goldtwin.py      # needs -g -Ln goldtwin.lbl; renders preview_goldtw
   * then yellow orange and white light grey
   * full colour from about the top bar's size (22 lines)
 
-  The traced highlight is dimmed the same way.
+  The traced highlight is never darker than medium grey. Its strongest
+  rows brighten first, grey to light grey to white, so as the bar nears,
+  the thick core of the highlight turns white before its thin edges.
 * **Near-clip.** At the camera it near-clips in two frames: the middle 32
   of its 48 rows (the nearest part) vanish, then the rest. Then there's a
   short black pause.
