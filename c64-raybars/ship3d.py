@@ -6,9 +6,10 @@ attitude is rotated (pitch, then roll), projected orthographically so the
 wingspan fills the sprite's 24 pixels in the tail view, and rasterised with
 a z-buffer at 8 x 4 samples per multicolour pixel.  Faces are flat-shaded
 into the sprite's three colours: %01 hull in shadow, %10 lit hull and trim
-(the wingtip fins and engine nacelles), %11 the engines' exhausts and the
-light on the nose.  A pixel takes %11 if a fifth of its samples glow,
-otherwise the majority hull colour if a third of it is covered.
+(the winglets and engine slots), %11 the light on the nose.  A pixel takes
+%11 if a fifth of its samples glow, otherwise the majority hull colour if a
+third of it is covered; thin slanted parts are kept whole by filling a
+lightly covered pixel between two filled ones.
 
     python3 ship3d.py frames.png      # preview the 9 attitudes
 """
@@ -65,29 +66,25 @@ def sphere(cx, cy, cz, r, kind, n=8):
             f.append(([pt(t0, p0), pt(t0, p1), pt(t1, p1), pt(t1, p0)], kind))
     return f
 
+def lozenge(w, h, cy=0.0):
+    a, b = w / 2, h / 2
+    return [(-a * 0.55, cy + b), (a * 0.55, cy + b), (a, cy + b * 0.2), (a, cy - b * 0.2),
+            (a * 0.55, cy - b), (-a * 0.55, cy - b), (-a, cy - b * 0.2), (-a, cy + b * 0.2)]
+
 def model():
-    """x right, y up, z forward: the nose points away from the camera."""
+    """The Arrow: a flying wing.  x right, y up, z forward: the nose points
+    away from the camera.  A flat body, a broad delta, two engine slots in
+    the tail, small downturned winglets, the light on the nose."""
     f = []
-    # fuselage: from the tail (z = -7) to the nose (z = 10)
-    f += loft([(-7, octagon(4.6, 3.8)), (-3, octagon(7.4, 6.2)),
-               (5, octagon(4.6, 3.8)), (10, octagon(1.6, 1.4))])
-    # the light on the nose
+    f += loft([(-7, lozenge(6.0, 2.6)), (-2, lozenge(7.0, 3.0)), (5, lozenge(4.0, 2.2)),
+               (10, lozenge(1.2, 0.9))])
     f += sphere(0, 0, 10.6, 1.4, "glow")
-    # flat delta wings on the fuselage's axis
     for s in (-1, 1):
-        f += slab([(s * 3.0, 0.0, 4.0), (s * 11.2, 0.0, -4.0), (s * 11.2, 0.0, -6.2),
-                   (s * 3.0, 0.0, -6.2)], 1.6)
-        # wingtip fins, as tall above the wing as below
-        f += fin([(s * 11.4, -3.3, -6.6), (s * 11.4, 3.3, -6.6), (s * 11.4, 3.3, -4.0),
-                  (s * 11.4, -3.3, -4.0)], 2.2, "trim")
-        # engine pods through the wing roots
-        f += loft([(-8, octagon(2.8, 3.2)), (-1, octagon(2.8, 3.2)),
-                   (1, octagon(1.2, 1.2))], "trim", caps=("trim", "trim"), dx=s * 4.6)
-    # tail fin and a matching ventral fin: the ship is nearly symmetric top
-    # to bottom, so climbing and diving views mirror each other
-    for v in (1, -1):
-        f += fin([(0, v * 2.4, -7.0), (0, v * 8.4, -7.6), (0, v * 8.4, -5.6),
-                  (0, v * 2.4, -1.0)], 2.2)
+        f += slab([(s * 3.0, 0, 6.0), (s * 11.6, 0, -5.0), (s * 11.6, 0, -7.0),
+                   (s * 3.0, 0, -7.0)], 1.4)
+        f += fin([(s * 11.8, 0.6, -7.0), (s * 11.8, -2.6, -7.4), (s * 11.8, -2.6, -6.0),
+                  (s * 11.8, 0.6, -4.6)], 1.6, "trim")
+        f += loft([(-7.6, lozenge(2.4, 1.4)), (-3, lozenge(2.4, 1.4))], "trim", dx=s * 1.6)
     return f
 
 LIGHT = (-0.45, 0.75, -0.5)            # toward the light: up, left, behind us

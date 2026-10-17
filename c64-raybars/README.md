@@ -375,22 +375,20 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   tail view; otherwise it leans that way, rolled 25 degrees and pitched
   30. `python3 ship3d.py frames.png` previews them
   (`preview_ship3d.png`).
-  * The model: a fuselage that tapers to the nose, flat delta wings with
-    wingtip fins, a tail fin with a matching ventral fin, two engine pods
-    through the wing roots, and the light on the nose.
-  * The model is nearly symmetric top to bottom, so climbing and diving
-    mirror each other. Climbing shows a "^" with the nose light above.
-    Diving shows a "v" with it below the engines. Only the shading
-    differs, because the light comes from above.
-  * In the tail view the wingspan fills all 24 pixels of the sprite.
+  * The model is the Arrow, a flying wing. It has a flat body, a broad
+    delta, small downturned winglets, two engine slots in the tail and the
+    light on the nose. It was picked from five colour-rendered designs.
+  * In the tail view it is a thin line across the full sprite width. Its
+    climbing and diving frames mirror each other: a "^" with the nose
+    light above, a "v" with it below.
   * Each frame is rendered with a z-buffer at 8 x 4 samples per
     multicolour pixel and flat-shaded into the sprite's three colours:
-    shadowed hull, lit hull and trim (wingtip fins, engine pods), and
-    white, kept for the light on the nose alone.
-  * Looking straight at the tail, the nose is hidden behind the fuselage,
-    so the level frame has no white.
-  * Parts thinner than a multicolour pixel (2 screen pixels) vanish at
-    this size, so the fins are modelled thick.
+    shadowed hull, lit hull and trim (winglets, engine slots), and white,
+    kept for the light on the nose alone.
+  * When a thin slanted part leaves a one-pixel gap between two filled
+    pixels, the conversion fills it, so the roll frames stay whole.
+  * Looking straight at the tail, the nose is hidden behind the body, so
+    the level frame has no white.
 * **Pitch** (up / down) eases the ship's climb speed toward ±1 unit per
   frame, so pushing up makes the bars sink. Each bar's height is relative
   to the ship's: it is `Y/Z` lines from the centre, above or below.
