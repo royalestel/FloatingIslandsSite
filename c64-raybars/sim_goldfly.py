@@ -57,7 +57,7 @@ def call(addr):
     return mpu.processorCycles - c
 
 # run the program's own start-up (it builds the first frame) up to its main loop
-mpu.pc, mpu.sp = L["start"], 0xFF
+mpu.pc, mpu.sp = 2061, 0xFF                  # where SYS 2061 lands
 while mpu.pc != L["main"]:
     mpu.step()
 mem[L["buf"]] = mem[L["nbuf"]] ^ 1

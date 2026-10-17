@@ -54,8 +54,6 @@
 
         .setcpu "6502"
 
-        .include "fly.inc"      ; FLYD, flight tables, dimmed palettes
-        .include "ship.inc"     ; ship sprites, roll tilts, spawn heights
 
 NSLOT     = 3           ; bars in flight
 SEGS      = 5
@@ -190,6 +188,7 @@ save_y:  .res 1
 .segment "CODE"
 
 start:  sei
+        .assert * = 2062, error, "SYS 2061 must land on start"
         lda #$7f
         sta CIA1_ICR
         sta CIA2_ICR
@@ -1563,6 +1562,8 @@ bout:   lda save_a
 ; =============================================================================
 .segment "TABLES"
         .include "tables.inc"   ; spectab, theta2_12, log2/atan
+        .include "fly.inc"      ; FLYD, flight tables, dimmed palettes
+        .include "ship.inc"     ; ship sprites, roll tilts, spawn heights
 shippal: .byte 4, 14, 1, 2, 8, 7   ; hull, trim, light: normal, collision
         .assert <spectab = 0, error, "spectab must be page aligned"
 
