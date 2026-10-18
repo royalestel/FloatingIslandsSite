@@ -21,7 +21,7 @@ from py65.devices.mpu6502 import MPU
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FRAMES, NSLOT, SEGS, LINE = int(os.environ.get("FRAMES", 600)), 3, 5, 63
+FRAMES, NSLOT, SEGS, LINE = int(os.environ.get("FRAMES", 600)), 3, 6, 63
 SPRY, SPRX = 150 - 11, 184 - 12
 TOP, BOTTOM = 40, 270
 
@@ -65,8 +65,9 @@ mem[L["ready"]] = 0
 
 over = 0
 frames, worst, pagecross, close, sprite_hit, early = [], 0, 0, 0, 0, 0
-badrow, baddly, badcell, merged = 0, 0, 0, 0
-ROWSTART = {sl: {L[f"n1_{sl}"], L[f"b_{sl}"], L[f"n2_{sl}"]} for sl in range(NSLOT)}
+badrow, baddly, badcell, merged, badop, badc0 = 0, 0, 0, 0, 0, 0
+# per loop copy (slot + buffer * NSLOT)
+ROWSTART = {ci: {L[f"n1_{ci}"], L[f"b_{ci}"], L[f"n2_{ci}"]} for ci in range(2 * NSLOT)}
 def s16(v):
     return v - 65536 if v & 0x8000 else v
 def yrel(sl):
@@ -107,7 +108,6 @@ for f in range(FRAMES):
                         best = (mem[L["st"] + sl], c)
         return 0 if best is None else best[1]
     # the top IRQ swaps the frame in
-    mem[L["ptr"]:L["ptr"] + NSLOT * SEGS * 2] = mem[L["nptr"]:L["nptr"] + NSLOT * SEGS * 2]
     nb = mem[L["nbuf"]]
     mem[L["scount"]] = cnt = mem[L["ncount"]]
     mem[L["sbase"]] = nb * NSLOT
@@ -120,13 +120,20 @@ for f in range(FRAMES):
         D = line + 2
         dly = mem[L["irq2"] + 2]          # ldx #delay after txs
         baddly += dly != (7 if BAND0 <= D - 1 < BAND1 else 8)
-        slot = mem[L["soff"] + nb * NSLOT + i]
-        ptrs = [mem[L["ptr"] + (slot * SEGS + k) * 2] |
-                mem[L["ptr"] + (slot * SEGS + k) * 2 + 1] << 8 for k in range(SEGS)]
-        mpu.pc, mpu.y = mem[L["curvec"]] | mem[L["curvec"] + 1] << 8, 0
+        ci = mem[L["soff"] + nb * NSLOT + i]      # loop copy
+        slot = ci % NSLOT
+        # each segment's column pointer: the loads' operands, the same in
+        # all three loops, the page the slot's own column (vcp)
+        ptrs = []
+        for k in range(SEGS):
+            ops = [mem[L[f"o{lt}{k}_{ci}"]] | mem[L[f"o{lt}{k}_{ci}"] + 1] << 8
+                   for lt in ("n1", "b", "n2")]
+            badop += len(set(ops)) != 1 or ops[0] >> 8 != mem[L["vcp"] + slot * SEGS + k]
+            ptrs.append(ops[0])
+        mpu.pc, mpu.x, mpu.y = mem[L["jop"]] | mem[L["jop"] + 1] << 8, 0, 0
         starts, rows = [], []
         while mpu.pc != L["bexit"]:
-            if mpu.pc in ROWSTART[slot]:
+            if mpu.pc in ROWSTART[ci]:
                 starts.append(mpu.processorCycles)
                 y = mpu.y
                 row = []
@@ -136,6 +143,7 @@ for f in range(FRAMES):
                     row.append(mem[p + y])
                 rows.append(row)
             mpu.step()
+        badc0 += mem[L["c0"]] != rows[0][0]       # irq2's store of the first row's
         for r in range(len(rows)):
             ln = D + r
             if r + 1 < len(rows):           # (the last row runs into bexit)
@@ -159,9 +167,10 @@ for f in range(FRAMES):
     mem[L["buf"]] = nb ^ 1
     mem[L["ready"]] = 0
 ok &= pagecross == 0 and close == 0 and early == 0
-ok &= badrow == 0 and baddly == 0 and badcell == 0
+ok &= badrow == 0 and baddly == 0 and badcell == 0 and badop == 0 and badc0 == 0
 print(f"rows with the wrong length {badrow}, irq2 delays wrong {baddly}, "
       f"cells not showing the nearest bar {badcell}")
+print(f"loop copies with mismatched pointers {badop}, first rows' segment 0 wrong {badc0}")
 print(f"build(): worst {worst:.1f}% of the frame's free time, frames over {over}")
 print(f"page-crossing reads {pagecross}, blocks too close {close}, "
       f"IRQs before line 58 {early}")
@@ -171,7 +180,7 @@ print("blocks per frame:", sorted({len(e) for e in frames}),
 
 # --- 3. render ---------------------------------------------------------------------
 W, H, SCALE = 384, BOTTOM - TOP, 2
-SEGX = [(24, 76), (76, 148), (148, 220), (220, 292), (292, 344)]   # sprite x
+SEGX = [(24, 56), (56, 120), (120, 184), (184, 248), (248, 312), (312, 344)]   # sprite x
 def render(f):
     ents = frames[f]
     ptr, c1, c2, c3, border = look[f]

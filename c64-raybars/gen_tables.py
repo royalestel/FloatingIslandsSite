@@ -466,13 +466,22 @@ for j in range(16):
     vert = 1 if up else 2 if dn else 0
     JF.append([[0, 1, 2], [3, 5, 6], [4, 7, 8]][side][vert])
 emit2("joyframe", JF)
+# goldship's 6 segments: splits at sprite x 56, 120, 184 (the light), 248,
+# 312, so the edge segments show 32 pixels and the rest 64.  Segment centres
+# relative to the light:
+SEGDX = [-144, -96, -32, 32, 96, 144]
 # roll r = -8 (left) .. 8 (right): the world turns the other way, so the bars'
-# slope is m = -3r/8 lines per segment (up to 3 between neighbours); off_k =
-# floor(6 + (k - 2) * m + 0.5) about the middle segment, 0..12, stored as
-# kb = 12 - off_k (goldship's PAD) (rtilt0..4, index r + 8)
-for k in range(5):
-    emit2(f"rtilt{k}", [12 - int(math.floor(6 + (k - 2) * (-3 * r / 8) + 0.5))
+# slope is m = -3r/8 lines per 72 pixels; off_k = floor(6 + dx_k/72 * m + 0.5)
+# about the light, 0..12, stored as kb = 12 - off_k (goldship's PAD)
+# (rtilt0..5, index r + 8)
+for k in range(6):
+    emit2(f"rtilt{k}", [12 - int(math.floor(6 + SEGDX[k] / 72 * (-3 * r / 8) + 0.5))
                         for r in range(-8, 9)])
+# highlight colour by (distance level, spec level, segment 0..2; 3..5 mirror
+# them): index (lev*9 + s)*3 + k, as fly.inc's hltab with the drop |dx| / 32
+DROP6 = [abs(d) // 32 for d in SEGDX[:3]]
+emit2("hlt6", [0 if sp - (HLTHR + DROP6[k]) < 0 else HLCOL[min(sp - (HLTHR + DROP6[k]), 2) + 3 - lv]
+               for lv in range(4) for sp in range(9) for k in range(3)])
 # spawn height relative to the ship, shuffled: 5 near it (|y| < 24 is a
 # collision course: they start at the screen centre) and 11 off the centre
 # line, up to 200 units (17 lines out when they appear).  16 bits.

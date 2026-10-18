@@ -21,25 +21,29 @@
 ;  Built on goldfly.s: the same bars, highlights, merging and the loops for
 ;  the sprite's DMA lines (see there).
 ;
-;  DISPLAY: POINTER-READ SPEEDCODE
+;  DISPLAY: SIX SEGMENTS, COLUMN-READ SPEEDCODE
 ;  Each bar's display code is a loop over its rows:
-;       5 x (lda (pK),y / sta $d021)  =  5 x 9 cycles  (72-pixel segments)
-;  The row can't start early enough for segment 0's store to land in the
-;  left border, so a row stores segments 1-4, then segment 0 of the next
-;  row in the right border (irq2 stores the first row's, from c0).
-;  pK points into segment K's colour column for this bar, offset by the
-;  segment's tilt.  The main loop only builds the columns and the
-;  pointers.  The bars live inside the display window (opened without
-;  badlines, see goldlight.s), so only $d021 is written; the side borders
-;  stay black.  Each column is one page, so (pK),y never crosses a page.
+;       5 x (lda colK,y / sta $d021)  =  5 x 8 cycles  (64-pixel segments)
+;  splitting the line at sprite x 56, 120, 184 (the light), 248 and 312:
+;  six segments, the two at the window's edges 32 pixels wide.  The row
+;  can't start early enough for segment 0's store to land in the left
+;  border, so it ends with the next row's (sta $d021,x), in the right
+;  border; irq2 stores the first row's, from c0.
+;  colK is segment K's colour column for this bar, offset by the segment's
+;  tilt.  The loops come in six copies, one per slot and buffer, so the
+;  build patches the copy of the frame it builds while the other is shown:
+;  only the low bytes, each copy's column pages being fixed.  The bars
+;  live inside the display window (opened without badlines, see
+;  goldlight.s), so only $d021 is written; the side borders stay black.
+;  Each column is one page, so colK,y never crosses a page.
 ;
 ;  THE LIGHT'S LINES
 ;  On the 21 lines where the light's sprite is fetched the VIC halts the
 ;  CPU for cycles 55-59, so a bar row there must be STEAL cycles shorter.
-;  Each slot has three loops -- normal rows above the light, rows on its
-;  lines, normal rows below -- chained by patched jumps with padded
+;  Each loop copy has three loops -- normal rows above the light, rows on
+;  its lines, normal rows below -- chained by branches into padded
 ;  entries, and irq2's stabilising delay is shortened when its line is one
-;  of them.  STEAL (5: the loop's tail only reads) and BAND0/1 are
+;  of them.  STEAL (5: the row's last load only reads) and BAND0/1 are
 ;  checked in VICE (the simulator can't emulate sprite DMA).  The sprite
 ;  covers bars behind it; bars nearer than the light keep off its lines.
 ;
@@ -60,11 +64,11 @@
 
 
 NSLOT     = 3           ; bars in flight
-SEGS      = 5
+SEGS      = 6
 NCOL      = 3           ; columns per bar: centre, middle, outer.  All bars
                         ; share the tilt and the highlight is symmetric, so
-                        ; segments 0 and 4 read one column, 1 and 3 another
-                        ; (each at its own tilt offset)
+                        ; segments 0 and 5 read one column, 1 and 4 another,
+                        ; 2 and 3 the centre one (each at its own tilt offset)
 PAD       = 12          ; black rows above / below a bar's rows (>= max slant)
 BASE      = 96          ; a bar's first row in its column; the rest of the
                         ; page is room for a merged bar above or below
@@ -115,8 +119,8 @@ theta2    = theta2_12
 
 ; =============================================================================
 .segment "ZEROPAGE"
-ptr:     .res NSLOT*SEGS*2      ; live column pointers (read by the bars)
 c0:      .res 1                 ; segment 0's colour on the next block's first row
+zero:    .res 1                 ; always 0 (irq2: ldy zero, a cycle longer than ldy #)
 frameflag: .res 1               ; top IRQ: start building the next frame
 ready:   .res 1                 ; main loop: next frame is built
 buf:     .res 1                 ; column buffer being built (0/1)
@@ -161,7 +165,7 @@ m1:      .res 1                 ; multiplier
 pnp:     .res 2                 ; merge: nearest / farther column pointers
 pfp:     .res 2
 fcl:     .res 1                 ; near-clip rows
-zp5:     .res 2*SEGS            ; merge: the nearest bar's five columns from
+zp5:     .res 2*SEGS            ; merge: the nearest bar's six columns from
 np:      .res 2*SEGS            ;   line cD / from their start, the farther
 fp:      .res 2*SEGS            ;   bar's (offset to match)
 bsx:     .res 1                 ; buffer * NSLOT + slot
@@ -222,16 +226,16 @@ start:  sei
 @zp:    sta $01,x
         dex
         bne @zp
-        sta ptr                 ; clear all columns (2 buffers)
+        sta t0                  ; clear all columns (2 buffers)
         tay
         lda #>cols
-        sta ptr+1
+        sta t0+1
         ldx #2*NSLOT*NCOL
         tya
-@col:   sta (ptr),y
+@col:   sta (t0),y
         iny
         bne @col
-        inc ptr+1
+        inc t0+1
         dex
         bne @col
         sta $dc02               ; CIA1 port A all inputs: the joystick only
@@ -510,7 +514,7 @@ done:   rts
 ; write segment K's highlight colour into its column at row x
 .macro hlrow K, opname
         .local skip
-        lda hltab + K,y         ; this segment's colour (0 = none)
+        lda hlt6 + K,y          ; this segment's colour (0 = none)
         beq skip
 opname = * + 1
         sta $ff00,x
@@ -612,18 +616,18 @@ clear:
         sta acc
         txa                     ; vcp per segment, for compose
         asl
-        asl
         adc s
+        asl                     ; s*6
         tay
         lda acc
         .repeat ::SEGS, K
-        .if K = 0 .or K = 4
+        .if K = 0 .or K = 5
         clc
         adc #2
         sta vcp+K,y
         sec
         sbc #2
-        .elseif K = 1 .or K = 3
+        .elseif K = 1 .or K = 4
         clc
         adc #1
         sta vcp+K,y
@@ -790,8 +794,8 @@ ph_op = * + 1
         beq clean
         lda s                   ; patch the stores: this slot's columns
         asl
-        asl
         adc s
+        asl                     ; s*6
         tay
         lda vcp+2,y             ; (segments 2, 1, 0: columns 0, 1, 2)
         sta zt0+1
@@ -873,7 +877,7 @@ zdone:  lda h
         beq :+
         jmp ovdone
 :       ldx lev                 ; highlight table base for this distance
-        lda lev45,x
+        lda lev27,x
         sta lb
         ldx h
         lda rsl,x
@@ -893,7 +897,7 @@ spe_op = * + 1
         bcc ovskip
         sty si
         tax
-        lda mul5,x
+        lda mul3,x
         clc
         adc lb
         sta hidx                ; hltab row for this spec level
@@ -936,8 +940,8 @@ ovdone:
         sta vh,x
         txa
         asl
-        asl
         adc s
+        asl                     ; s*6
         tax
         .repeat ::SEGS, K
         lda kb+K
@@ -1082,68 +1086,70 @@ single: ldx mem                 ; the nearest draws the block
         sbc cD
         sta span
 
-        ; ---- schedule entry: line, slot, loop entry, chunks ---------------
+        ; ---- schedule entry: line, loop copy, entry, irq2's delay, c0 ------
+        ; The block is drawn by the nearest bar's loops, the copy for this
+        ; buffer (the other copy may be on screen): its chunk ends and
+        ; column pointers are patched here.
         lda ncount
         clc
         adc wb
         tax
+        stx sx
         inc ncount
         lda cD
         sec
         sbc #2
         sta sline,x
-        ldy nr
-        tya
-        sta soff,x
+        lda nr
+        clc
+        adc wb
+        sta soff,x              ; loop copy: slot + buffer * NSLOT
+        tay
+        lda n1lo,y
+        sta lp
+        lda n1hi,y
+        sta lp+1
         lda #::BAND0            ; band rows: rb0 .. rb1-1 (clamped to 0..span)
         jsr bandrow
         sta rb0
         lda #::BAND1
         jsr bandrow
         sta rb1
-        lda span                ; defaults: every chunk runs to the end,
-        sta sc1,x               ; every jump exits
-        sta sc2,x
-        sta sc3,x
-        lda #<bexit
-        sta sj1lo,x
-        sta sj2lo,x
-        lda #>bexit
-        sta sj1hi,x
-        sta sj2hi,x
+        cmp span                ; the block's last row runs as a normal row
+        bcc :+                  ; even on the light's lines (nothing follows
+        lda span                ; it), so the band loop always exits into n2
+        sbc #1
+        sta rb1
+:       ldy soff,x
         lda rb0
         cmp rb1
-        bne band
+        bcc band
         lda n2lo,y              ; no light rows: n2 only
         sta sentlo,x
         lda n2hi,y
         sta senthi,x
-        jmp chunks
-band:   lda rb1                 ; light rows end at rb1, then n2 (if any)
-        sta sc2,x
-        cmp span
-        bcs :+
-        lda n2elo,y
-        sta sj2lo,x
-        lda n2ehi,y
-        sta sj2hi,x
-:       lda rb0
+        jmp ends
+band:   lda rb0
         bne above
         lda blo,y               ; starts on the light's lines
         sta sentlo,x
         lda bhi,y
         sta senthi,x
-        jmp chunks
-above:  sta sc1,x               ; n1 up to the light's lines
-        lda n1lo,y
+        jmp ends
+above:  lda n1lo,y              ; n1 up to the light's lines
         sta sentlo,x
         lda n1hi,y
         sta senthi,x
-        lda belo,y
-        sta sj1lo,x
-        lda behi,y
-        sta sj1hi,x
-chunks: lda #8                  ; irq2's delay: one turn less if its line
+ends:   ldy #n1c_0 - n1_0       ; chunk ends: n1 to rb0, b to rb1, n2 to span
+        lda rb0
+        sta (lp),y
+        ldy #bc_0 - n1_0
+        lda rb1
+        sta (lp),y
+        ldy #n2c_0 - n1_0
+        lda span
+        sta (lp),y
+        lda #8                  ; irq2's delay: one turn less if its line
         ldy cD                  ; (cD - 1) has the sprite's DMA
         dey
         cpy #::BAND0
@@ -1153,31 +1159,42 @@ chunks: lda #8                  ; irq2's delay: one turn less if its line
         lda #7
 :       sta sdel,x
 
-        ; ---- the nearest bar's pointers: pl_K - dn ------------------------
+        ; ---- the nearest bar's column pointers, pl_K - dn, into the three
+        ; loops' loads (the high bytes are the copy's fixed column pages) --
         lda nr
         asl
-        asl
         adc nr
-        sta ni
         asl
+        sta ni                  ; nr*6
         tax
-        ldy ni
-        lda #SEGS
-        sta k
-ptrs:   lda vpl,y
+        .repeat ::SEGS, K
+        lda vpl+K,x
         sec
         sbc dn
-        sta nptr,x
-        lda vcp,y
-        sta nptr+1,x
-        inx
-        inx
-        iny
-        dec k
-        bne ptrs
+        ldy #.ident(.sprintf("on1%d_0", K)) - n1_0
+        sta (lp),y
+        ldy #.ident(.sprintf("ob%d_0", K)) - n1_0
+        sta (lp),y
+        ldy #.ident(.sprintf("on2%d_0", K)) - n1_0
+        sta (lp),y
+        .endrep
         lda mcnt
         cmp #2
-        bcs merge
+        bcc :+
+        jsr merge
+        ; ---- c0: segment 0's colour on the block's first row (irq2 stores
+        ; it), after the merge
+:       ldx ni
+        lda vpl,x
+        sec
+        sbc dn
+        sta t0
+        lda vcp,x
+        sta t0+1
+        ldy #0
+        lda (t0),y
+        ldx sx
+        sta sc0,x
         rts
 
 merge:  lda buf                 ; its top pad needs re-blacking next time
@@ -1199,12 +1216,12 @@ merge:  lda buf                 ; its top pad needs re-blacking next time
         .endrep
         lda zp5
         sta pnl                 ; (segment 0's index of line cD)
-        ldy #0                  ; black outside its own lines, all five
-        lda dn                  ; columns at once (all bars share the tilt,
-        jsr zero5               ; so the same lines in each)
+        ldy #0                  ; black outside its own lines, all six
+        lda dn                  ; segments at once (all bars share the tilt,
+        jsr zero6               ; so the same lines in each)
         ldy en
         lda span
-        jsr zero5
+        jsr zero6
 
         ldy ni                  ; copy targets: the nearest bar's columns
         lda #0                  ; from their start, y = column index
@@ -1235,9 +1252,9 @@ far:    ldy mem,x
         sty acc
         tya
         asl
-        asl
         adc acc
-        tax                     ; its slot * 5
+        asl
+        tax                     ; its slot * 6
         lda vpl,x               ; its column index of line cD (segment 0)
         sec
         sbc flo
@@ -1312,19 +1329,20 @@ c5:     .repeat ::NCOL, C
         bne c5
 c5done: rts
 
-zero5:  sta ce                  ; black rows y .. A-1 in all five columns
+zero6:  sta ce                  ; black rows y .. A-1 in all six segments
         cpy ce
-        bcs z5done
+        bcs z6done
         lda #0
-z5:     sta (zp5),y
+z6:     sta (zp5),y
         sta (zp5+2),y
         sta (zp5+4),y
         sta (zp5+6),y
         sta (zp5+8),y
+        sta (zp5+10),y
         iny
         cpy ce
-        bne z5
-z5done: rts
+        bne z6
+z6done: rts
 
 
 
@@ -1356,11 +1374,6 @@ irqtop: sta save_a
 
         lda ready
         beq noswap
-        ldx #NSLOT*SEGS*2-1     ; pointers
-:       lda nptr,x
-        sta ptr,x
-        dex
-        bpl :-
         lda ncount              ; schedule: the half just built
         sta scount
         lda nbuf
@@ -1389,8 +1402,8 @@ out:    asl VIC_IRQ
         ldy save_y
         rti
 
-; set up the IRQ for schedule entry sidx: its line, its loop entry, the
-; chunk ends and chunk jumps in its slot's loops, irq2's delay
+; set up the IRQ for schedule entry sidx: its line, its loop entry, irq2's
+; delay, segment 0's colour on its first row (the rest is patched by compose)
 nextbar:
         lda sidx
         clc
@@ -1399,40 +1412,12 @@ nextbar:
         lda sline,x
         sta VIC_RASTER
         lda sentlo,x
-        sta curvec
+        sta jop
         lda senthi,x
-        sta curvec+1
+        sta jop+1
         lda sdel,x
         sta dly_op
-        ldy soff,x              ; the slot's loops
-        lda n1lo,y
-        sta lp
-        lda n1hi,y
-        sta lp+1
-        ldy #n1c_0 - n1_0
-        lda sc1,x
-        sta (lp),y
-        ldy #bc_0 - n1_0
-        lda sc2,x
-        sta (lp),y
-        ldy #n2c_0 - n1_0
-        lda sc3,x
-        sta (lp),y
-        ldy #n1j_0 - n1_0
-        lda sj1lo,x
-        sta (lp),y
-        iny
-        lda sj1hi,x
-        sta (lp),y
-        ldy #bj_0 - n1_0
-        lda sj2lo,x
-        sta (lp),y
-        iny
-        lda sj2hi,x
-        sta (lp),y
-        ldy soff,x              ; segment 0's colour on the first row
-        ldx mul10,y
-        lda (ptr,x)
+        lda sc0,x
         sta c0
         lda #<irq1
         sta $fffe
@@ -1478,8 +1463,9 @@ dly_op = * + 1
         nop
         .endrep
         sty VIC_BG              ; segment 0 of the first row (left border)
-        ldy #0                  ; first row
-        jmp (curvec)
+        ldy zero                ; first row (3 cycles: the row starts 10 after
+jop := * + 1                    ;   @stable, its first store at sprite x 56)
+        jmp $ffff               ; the block's loop entry (nextbar)
 
 ; N cycles of padding (N = 0 or N >= 2)
 .macro fill N
@@ -1496,67 +1482,88 @@ dly_op = * + 1
   .endif
 .endmacro
 
-; one row: 5 x (lda (pK),y / sta $d021) = 45 cycles, iny: 47.  Segments
-; 1-4 are stored at their left edges; segment 0's store would come a
-; segment late, so the row ends with the next row's, in the right border.
-.macro row SL
-  .repeat SEGS - 1, K
-        lda (ptr + (SL*SEGS + K + 1)*2),y
+; one row of loop copy CI, loop LT: 5 x (lda colK,y / sta $d021) = 40
+; cycles, segments 1-5 at their left edges; iny; then the next row's
+; segment 0 in the right border (sta $d021,x with x = 0: 5 cycles): 51.
+; The loads' low bytes (o<LT><K>_<CI>) are patched by compose; the high
+; bytes are the copy's column pages: buffer CI / 3, slot CI mod 3, column
+; outer / middle / centre for segments 0, 5 / 1, 4 / 2, 3.
+.macro row CI, LT
+        .local pcen, pmid, pout
+pcen = >cols + ((CI)/3)*9 + ((CI) .mod 3)*3      ; this copy's columns:
+pmid = pcen + 1                                 ;   centre, middle, outer
+pout = pcen + 2
+.ident(.sprintf("o%s1_%d", LT, CI)) := * + 1
+        lda 256*pmid, y         ; segment 1
         sta VIC_BG
-  .endrep
+.ident(.sprintf("o%s2_%d", LT, CI)) := * + 1
+        lda 256*pcen, y         ; segment 2
+        sta VIC_BG
+.ident(.sprintf("o%s3_%d", LT, CI)) := * + 1
+        lda 256*pcen, y         ; segment 3
+        sta VIC_BG
+.ident(.sprintf("o%s4_%d", LT, CI)) := * + 1
+        lda 256*pmid, y         ; segment 4
+        sta VIC_BG
+.ident(.sprintf("o%s5_%d", LT, CI)) := * + 1
+        lda 256*pout, y         ; segment 5
+        sta VIC_BG
         iny
-        lda (ptr + (SL*SEGS)*2),y
-        sta VIC_BG
+.ident(.sprintf("o%s0_%d", LT, CI)) := * + 1
+        lda 256*pout, y         ; the next row's segment 0
+        sta VIC_BG,x
 .endmacro
 
-; Three loops per slot, rows in screen order: normal rows above the light
+; a branch that must not cross a page (the extra cycle would break the row)
+.macro beqnear T
+        beq T
+        .assert >* = >(T), error, "branch crosses a page"
+.endmacro
+
+; Three loops per copy, rows in screen order: normal rows above the light
 ; (n1), rows on the light's DMA lines (b), normal rows below it (n2).  A
-; normal row is 63 cycles; a light row 63 - STEAL, the VIC taking the rest
-; in the loop's tail (reads only, so cycles 55-59 of the line all go).
-; Each loop ends when y reaches its chunk end (n1c / bc / n2c), then
-; jumps on (n1j / bj), arriving 55 cycles into the row: the next loop's
-; entry pads the row out (be: 8 cycles, n2e: 8 - STEAL).  All patched by
-; nextbar; the slots' loops are laid out alike, LOOPSZ bytes apart.
-        .repeat NSLOT, SL
-.ident(.sprintf("n1_%d", SL)):
-:       row SL                  ; 47
-.ident(.sprintf("n1c_%d", SL)) = * + 1
-        cpy #0                  ; 49
-        beq :+                  ; 51 (52 taken)
-        fill 9                  ; 60
-        jmp :-                  ; 63
-:
-.ident(.sprintf("n1j_%d", SL)) = * + 1
-        jmp bexit               ; 55: band entry or bexit
-.ident(.sprintf("be_%d", SL)):
-        fill 8                  ; the last n1 row: 63
-.ident(.sprintf("b_%d", SL)):
-:       row SL
-.ident(.sprintf("bc_%d", SL)) = * + 1
+; normal row is 63 cycles; a light row 63 - STEAL = 58, the VIC taking
+; cycles 55-59 of the line in the row's last load (reads only).  Each loop
+; ends when y reaches its chunk end (n1c / bc / n2c, patched by compose)
+; and branches 56 cycles into the row to the next loop's entry, which pads
+; it out: be 7 cycles (63), n2e 2 (58).  n1 always ends in b, b in n2.
+; Starting on a page, no copy's branches cross one (asserted).
+        .align $100
+        .repeat 2*NSLOT, CI
+.ident(.sprintf("n1_%d", CI)):
+        row CI, "n1"            ; 51
+.ident(.sprintf("n1c_%d", CI)) := * + 1
+        cpy #0                  ; 53
+        beqnear .ident(.sprintf("be_%d", CI))   ; 55 (56 taken)
+        fill 5                  ; 60
+        jmp .ident(.sprintf("n1_%d", CI))       ; 63
+.ident(.sprintf("be_%d", CI)):
+        fill 7                  ; the last n1 row: 63
+.ident(.sprintf("b_%d", CI)):
+        row CI, "b"             ; 51
+.ident(.sprintf("bc_%d", CI)) := * + 1
+        cpy #0                  ; 53
+        beqnear .ident(.sprintf("n2e_%d", CI))  ; 55 (56 taken)
+        jmp .ident(.sprintf("b_%d", CI))        ; 58
+.ident(.sprintf("n2e_%d", CI)):
+        nop                     ; the last band row: 58
+.ident(.sprintf("n2_%d", CI)):
+        row CI, "n2"
+.ident(.sprintf("n2c_%d", CI)) := * + 1
         cpy #0
-        beq :+
-        fill 9 - STEAL          ; 63 - STEAL
-        jmp :-
-:
-.ident(.sprintf("bj_%d", SL)) = * + 1
-        jmp bexit               ; 55: n2 entry or bexit
-.ident(.sprintf("n2e_%d", SL)):
-        fill 8 - STEAL          ; the last band row: 63 - STEAL
-.ident(.sprintf("n2_%d", SL)):
-:       row SL
-.ident(.sprintf("n2c_%d", SL)) = * + 1
-        cpy #0
-        beq :+
-        fill 9
-        jmp :-
-:       jmp bexit
+        beqnear .ident(.sprintf("n2x_%d", CI))
+        fill 5
+        jmp .ident(.sprintf("n2_%d", CI))
+.ident(.sprintf("n2x_%d", CI)):
+        stx VIC_BG              ; black, 60 cycles in (65 after the light's
+        jmp bexit               ;   DMA): still in the left border
         .endrep
 LOOPSZ = n1_1 - n1_0
-        .assert n1_2 - n1_1 = LOOPSZ, error, "slot loops must be laid out alike"
+        .repeat 2*NSLOT - 1, CI
+        .assert .ident(.sprintf("n1_%d", CI + 1)) - .ident(.sprintf("n1_%d", CI)) = LOOPSZ, error, "loop copies must be laid out alike"
+        .endrep
 
-bexit:  lda #0
-        sta VIC_BG
-        asl VIC_IRQ
+bexit:  asl VIC_IRQ
         inc sidx
         lda sidx
         cmp scount
@@ -1580,7 +1587,6 @@ bout:   lda save_a
         .include "fly.inc"      ; FLYD, flight tables, dimmed palettes
         .include "ship.inc"     ; ship sprites, roll tilts, spawn heights
 shippal: .byte 4, 14, 1, 2, 8, 7   ; hull, trim, light: normal, collision
-mul10:  .byte 0, SEGS*2, 2*SEGS*2   ; a slot's offset into ptr
 udswap:                         ; joystick bits with up (1) and down (2) swapped
         .repeat 16, I
         .byte (I & 12) | ((I & 1) << 1) | ((I & 2) >> 1)
@@ -1589,15 +1595,10 @@ udswap:                         ; joystick bits with up (1) and down (2) swapped
 
 stagger: .byte 0, FLYD/3, 2*FLYD/3
 
-; per-segment highlight drop: segment centres at sprite x 50/112/184/256/318,
-; light at 184: |a| / 32
-DROP0 = 4
-DROP1 = 2
-DROP2 = 0
-DROP3 = 2
-DROP4 = 4
-lev45:  .byte 0, 45, 90, 135     ; hltab: (lev*9 + spec)*5 + segment
-mul5:   .byte 0, 5, 10, 15, 20, 25, 30, 35, 40
+; highlight colours (ship.inc's hlt6): (lev*9 + spec)*3 + segment 0..2,
+; segments 3..5 mirroring them; per-segment drop |dx| / 32 from the light
+lev27:  .byte 0, 27, 54, 81
+mul3:   .byte 0, 3, 6, 9, 12, 15, 18, 21, 24
 
 rsl:    .repeat 49, HH
         .byte <(rowstart + HH*25)
@@ -1614,39 +1615,29 @@ flphh:  .hibytes flph0, flph1, flph2, flph3
 flcll:  .lobytes flclip0, flclip1, flclip2, flclip3
 flclh:  .hibytes flclip0, flclip1, flclip2, flclip3
         .include "flyprof.inc"  ; profiled heights, highlight levels, colours
-; per slot: its loops' entries
-n1lo:   .lobytes n1_0, n1_1, n1_2
-n1hi:   .hibytes n1_0, n1_1, n1_2
-blo:    .lobytes b_0, b_1, b_2
-bhi:    .hibytes b_0, b_1, b_2
-belo:   .lobytes be_0, be_1, be_2
-behi:   .hibytes be_0, be_1, be_2
-n2lo:   .lobytes n2_0, n2_1, n2_2
-n2hi:   .hibytes n2_0, n2_1, n2_2
-n2elo:  .lobytes n2e_0, n2e_1, n2e_2
-n2ehi:  .hibytes n2e_0, n2e_1, n2e_2
+; per loop copy (slot + buffer * NSLOT): its loops' entries
+n1lo:   .lobytes n1_0, n1_1, n1_2, n1_3, n1_4, n1_5
+n1hi:   .hibytes n1_0, n1_1, n1_2, n1_3, n1_4, n1_5
+blo:    .lobytes b_0, b_1, b_2, b_3, b_4, b_5
+bhi:    .hibytes b_0, b_1, b_2, b_3, b_4, b_5
+n2lo:   .lobytes n2_0, n2_1, n2_2, n2_3, n2_4, n2_5
+n2hi:   .hibytes n2_0, n2_1, n2_2, n2_3, n2_4, n2_5
 
 ; =============================================================================
 .segment "BSS"
 dirty:  .res 2*NSLOT            ; per buffer and slot: pads stale (merge, respawn)
 lasth:  .res 2*NSLOT            ;   bar height when last built
 nbuf:   .res 1
-nptr:   .res NSLOT*SEGS*2
 ncount: .res 1
-; IRQ schedule, two halves (built / shown), per entry: raster line, slot's
-; slot, loop entry, chunk ends, chunk jumps, irq2's delay
+; IRQ schedule, two halves (built / shown), per entry: raster line, loop
+; copy, loop entry, irq2's delay, segment 0's colour on the first row
 sline:  .res 2*NSLOT
 soff:   .res 2*NSLOT
 sentlo: .res 2*NSLOT
 senthi: .res 2*NSLOT
-sc1:    .res 2*NSLOT
-sc2:    .res 2*NSLOT
-sc3:    .res 2*NSLOT
-sj1lo:  .res 2*NSLOT
-sj1hi:  .res 2*NSLOT
-sj2lo:  .res 2*NSLOT
-sj2hi:  .res 2*NSLOT
 sdel:   .res 2*NSLOT
+sc0:    .res 2*NSLOT
+sx:     .res 1                  ; compose: schedule entry being written
 scount: .res 1
 vis:    .res NSLOT              ; per slot, from doslot: shown?
 vD:     .res NSLOT              ;   first line, end line, bar height
@@ -1667,7 +1658,7 @@ span:   .res 1
 dn:     .res 1                  ; nearest bar's lines relative to cD
 en:     .res 1
 hn:     .res 1
-ni:     .res 1                  ; nearest slot * 5
+ni:     .res 1                  ; nearest slot * 6
 rb0:    .res 1                  ; block rows on the light's lines
 rb1:    .res 1
 k:      .res 1

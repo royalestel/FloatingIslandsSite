@@ -393,12 +393,16 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   it up. It eases the ship's climb speed toward ±1 unit per frame, so
   pushing up makes the bars rise. Each bar's height is relative
   to the ship's: it is `Y/Z` lines from the centre, above or below.
+* **Six segments.** Each bar line is split at sprite x 56, 120, 184 (the
+  light), 248 and 312. The four inner segments are 64 pixels wide and the
+  two at the window's edges 32. A split costs 8 cycles (`lda col,y` /
+  `sta $d021`), down from 9 with `lda (zp),y`, which makes room for the
+  sixth.
 * **Roll** (left / right) tilts every bar the other way, one step every
-  other frame. Neighbouring segments can be up to 3 lines apart, so at
-  full roll a bar drops 12 lines from one edge to the other. Letting go
-  levels out again.
+  other frame. At full roll a bar drops 12 lines from one edge to the
+  other, 3 lines per 72 pixels. Letting go levels out again.
   * All bars are parallel, so the tilt comes from one 17-entry table per
-    segment (`rtilt0..4`).
+    segment (`rtilt0..5`), taken at each segment's centre.
   * Each bar has 12 black padding rows above and below it (`PAD`), one
     for each line of the steepest slant.
 * **New bars** appear far away at your current height, plus the next of
@@ -437,14 +441,14 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   * Colours come ready-made: the profiled list for the bar's palette and
     flight frame is a straight copy (`lda list,y`, 3 stores, `dey / bpl`).
   * Only 3 columns per bar. All bars share the tilt and the highlight is
-    symmetric, so segments 0 and 4 read one column and 1 and 3 another,
-    each at its own tilt offset. Expansion, highlight and merge copies
-    write 3 columns instead of 5. A row costs 24 cycles instead of 43.
+    symmetric, so segments 0 and 5 read one column, 1 and 4 another, and 2
+    and 3 the centre one, each at its own tilt offset. Expansion,
+    highlight and merge copies write 3 columns instead of 6.
   * The near clip has its own profiled lists, with the cut rows black, so
     it costs nothing extra.
   * All bars share one tilt, so a farther bar's rows sit at the same
     offset in every column. Copying them and blacking around the nearest
-    bar both handle all five columns at once.
+    bar both handle all six segments at once.
   * This program banks out the ROMs, so its zero page can run past $7F
     (the shared `raybars.cfg` now allows up to $FF).
 * **Simulator.** `sim_goldship.py` flies with an autopilot on `$dc00`. It
@@ -457,6 +461,31 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   * The worst frame uses 79% of the free time, leaving at least 2,600
     cycles (about 42 raster lines) of each frame spare.
   * Every bar row holds its profiled colour, or a highlight drawn over it.
+  * With six segments (600 frames): each block's loads read the nearest
+    bar's columns in all three loops, irq2's segment 0 matches the first
+    row, and the worst frame uses 74% of the free time.
+* **The six-segment display loops.**
+  * Each row stores segments 1 to 5 at their left edges, then the next
+    row's segment 0 in the right border (`sta $d021,x`, x = 0, so 5
+    cycles): 51 cycles. irq2 stores the first row's segment 0 (`c0`) in
+    the left border, and starts the row a cycle earlier than before
+    (`ldy zero`, `jmp` patched by `nextbar`), so the first split falls at
+    sprite x 56.
+  * The loads' column addresses are patched into the code. The loops come
+    in six copies, one per slot and buffer, so the build patches the copy
+    of the frame it is building while the other copy is on screen. Each
+    copy's column pages are fixed, so only the low bytes change, written
+    by `compose` along with the chunk ends. `nextbar` now only sets the
+    raster line, the loop entry, irq2's delay and `c0`.
+  * Row tails: n1 and n2 loop in 63 cycles and band rows in 58. Each loop
+    exits with a branch 56 cycles in, to the next loop's entry, which pads
+    the row out: `be` (7 cycles) and `n2e` (2). A block's last row runs as
+    a normal row even on the sprite's lines, since nothing follows it, so
+    the band loop always exits into n2.
+  * On exit, n2 writes black (`stx $d021`) 60 cycles in, 65 after the
+    sprite's DMA: still in the left border of the next line.
+  * The copies start on a page, and asserts check that no exit branch
+    crosses one (that would add a cycle).
 
 * **Checked in VICE** (x64sc, PAL). The 8565's grey dot marks every
   `$d021` write, so each split's position can be read off a screenshot.
@@ -472,6 +501,13 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     cycles of two NOPs. The row timing is unchanged.
   * A screen rebuilt from a VICE snapshot (its RAM run through the
     program's own `nextbar` and row loops) matches VICE's frame.
+  * Six segments, over 400 sampled frames: every colour change falls on
+    the five splits (sprite x 56, 120, 184, 248, 312), including the
+    first rows of 81 blocks whose IRQ line has the sprite's DMA. A
+    snapshot rebuild matches VICE's frame again.
+  * The grey dots are the 8565's (C64C) artefact: one light-grey pixel at
+    every colour-register write. On the 6569 (`-model c64`) there are
+    none.
 
 ## FLYBY3D: profiling the bars in true perspective
 
