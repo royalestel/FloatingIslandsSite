@@ -190,14 +190,24 @@ def scene_bars(f):
     return [(yc, fb.zof((f + st) % fb.FLYD), fb.bands48(pal)) for pal, yc, st in fl.FLIGHTS]
 
 # ---- outputs ---------------------------------------------------------------------------------
-def animation(path, frames_dir=None, step=3, dir_step=4):
+def export_frames(frames_dir, step=4):
+    """Each moment's two frames of the combined way, sharp (s) and through
+    the PAL CRT model (c): se000.png, so000.png, ce000.png, co000.png."""
+    os.makedirs(frames_dir, exist_ok=True)
+    s0, s1 = fl.ship_pair(0, 0)
+    for k, f in enumerate(range(0, fb.FLYD, step)):
+        fr = frames_for(scene_bars(f), "full", s0, s1)
+        for nm, img in (("e", fr[0]), ("o", fr[1])):
+            fl.save_png(img, os.path.join(frames_dir, f"s{nm}{k:03d}.png"))
+            fl.save_png(crt(img.astype(float)).astype(np.uint8),
+                        os.path.join(frames_dir, f"c{nm}{k:03d}.png"))
+
+def animation(path, step=3):
     font, small = fl.fonts()
     single = ship3d.render(0, 0)
     s0, s1 = fl.ship_pair(0, 0)
     W2, H2 = fb.W * 2, fb.H * 2
     out = []
-    if frames_dir:
-        os.makedirs(frames_dir, exist_ok=True)
     for f in range(0, fb.FLYD, step):
         bars = scene_bars(f)
         panels = []
@@ -207,12 +217,6 @@ def animation(path, frames_dir=None, step=3, dir_step=4):
             fr = frames_for(bars, mode, *sh)
             im = Image.fromarray(seen(fr)).resize((W2, H2), Image.LANCZOS)
             panels.append(fl.label(im, text + " (PAL CRT, as seen)", small))
-            if mode == "full" and frames_dir and f % dir_step == 0:
-                k = f // dir_step
-                for nm, img in (("e", fr[0]), ("o", fr[1])):
-                    fl.save_png(img, os.path.join(frames_dir, f"s{nm}{k:03d}.png"))
-                    fl.save_png(crt(img.astype(float)).astype(np.uint8),
-                                os.path.join(frames_dir, f"c{nm}{k:03d}.png"))
         both = Image.new("RGB", (W2 * 3 + 16, H2), (20, 20, 28))
         for i, p in enumerate(panels):
             both.paste(p, (i * (W2 + 8), 0))
@@ -274,6 +278,8 @@ def sheet(path):
 if __name__ == "__main__":
     sheet(os.path.join(HERE, "preview_interlace.png"))
     print("wrote preview_interlace.png")
-    animation(os.path.join(HERE, "preview_interlace.gif"),
-              frames_dir=sys.argv[1] if len(sys.argv) > 1 else None)
+    animation(os.path.join(HERE, "preview_interlace.gif"))
     print("wrote preview_interlace.gif")
+    if len(sys.argv) > 1:
+        export_frames(sys.argv[1])
+        print("wrote the live page's frames to", sys.argv[1])
