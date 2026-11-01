@@ -12,7 +12,8 @@ A step of jitter delays a row's start one cycle: its five inner splits land
 8 px further right.  One C64 frame per video frame, through interlace.py's
 PAL CRT model.
 
-    python3 jitter_video.py out.mp4 [fps]     # default 60
+    python3 jitter_video.py out.mp4 [fps]         # default 60
+    python3 jitter_video.py out.mp4 60 extra      # the flickering extra line
 """
 import subprocess, sys
 import numpy as np
@@ -24,11 +25,42 @@ import mockup as mk
 import ship_aa
 
 SAW4, SAW3 = [0, 1, 2, 3], [0, 1, 2]
-OPTIONS = [("No jitter: rounded offsets", None, None),
-           ("All lines, sawtooth 0-8-16-24 px", SAW4, "all"),
-           ("All lines, sawtooth 0-8-16 px", SAW3, "all"),
-           ("Top and bottom lines only, sawtooth 0-8-16-24 px", SAW4, "rows"),
-           ("Top and bottom lines only, sawtooth 0-8-16 px", SAW3, "rows")]
+OPTIONS = [("No jitter: rounded offsets", None, None, None),
+           ("All lines, sawtooth 0-8-16-24 px", SAW4, "all", None),
+           ("All lines, sawtooth 0-8-16 px", SAW3, "all", None),
+           ("Top and bottom lines only, sawtooth 0-8-16-24 px", SAW4, "rows", None),
+           ("Top and bottom lines only, sawtooth 0-8-16 px", SAW3, "rows", None)]
+# the flickering extra line: while the bar is tilted, each segment shows one
+# more line of the bar's edge colour above its top (and below its bottom),
+# on even frames only, so it shows at half strength
+EXTRA = [("Rounded offsets, no extra line", None, None, None),
+         ("Tilted: an extra line above each segment, on alternate frames", None, None, "above"),
+         ("Tilted: extra lines above and below each segment, on alternate frames", None, None, "both")]
+
+def add_extra(cols, k, roll, extra):
+    """The segment columns with the flickering extra line(s) added."""
+    if not extra or roll == 0 or k & 1:
+        return cols
+    out = cols.copy()
+    on = (cols & 15) != 0
+    for s in range(6):
+        ys = np.flatnonzero(on[s])
+        if not len(ys):
+            continue
+        # the bars' extents: lit lines, gaps under 3 lines (dark rows inside
+        # a bar) bridged
+        runs, a = [], ys[0]
+        for p, q in zip(ys, ys[1:]):
+            if q - p > 3:
+                runs.append((a, p))
+                a = q
+        runs.append((a, ys[-1]))
+        for a, b in runs:
+            if a > 0:
+                out[s, a - 1] = cols[s, a]                  # above its top
+            if extra == "both" and b + 1 < fb.H:
+                out[s, b + 1] = cols[s, b]                  # below its bottom
+    return out
 SHIPPAL = [fb.C64RGB[c] for c in (0, 4, 14, 1)]
 Z = 3                                   # scale
 
@@ -56,7 +88,7 @@ def frame_image(cols, k, pair, seq, where):
                 img[y, x:x + 2] = SHIPPAL[v]
     return img
 
-def main(path, fps=60):
+def main(path, fps=60, options=OPTIONS):
     recs, ship = fv.record(0, fv.bank(), ("notilt",))
     frames = [np.frombuffer(b, np.uint8).reshape(6, fb.H) for b in recs["notilt"]]
     pairs = ship_aa.pairs()
@@ -64,7 +96,7 @@ def main(path, fps=60):
     bot = fb.CY + 13
     sh_, sw_ = (bot - top) * Z, fb.W * Z
     lab = 26
-    Wv, Hv = sw_ + 32, len(OPTIONS) * (sh_ + lab) + 16
+    Wv, Hv = sw_ + 32, len(options) * (sh_ + lab) + 16
     Wv, Hv = Wv + Wv % 2, Hv + Hv % 2
     ff = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo",
                            "-pix_fmt", "rgb24", "-s", f"{Wv}x{Hv}", "-r", str(fps), "-i", "-",
@@ -79,8 +111,9 @@ def main(path, fps=60):
             canvas = Image.new("RGB", (Wv, Hv), (11, 10, 18))
             dr = ImageDraw.Draw(canvas)
             pair = pairs[ship[k][0]][k & 1]
-            for i, (text, seq, where) in enumerate(OPTIONS):
-                img = frame_image(frames[k], k, pair, seq, where)
+            for i, (text, seq, where, extra) in enumerate(options):
+                cols = add_extra(frames[k], k, ship[k][3], extra)
+                img = frame_image(cols, k, pair, seq, where)
                 # (padded with black: the CRT model's blur wraps round)
                 pad = np.pad(img[top - 1:bot], ((0, 0), (8, 8), (0, 0)))
                 crop = il.crt(pad.astype(float))[1:, 8:-8].astype(np.uint8)
@@ -93,4 +126,5 @@ def main(path, fps=60):
     print(f"wrote {path}: {2 * n} frames at {fps} fps")
 
 if __name__ == "__main__":
-    main(sys.argv[1], int(sys.argv[2]) if len(sys.argv) > 2 else 60)
+    main(sys.argv[1], int(sys.argv[2]) if len(sys.argv) > 2 else 60,
+         EXTRA if len(sys.argv) > 3 and sys.argv[3] == "extra" else OPTIONS)
