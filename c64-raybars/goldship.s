@@ -11,7 +11,11 @@
 ;  as a pilot's stick, up pushes the nose down (the ship dives, so the bars
 ;  move up) and down pulls it up (it climbs, the bars sink); left / right
 ;  roll it (the bars tilt the other way, up to 3 lines per segment).  The
-;  ship's sprite leans in the 8 directions while pushed.
+;  ship's sprite follows the eased roll and climb speed: 9 rolls x 9 pitches
+;  rendered from the 3D model (ship3d.py, ship_aa.py), each a pair of frames
+;  shown on alternate frames, which antialiases its edges and blends its
+;  shadowed and lit hull (a sprite-pointer change: no cycles on the bars).
+;  The 162 frames load above the program and are copied to FRAMES at start.
 ;  When a bar ahead is on a collision course (it covers the screen centre,
 ;  which in perspective means it is within half its thickness of the ship's
 ;  height, at any distance) the ship's palette turns from purple / light
@@ -84,7 +88,8 @@ BAND1     = SPRY + 21   ;   lines are one later)
 SEP       = 6           ; bars closer than this (lines) share one IRQ block
 HLTHR     = 3           ; highlight: white from spec level 3 (+ segment drop)
 VICBANK   = $8000
-SPRBUF    = VICBANK + $0000
+FRAMES    = VICBANK + $0800 ; the ship's 162 frames (to $b07f); the screen
+                        ; ($8400, only its sprite pointers used) sits below
 SPRPTR    = VICBANK + $0400 + $03f8
 IDLEBYTE  = VICBANK + $3fff
 SPRX      = 184 - 12    ; ball centred on the screen
@@ -198,6 +203,18 @@ save_y:  .res 1
 
 start:  sei
         .assert * = 2062, error, "SYS 2061 must land on start"
+        ; the ship's frames: from where they loaded (above the program) up to
+        ; FRAMES.  The two ranges overlap, the target higher: copy top down
+        ldx #(NSHIPFR*64 + 255) / 256
+        ldy #0
+@cpf:   lda shipfr + ((NSHIPFR*64 + 255) / 256 - 1) * 256,y
+@cpt:   sta FRAMES + ((NSHIPFR*64 + 255) / 256 - 1) * 256,y
+        iny
+        bne @cpf
+        dec @cpf+2
+        dec @cpt+2
+        dex
+        bne @cpf
         lda #$7f
         sta CIA1_ICR
         sta CIA2_ICR
@@ -248,14 +265,9 @@ start:  sei
         dex
         bpl @stg
 
-        ldx #0                  ; the ship's 9 frames
-@spr:   .repeat 3, P
-        lda shipspr + P*256,x
-        sta SPRBUF + P*256,x
-        .endrep
-        inx
-        bne @spr
-        lda #<((SPRBUF - VICBANK)/64)
+        lda rollfr+8            ; level, no climb
+        clc
+        adc pitchfr+8
         sta SPRPTR
         lda #1
         sta VIC_SPREN
@@ -417,11 +429,21 @@ rdone:  lda roll
         clc
         adc #8
         sta rolli
-        ; ---- the ship leans with the stick
-        ldx joy
-        lda joyframe,x
+        ; ---- the ship's attitude: the eased roll and climb speed pick one
+        ;      of 81 frame pairs; its two frames alternate every frame
+        lda vy                  ; -64..64
         clc
-        adc #<((SPRBUF - VICBANK)/64)
+        adc #64
+        lsr
+        lsr
+        lsr
+        tax                     ; 0..16
+        lda fcount
+        and #1
+        ora pitchfr,x           ; (even)
+        ldx rolli               ; 0..16
+        clc
+        adc rollfr,x
         sta SPRPTR
         ; ---- its palette: red / orange / yellow on a collision course
         ldx #0
@@ -1585,7 +1607,7 @@ bout:   lda save_a
 .segment "TABLES"
         .include "tables.inc"   ; spectab, theta2_12, log2/atan
         .include "fly.inc"      ; FLYD, flight tables, dimmed palettes
-        .include "ship.inc"     ; ship sprites, roll tilts, spawn heights
+        .include "ship.inc"     ; ship frame selection, roll tilts, spawn heights
 shippal: .byte 4, 14, 1, 2, 8, 7   ; hull, trim, light: normal, collision
 udswap:                         ; joystick bits with up (1) and down (2) swapped
         .repeat 16, I
@@ -1624,7 +1646,11 @@ n2lo:   .lobytes n2_0, n2_1, n2_2, n2_3, n2_4, n2_5
 n2hi:   .hibytes n2_0, n2_1, n2_2, n2_3, n2_4, n2_5
 
 ; =============================================================================
-.segment "BSS"
+.segment "RAMPS"
+cols:   .res 2*NSLOT*NCOL*256   ; a page per column, 2 buffers
+        .assert <cols = 0, error, "cols must be page aligned"
+; the variables follow in RAMPS, not BSS, which raybars.cfg places after
+; SHIPFR, in the frames' copy target
 dirty:  .res 2*NSLOT            ; per buffer and slot: pads stale (merge, respawn)
 lasth:  .res 2*NSLOT            ;   bar height when last built
 nbuf:   .res 1
@@ -1673,7 +1699,10 @@ hf:     .res 1
 lo:     .res 1
 hi:     .res 1
 
-.segment "RAMPS"
-cols:   .res 2*NSLOT*NCOL*256   ; a page per column, 2 buffers
-        .assert <cols = 0, error, "cols must be page aligned"
         .assert * <= VICBANK, error, "program runs into the VIC bank"
+
+; the ship's frames, loaded after everything else and copied to FRAMES
+.segment "SHIPFR"
+        .include "shipfr.inc"
+        .assert shipfr < FRAMES, error, "the frames' top-down copy needs shipfr below FRAMES"
+        .assert FRAMES + NSHIPFR*64 <= IDLEBYTE, error, "the frames run into the idle byte"

@@ -62,6 +62,14 @@ while mpu.pc != L["main"]:
     mpu.step()
 mem[L["buf"]] = mem[L["nbuf"]] ^ 1
 mem[L["ready"]] = 0
+# the ship's 162 frames, copied up to $8800 by the start-up
+SHIPFR = [int(b, 16) for ln in open(os.path.join(HERE, "shipfr.inc"))
+          if ln.strip().startswith(".byte") for b in ln.split(".byte")[1].replace("$", "").split(",")]
+badcopy = list(mem[0x8800:0x8800 + len(SHIPFR)]) != SHIPFR or mem[0xBFFF] != 0
+def tab(name, n):
+    return [mem[L[name] + i] for i in range(n)]
+ROLLFR, PITCHFR = tab("rollfr", 17), tab("pitchfr", 17)
+badptr = 0
 
 over = 0
 frames, worst, pagecross, close, sprite_hit, early = [], 0, 0, 0, 0, 0
@@ -91,6 +99,11 @@ for f in range(FRAMES):
     cyc = call(L["build"])
     hits += mem[L["hitfl"]] > hit0
     redframes += mem[0xD025] == 2
+    # the sprite pointer: the eased roll and climb speed's pair, the frame
+    # count's parity picking its frame
+    roll, vy = mem[L["roll"]], mem[L["vy"]]
+    roll, vy = roll - 256 if roll > 127 else roll, vy - 256 if vy > 127 else vy
+    badptr += mem[0x87F8] != ROLLFR[roll + 8] + PITCHFR[(vy + 64) >> 3] + (mem[L["fcount"]] & 1)
     look.append((mem[L["SPRPTR"]] if "SPRPTR" in L else mem[0x87F8],
                  mem[0xD025], mem[0xD027], mem[0xD026], mem[0xD020]))
     # the bars as built: visible slots, their lines and columns
@@ -166,7 +179,9 @@ for f in range(FRAMES):
     frames.append(ents)
     mem[L["buf"]] = nb ^ 1
     mem[L["ready"]] = 0
-ok &= pagecross == 0 and close == 0 and early == 0
+ok &= pagecross == 0 and close == 0 and early == 0 and not badcopy and badptr == 0
+print(f"ship frames copied to $8800 {'wrong' if badcopy else 'ok'} (idle byte 0), "
+      f"sprite pointers wrong {badptr}")
 ok &= badrow == 0 and baddly == 0 and badcell == 0 and badop == 0 and badc0 == 0
 print(f"rows with the wrong length {badrow}, irq2 delays wrong {baddly}, "
       f"cells not showing the nearest bar {badcell}")
@@ -207,12 +222,18 @@ def render(f):
                     px[SPRX + 8 + cx * 2 + dx, SPRY + 1 + sy - TOP] = MC[v]
     return im.resize((W * SCALE, H * SCALE), Image.NEAREST)
 
-imgs = [render(f) for f in range(100, FRAMES, 2)]
+def seen(f):
+    """Frames f and f + 1 blended (linear light): the ship's pair as seen."""
+    import numpy as np
+    a, b = (np.asarray(render(g), float) / 255 for g in (f, f + 1))
+    return Image.fromarray((((a ** 2.2 + b ** 2.2) / 2) ** (1 / 2.2) * 255).astype(np.uint8))
+
+imgs = [seen(f) for f in range(100, FRAMES - 1, 2)]
 imgs[0].save(os.path.join(HERE, "preview_goldship.gif"), save_all=True,
              append_images=imgs[1:], duration=40, loop=0)
 sheet = Image.new("RGB", (W * SCALE * 3, H * SCALE * 2))
 for i, n in enumerate((90, 290, 490, 190, 390, 590)):   # full left; full right
-    sheet.paste(render(n), ((i % 3) * W * SCALE, (i // 3) * H * SCALE))
+    sheet.paste(seen(n), ((i % 3) * W * SCALE, (i // 3) * H * SCALE))
 sheet.save(os.path.join(HERE, "preview_goldship.png"))
 print("wrote preview_goldship.gif, preview_goldship.png")
 sys.exit(0 if ok else 1)

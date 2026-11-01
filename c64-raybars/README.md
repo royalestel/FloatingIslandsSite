@@ -365,16 +365,45 @@ through parallel bars that come at it out of the distance. Joystick in
 port 2.
 
 ```sh
+python3 gen_tables.py        # ship.inc, shipfr.inc (the ship's 162 frames)
 cl65 -t none -C raybars.cfg -o goldship.prg goldship.s
 python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldship.gif
 ```
 
 * **The ship** is one multicolour sprite at the centre of the screen.
-  Its 9 frames are renders of a small 3D model (`ship3d.py`, called by
-  `gen_tables.py` into `ship.inc`). With the stick centred you see the
-  tail view; otherwise it leans that way, rolled 25 degrees and pitched
-  30. `python3 ship3d.py frames.png` previews them
-  (`preview_ship3d.png`).
+  Its frames are renders of a small 3D model (`ship3d.py`), at 9 rolls
+  (-25 to 25 degrees, 6.25 apart) by 9 pitches (-30 to 30, 7.5 apart).
+  Each of the 81 angles is a pair of frames (`ship_aa.py`, called by
+  `gen_tables.py` into `shipfr.inc`): 162 frames, 10,368 bytes.
+  * The sprite follows the eased roll (-8 to 8, two steps per angle) and
+    climb speed (-64 to 64, 16 per angle), so it turns smoothly instead
+    of jumping with the stick. The pointer is
+    `rollfr[roll+8] + pitchfr[(vy+64)>>3] + (fcount & 1)`: the pair's two
+    frames alternate every frame, at no cost to the bars.
+  * The pair antialiases the ship. A half-covered edge pixel is lit in
+    one frame only, in a checkerboard, so it shows at half strength and
+    the edge is dithered along the line for the TV to blur. A pixel split
+    between shadowed and lit hull alternates purple and light blue, in
+    opposite phase on neighbouring lines, so the PAL delay line blends
+    them as well (they are one brightness level apart, so it barely
+    flickers). A pixel touched by the nose light shows it in one frame.
+  * Each angle's thresholds and checkerboard phase are chosen by looking:
+    every candidate pair goes through `interlace.py`'s PAL CRT model and is
+    compared with the model's own coverage through the same CRT. Averaged
+    over the 81 angles, the pair's error is 3.9 against 5.5 for a
+    single frame.
+  * Memory: the frames load straight after the program ($7783-$A002) and
+    the start-up copies them, top page first, to `FRAMES` = $8800-$B07F
+    in the VIC bank. The variables live in `RAMPS` rather than `BSS`, so
+    nothing sits in the copy's path. `raybars.cfg` has an optional
+    `SHIPFR` segment for this; the other programs build unchanged.
+  * `python3 ship_aa.py` writes `preview_ship_aa.png`: each angle in full
+    colour, its sprite, and the pair as a PAL TV shows it.
+    `python3 ship_aa.py page.html` also writes a live page that swaps
+    the pairs on every screen refresh, which a GIF can't do.
+    `ship3d.py frames.png` still previews the earlier 9 attitudes.
+  * Still to check in VICE: the flicker on a real (emulated) PAL frame,
+    and the load, which now runs past $A000 (under the BASIC ROM).
   * The model is a gull, picked from colour-rendered design variations.
     It has a flat body with the light on its nose, wings that rise to a
     kink and fall to the tips, and an engine pod at each kink.
@@ -464,6 +493,9 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   * With six segments (600 frames): each block's loads read the nearest
     bar's columns in all three loops, irq2's segment 0 matches the first
     row, and the worst frame uses 74% of the free time.
+  * The ship's frames arrive intact at $8800, the idle byte stays 0, and
+    every frame's sprite pointer is the one for its roll, climb speed and
+    frame parity. The preview blends each two frames, as the eye does.
 * **The six-segment display loops.**
   * Each row stores segments 1 to 5 at their left edges, then the next
     row's segment 0 in the right border (`sta $d021,x`, x = 0, so 5
