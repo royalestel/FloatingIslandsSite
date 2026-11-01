@@ -174,7 +174,7 @@ def animations(path, path50, step=3):
         both.paste(a, (0, 0))
         both.paste(b, (W2 + 8, 0))
         out.append(both)
-        if f == 198:
+        if f == 48:
             keep = (fe, fo)
     out[0].save(path, save_all=True, append_images=out[1:], duration=60, loop=0)
     # the real thing: the two frames alternating at 50 Hz (20 ms each)

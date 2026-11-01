@@ -550,6 +550,42 @@ python3 flyby_spec.py  # preview_flyby_spec*.png / .gif: the highlight
   * The true one shows on the C64 only in the last stretch before the
     ship.
 
+## FLICKER: colours between the C64's colours
+
+`flicker.py` previews flicker colours: two C64 colours shown on alternate
+frames (50 a second) blend in the eye into a colour in between.
+
+```sh
+python3 flicker.py   # preview_flicker.png, preview_flicker.gif (as seen),
+                     # preview_flicker_50hz.gif (the two frames themselves)
+```
+
+* **Colours.** The 16 colours sit on 9 brightness levels. Pairs on the
+  same level barely flicker, and pairs one level apart flicker a little
+  more. Allowing both gives 35 more colours, 51 in all.
+  * A pair's colour is the mean of the two in linear light: a CRT adds
+    light, not sRGB values.
+  * Neighbouring rows alternate in opposite phase, which halves the
+    visible flicker.
+* **Bars.** The true-perspective fly-by (`flyby3d.py`) decimated to the
+  nearest of the 51. Pairs one level apart count 15% farther, for their
+  flicker.
+  * The gain is largest for dimmed bars, where the 16 colours collapse to
+    a few browns and greys.
+  * In the game it would cost no cycles: bars are rebuilt every frame, so
+    even and odd frames would copy different colour lists. It needs twice
+    the colour-table memory.
+* **Ship antialiasing.** Two sprite frames per attitude, swapped each
+  frame by the sprite pointer:
+  * a half-covered edge pixel is lit in one frame of the two, so it shows
+    at half strength;
+  * a pixel split between shadowed and lit hull alternates purple and
+    light blue.
+* **Previews.** `preview_flicker.gif` shows what the eye sees, the mean of
+  the two frames, beside today's 16 colours. `preview_flicker_50hz.gif`
+  alternates the two real frames every 20 ms. A 60 Hz monitor can't show
+  50 Hz evenly, so judge the flicker on a real C64 or in VICE.
+
 ## Tuning notes
 
 * PAL only: the loop is 63 cycles per line, and an NTSC frame has too little vblank.
