@@ -91,8 +91,48 @@ def model():
 
 LIGHT = (-0.45, 0.75, -0.5)            # toward the light: up, left, behind us
 
+SX, SY = 8, 4                                        # samples per MC pixel
+
 def render(roll, pitch, scale=0.96):
     """-> 21 rows of 12 classes: 0 none, 1 dark hull, 2 lit hull, 3 glow."""
+    counts = sample_counts(roll, pitch, scale)
+    tot = SX * SY
+    def pick(cnt):
+        return 2 if cnt[2] >= cnt[1] else 1
+    rows = []
+    for r in range(21):
+        row = []
+        for cx in range(12):
+            cnt = counts[r][cx]
+            if cnt[3] * 5 >= tot:
+                row.append(3)
+            elif cnt[1] + cnt[2] + cnt[3] >= tot * 0.34:
+                row.append(pick(cnt))
+            else:
+                row.append(0)
+        rows.append(row)
+    # bridge one-pixel gaps: an empty pixel a part passes through is filled
+    # when it sits between two filled ones (thin slanted parts break up)
+    def at(r, c):
+        return rows[r][c] if 0 <= r < 21 and 0 <= c < 12 else 0
+    add = []
+    for r in range(21):
+        for cx in range(12):
+            cnt = counts[r][cx]
+            if rows[r][cx] or cnt[1] + cnt[2] + cnt[3] < tot * 0.08:
+                continue
+            for (a1, b1), (a2, b2) in (((0, -1), (0, 1)), ((-1, 0), (1, 0)),
+                                       ((-1, -1), (1, 1)), ((-1, 1), (1, -1))):
+                if at(r + a1, cx + b1) and at(r + a2, cx + b2):
+                    add.append((r, cx, 3 if cnt[3] > max(cnt[1], cnt[2]) else pick(cnt)))
+                    break
+    for r, cx, v in add:
+        rows[r][cx] = v
+    return rows
+
+def sample_counts(roll, pitch, scale=0.96):
+    """-> 21 rows of 12 [none, dark hull, lit hull, glow] sample counts
+    (SX x SY samples per multicolour pixel)."""
     cp, sp = math.cos(math.radians(pitch)), math.sin(math.radians(pitch))
     cr, sr = math.cos(math.radians(-roll)), math.sin(math.radians(-roll))
     def xf(p):
@@ -102,7 +142,6 @@ def render(roll, pitch, scale=0.96):
         return x, y, z
     ll = math.sqrt(sum(c * c for c in LIGHT))
     L = [c / ll for c in LIGHT]
-    SX, SY = 8, 4                                    # samples per MC pixel
     W, H = 12 * SX, 21 * SY
     zb = [[1e9] * W for _ in range(H)]
     cls = [[0] * W for _ in range(H)]
@@ -151,39 +190,7 @@ def render(roll, pitch, scale=0.96):
                     cnt[cls[yy][xx]] += 1
             crow.append(cnt)
         counts.append(crow)
-    tot = SX * SY
-    def pick(cnt):
-        return 2 if cnt[2] >= cnt[1] else 1
-    rows = []
-    for r in range(21):
-        row = []
-        for cx in range(12):
-            cnt = counts[r][cx]
-            if cnt[3] * 5 >= tot:
-                row.append(3)
-            elif cnt[1] + cnt[2] + cnt[3] >= tot * 0.34:
-                row.append(pick(cnt))
-            else:
-                row.append(0)
-        rows.append(row)
-    # bridge one-pixel gaps: an empty pixel a part passes through is filled
-    # when it sits between two filled ones (thin slanted parts break up)
-    def at(r, c):
-        return rows[r][c] if 0 <= r < 21 and 0 <= c < 12 else 0
-    add = []
-    for r in range(21):
-        for cx in range(12):
-            cnt = counts[r][cx]
-            if rows[r][cx] or cnt[1] + cnt[2] + cnt[3] < tot * 0.08:
-                continue
-            for (a1, b1), (a2, b2) in (((0, -1), (0, 1)), ((-1, 0), (1, 0)),
-                                       ((-1, -1), (1, 1)), ((-1, 1), (1, -1))):
-                if at(r + a1, cx + b1) and at(r + a2, cx + b2):
-                    add.append((r, cx, 3 if cnt[3] > max(cnt[1], cnt[2]) else pick(cnt)))
-                    break
-    for r, cx, v in add:
-        rows[r][cx] = v
-    return rows
+    return counts
 
 # attitudes: level, up, down, left, right, left-up, left-down, right-up,
 # right-down (roll / pitch signs; the angles below)
