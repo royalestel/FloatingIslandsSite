@@ -25,6 +25,8 @@ canvas.sharp { image-rendering: pixelated; }
 canvas.strip { aspect-ratio: auto; }
 h2 { font-family: var(--display); font-weight: 500; font-size: 1.15rem; margin: 6px 0 4px; }
 .bank { display: grid; gap: 8px; }
+.strips { display: grid; gap: 6px; }
+.strips .lab { margin-top: 6px; }
 .bar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .lab { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
@@ -43,6 +45,7 @@ button:focus-visible { outline: 2px solid #d0dc71; outline-offset: 2px; }
     <div class="seg"><span class="lab">Bars</span>
       <button id="r-all" data-r="all" aria-pressed="true">all tricks</button>
       <button id="r-notilt" data-r="notilt" aria-pressed="false">no tilt flicker</button>
+      <button id="r-jitter" data-r="jitter" aria-pressed="false">split jitter</button>
       <button id="r-plain" data-r="plain" aria-pressed="false">plain 16 colours</button></div>
     <div class="seg"><span class="lab">Screen</span>
       <button id="t-pal" data-t="1" aria-pressed="true">PAL TV</button>
@@ -57,9 +60,13 @@ button:focus-visible { outline: 2px solid #d0dc71; outline-offset: 2px; }
   <div class="read" id="read">loading…</div>
   <section class="bank">
     <h2>Banking, one bar</h2>
-    <p class="hint">One bar held at a fixed distance while the ship banks slowly from level to full left, full right and back, a roll step every 8 frames. Top: the tilt flickers between the two nearest lines, so each step moves the segments by half a line. Bottom: offsets rounded, whole-line jumps. Both 60 frames a second, with the Screen and pause settings above.</p>
-    <div class="tv"><div class="lab">Tilt flicker</div><canvas id="bk1" class="strip"></canvas>
-      <div class="lab" style="margin-top:10px">Rounded offsets</div><canvas id="bk2" class="strip"></canvas></div>
+    <p class="hint">One bar held at a fixed distance while the ship banks slowly from level to full left, full right and back, a roll step every 8 frames, 60 frames a second, with the Screen and pause settings above. <b>Split jitter</b>: on odd frames each block of bars starts 1 or 2 cycles later, so every split on every line lands 8 or 16 pixels further right, and each step blurs sideways. <b>Per-line</b> also swaps the jitter on alternate lines (a checkerboard in space and time), which needs a row loop that runs 62 and 64 cycles on alternate lines.</p>
+    <div class="tv strips">
+      <div class="lab">Rounded offsets (no tricks on the tilt)</div><canvas id="bk2" class="strip"></canvas>
+      <div class="lab">Split jitter, 1 cycle (8 px) on odd frames</div><canvas id="bk3" class="strip"></canvas>
+      <div class="lab">Split jitter, 2 cycles (16 px) on odd frames</div><canvas id="bk4" class="strip"></canvas>
+      <div class="lab">Split jitter, 2 cycles, swapped on alternate lines</div><canvas id="bk5" class="strip"></canvas>
+      <div class="lab">Tilt flicker (the previous idea)</div><canvas id="bk1" class="strip"></canvas></div>
   </section>
   <div class="hint"><b>All tricks:</b> every bar line picks a flicker pair of C64 colours, with the phase swapped on alternate lines so a PAL TV's delay line blends neighbouring lines; distant and dim bars get the ghost byte (every other pixel black); the ship is an antialiased frame pair; and the <b>tilt flickers</b>: a segment whose exact offset falls between two lines alternates between them every frame, so the bars bank in half-line steps. One C64 frame per screen refresh, 60 a second. <b>PAL TV</b> runs each frame through the PAL CRT model (composite blur, delay line); <b>sharp pixels</b> shows the raw frames.</div>
 </div>
@@ -89,14 +96,19 @@ function Screen(canvas, ship, n, crop) {
   const octx = off.getContext("2d"), img = octx.createImageData(W, H), px = img.data;
   const idx = new Uint8Array(W * H), ctx = canvas.getContext("2d");
   if (crop) { canvas.width = crop[2] * 3; canvas.height = crop[3] * 3; } else { canvas.width = W; canvas.height = H; }
-  function compose(fr, k, plain) {
+  function compose(fr, k, plain, jit) {
     const base = k * 6 * WH, [si, red, border] = ship[k];
     idx.fill(border);
     for (let y = 0; y < WH; y++) {
       const row = (Y0 + y) * W + X0;
       for (let s = 0; s < 6; s++) {
         const v = fr[base + s * WH + y], c = v & 15, g = v & 16;
-        for (let x = D.segx[s]; x < D.segx[s + 1]; x++) idx[row + x] = g && (x & 1) ? 0 : c;
+        // split jitter: the block starts jit.cyc cycles later on odd frames
+        // (swapped on odd lines with jit.lines), moving the five inner
+        // splits 8 px a cycle; the window's edges are in the border
+        const sh = jit ? (((k & 1) ^ (jit.lines ? y & 1 : 0)) * 8 * jit.cyc) : 0;
+        const xa = s ? D.segx[s] + sh : 0, xb = s < 5 ? D.segx[s + 1] + sh : WW;
+        for (let x = xa; x < xb; x++) idx[row + x] = g && (x & 1) ? 0 : c;
       }
     }
     const sp = D.pairs[si][plain ? 2 : k & 1], pal = SHIP[red];
@@ -135,8 +147,8 @@ function Screen(canvas, ship, n, crop) {
   }
   return {
     n, ship,
-    show(fr, k, plain) {
-      compose(fr, k, plain); render();
+    show(fr, k, plain, jit) {
+      compose(fr, k, plain, jit); render();
       octx.putImageData(img, 0, 0);
       ctx.imageSmoothingEnabled = tv;
       canvas.classList.toggle("sharp", !tv);
@@ -153,14 +165,21 @@ const main = Screen(document.getElementById("scr"), D.ship, D.n);
 const btop = Y0 + D.bank.top - 14, crop = [X0 - 8, btop, WW + 16, Y0 + D.CY + 13 - btop];
 const bk1 = Screen(document.getElementById("bk1"), D.bank.ship, D.bank.n, crop);
 const bk2 = Screen(document.getElementById("bk2"), D.bank.ship, D.bank.n, crop);
+const bk3 = Screen(document.getElementById("bk3"), D.bank.ship, D.bank.n, crop);
+const bk4 = Screen(document.getElementById("bk4"), D.bank.ship, D.bank.n, crop);
+const bk5 = Screen(document.getElementById("bk5"), D.bank.ship, D.bank.n, crop);
 // ---- playback: one C64 frame per 1/60 s ----
 let t0 = 0, tick0 = 0, step = 0, last = -1, shown = [];
 function frameAt(s, n) { return ((s % n) + n) % n; }
 function draw() {
   const k = frameAt(step, D.n), b = frameAt(step, D.bank.n);
-  main.show(rec[which], k, which === "plain");
+  if (which === "jitter") main.show(rec.notilt, k, false, { cyc: 2 });
+  else main.show(rec[which], k, which === "plain");
   bk1.show(brec.all, b, false);
   bk2.show(brec.notilt, b, false);
+  bk3.show(brec.notilt, b, false, { cyc: 1 });
+  bk4.show(brec.notilt, b, false, { cyc: 2 });
+  bk5.show(brec.notilt, b, false, { cyc: 2, lines: true });
   return [k, b];
 }
 function tick(t) {
