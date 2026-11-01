@@ -10,8 +10,7 @@
 ;  approaches.  Joystick in port 2:
 ;  as a pilot's stick, up pushes the nose down (the ship dives, so the bars
 ;  move up) and down pulls it up (it climbs, the bars sink); left / right
-;  roll it (the bars tilt the other way, up to 3 lines per segment, the
-;  tilt flickering between neighbouring lines for half-line steps).  The
+;  roll it (the bars tilt the other way, up to 3 lines per segment).  The
 ;  ship's sprite follows the eased roll and climb speed: 9 rolls x 9 pitches
 ;  rendered from the 3D model (ship3d.py, ship_aa.py), each a pair of frames
 ;  shown on alternate frames, which antialiases its edges and blends its
@@ -761,13 +760,7 @@ hidden: ldx s
 visible:
 
         ; ---- tilt -----------------------------------------------------------------
-        lda fcount              ; all bars parallel: the roll's tilt,
-        and #1                  ;   flickering between the two nearest
-        beq :+                  ;   lines (odd frames: rtilt's second half)
-        lda #17
-:       clc
-        adc rolli
-        tay
+        ldy rolli               ; all bars parallel: the roll's tilt
         .repeat ::SEGS, K
         lda .ident(.sprintf("rtilt%d", K)),y
         sta kb+K

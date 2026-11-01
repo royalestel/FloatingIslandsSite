@@ -406,9 +406,14 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     frame and writes a live page that plays it, one C64 frame per 1/60 s,
     raw or through the PAL CRT model. It has every trick: flicker colours
     with the phase swapped on alternate lines, the ghost byte on distant
-    and dim bars, the ship's pairs, and the tilt flicker. Two more
-    recordings of the same flight compare it without the tilt flicker and
-    in plain 16 colours.
+    and dim bars, the ship's pairs, and the tilt flicker (an experiment,
+    since removed from the program). Two more recordings of the same
+    flight compare it without the tilt flicker and in plain 16 colours.
+    `python3 jitter_video.py out.mp4 [fps] [extra|ghost]` renders the
+    other tilt antialiasing experiments as videos (split jitter, a
+    flickering extra line above and below, ghosted or not). None went
+    into the program: the jitter and tilt flicker didn't smooth the
+    banking, and the extra line made the bars look thicker.
     `ship3d.py frames.png` still previews the earlier 9 attitudes.
   * Still to check in VICE: the flicker on a real (emulated) PAL frame,
     and the load, which now runs past $A000 (under the BASIC ROM).
@@ -450,13 +455,6 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     pixels, the conversion fills it, so the roll frames stay whole.
   * Looking straight at the tail, the nose is hidden behind the body, so
     the level frame has no white.
-* **Tilt flicker.** The bars' tilt is a whole number of lines per
-  segment, so slight banks look stepped. Each segment's exact offset `x`
-  is now shown as `floor(x + 0.75)` on even frames and `floor(x + 0.25)`
-  on odd ones (`rtilt0..5` hold both halves, 34 entries; the build picks
-  the half by `fcount`'s parity). An offset half way between two lines
-  alternates between them, so the bars bank in half-line steps; a level
-  bar doesn't flicker. Cost: about 12 cycles per bar.
 * **Pitch** works like a pilot's stick: up pushes the nose down, down pulls
   it up. It eases the ship's climb speed toward ±1 unit per frame, so
   pushing up makes the bars rise. Each bar's height is relative
@@ -535,8 +533,8 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   * The ship's frames arrive intact at $8800, the idle byte stays 0, and
     every frame's sprite pointer is the one for its roll, climb speed and
     frame parity. Every block's idle byte is the ghost byte for its
-    nearest bar's distance, or 0. With the flicker colours, ghost byte
-    and tilt flicker the worst frame uses 74.2% of the free time. The
+    nearest bar's distance, or 0. With the flicker colours and ghost
+    byte the worst frame uses 73.9% of the free time. The
     preview shows each two frames through the PAL CRT model, blended as
     the eye does.
 * **The six-segment display loops.**
