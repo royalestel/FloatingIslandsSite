@@ -128,13 +128,28 @@ def fly(nframes, warmup=240):
             if b.st >= fb.FLYD:
                 bars[i] = respawn(0)
 
-def record(nframes):
-    recs = {"all": [], "notilt": [], "plain": []}
+BANK_T = 196                    # the banking demo's bar: flight frame (about 16 lines)
+
+def bank():
+    """One bar held at a fixed distance just above the ship while the ship
+    banks slowly from level to full left, full right and back: a roll step
+    every 8 frames, held 40 frames at each end."""
+    seq = []
+    for r in list(range(0, -9, -1)) + list(range(-8, 9)) + list(range(8, -1, -1)):
+        seq += [r] * (40 if abs(r) == 8 else 8)
+    b = mk.Bar(26.0, 0, BANK_T)
+    for roll in seq:
+        yield [b], 0.0, roll, 0, False, 0
+
+def record(nframes, flight=None, names=("all", "notilt", "plain")):
+    recs = {k: [] for k in names}
     ship = []
-    for n, (bars, shipy, roll, vy, red, hit) in enumerate(fly(nframes)):
+    for n, (bars, shipy, roll, vy, red, hit) in enumerate(flight or fly(nframes)):
         p = n & 1
         for name, mode, aa in (("all", "full", True), ("notilt", "full", False),
                                ("plain", "single", False)):
+            if name not in recs:
+                continue
             cols = columns(bars, shipy, offsets(roll, p, aa), mode)
             fr = np.zeros((6, fb.H), np.uint8)
             for k, (c, g) in enumerate(cols):
@@ -148,6 +163,7 @@ def record(nframes):
 
 def page(path, nframes):
     recs, ship = record(nframes)
+    brecs, bship = record(0, bank(), ("all", "notilt"))
     pairs = ship_aa.pairs()
     data = {"W": fb.W, "H": fb.H, "CY": fb.CY, "n": nframes,
             "segx": mk.SEGX,
@@ -155,7 +171,10 @@ def page(path, nframes):
                       for f0, f1, s, *_ in pairs],
             "ship": ship,
             "rec": {k: base64.b64encode(zlib.compress(b"".join(v), 9)).decode()
-                    for k, v in recs.items()}}
+                    for k, v in recs.items()},
+            "bank": {"n": len(bship), "ship": bship, "top": int(fb.CY - 26 / fb.zof(BANK_T)),
+                     "rec": {k: base64.b64encode(zlib.compress(b"".join(v), 9)).decode()
+                             for k, v in brecs.items()}}}
     tpl = open(os.path.join(HERE, "flight_page.html")).read()
     open(path, "w").write(tpl.replace("/*DATA*/null", json.dumps(data, separators=(",", ":"))))
     print("wrote", path, os.path.getsize(path) // 1024, "KB")

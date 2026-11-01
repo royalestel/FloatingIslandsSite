@@ -22,6 +22,9 @@ h1 { font-family: var(--display); font-weight: 700; font-size: 1.6rem; letter-sp
 .tv { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
 canvas { display: block; width: 100%; aspect-ratio: 384 / 272; background: #000; border-radius: 6px; max-width: 100%; }
 canvas.sharp { image-rendering: pixelated; }
+canvas.strip { aspect-ratio: auto; }
+h2 { font-family: var(--display); font-weight: 500; font-size: 1.15rem; margin: 6px 0 4px; }
+.bank { display: grid; gap: 8px; }
 .bar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .lab { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
@@ -52,6 +55,12 @@ button:focus-visible { outline: 2px solid #d0dc71; outline-offset: 2px; }
       <button id="stepf" aria-label="one frame on">frame ▶</button></div>
   </div>
   <div class="read" id="read">loading…</div>
+  <section class="bank">
+    <h2>Banking, one bar</h2>
+    <p class="hint">One bar held at a fixed distance while the ship banks slowly from level to full left, full right and back, a roll step every 8 frames. Top: the tilt flickers between the two nearest lines, so each step moves the segments by half a line. Bottom: offsets rounded, whole-line jumps. Both 60 frames a second, with the Screen and pause settings above.</p>
+    <div class="tv"><div class="lab">Tilt flicker</div><canvas id="bk1" class="strip"></canvas>
+      <div class="lab" style="margin-top:10px">Rounded offsets</div><canvas id="bk2" class="strip"></canvas></div>
+  </section>
   <div class="hint"><b>All tricks:</b> every bar line picks a flicker pair of C64 colours, with the phase swapped on alternate lines so a PAL TV's delay line blends neighbouring lines; distant and dim bars get the ghost byte (every other pixel black); the ship is an antialiased frame pair; and the <b>tilt flickers</b>: a segment whose exact offset falls between two lines alternates between them every frame, so the bars bank in half-line steps. One C64 frame per screen refresh, 60 a second. <b>PAL TV</b> runs each frame through the PAL CRT model (composite blur, delay line); <b>sharp pixels</b> shows the raw frames.</div>
 </div>
 
@@ -61,100 +70,126 @@ const C = [[0,0,0],[255,255,255],[137,64,54],[122,191,199],[138,70,174],[104,169
            [144,95,37],[92,71,0],[187,119,109],[85,85,85],[128,128,128],[172,234,136],[124,112,218],[171,171,171]];
 const SHIP = [[4, 14, 1], [2, 8, 7]];                     // hull, trim, light: normal, collision
 const W = 384, H = 272, X0 = 32, Y0 = 36, WW = D.W, WH = D.H;
-const cv = document.getElementById("scr"), ctx = cv.getContext("2d");
-const off = document.createElement("canvas"); off.width = W; off.height = H;
-const octx = off.getContext("2d"), img = octx.createImageData(W, H), px = img.data;
-const idx = new Uint8Array(W * H);                        // C64 colour per pixel
-let rec = {}, which = "all", tv = true, zoom = 1, paused = false, n = 0;
+let tv = true, zoom = 1, paused = false, which = "all";
 
 async function inflate(b64) {
   const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
   const s = new Blob([bin]).stream().pipeThrough(new DecompressionStream("deflate"));
   return new Uint8Array(await new Response(s).arrayBuffer());
 }
-// ---- one C64 frame into idx ----
-function compose(k) {
-  const fr = rec[which], base = k * 6 * WH, [si, red, border] = D.ship[k];
-  idx.fill(border);
-  for (let y = 0; y < WH; y++) {
-    const row = (Y0 + y) * W + X0;
-    for (let s = 0; s < 6; s++) {
-      const v = fr[base + s * WH + y], c = v & 15, g = v & 16;
-      for (let x = D.segx[s]; x < D.segx[s + 1]; x++) idx[row + x] = g && (x & 1) ? 0 : c;
-    }
-  }
-  const sp = D.pairs[si][which === "plain" ? 2 : k & 1], pal = SHIP[red];
-  for (let i = 0; i < 252; i++) {
-    const c = +sp[i]; if (!c) continue;
-    const y = Y0 + D.CY - 10 + Math.floor(i / 12), x = X0 + WW / 2 - 12 + (i % 12) * 2;
-    idx[y * W + x] = idx[y * W + x + 1] = pal[c - 1];
-  }
-}
-// ---- the PAL CRT model (interlace.py): luma and chroma blurred along the
-//      line, chroma averaged with the line above (the delay line) ----
+// the PAL CRT model (interlace.py): luma and chroma blurred along the line,
+// chroma averaged with the line above (the delay line)
 const YUV = C.map(([r, g, b]) => { r /= 255; g /= 255; b /= 255; const y = .299 * r + .587 * g + .114 * b; return [y, .492 * (b - y), .877 * (r - y)]; });
 const HY = [.2, .6, .2], HC = [.1, .2, .4, .2, .1];
-const Yb = new Float32Array(W * H), Ub = new Float32Array(W * H), Vb = new Float32Array(W * H);
 const Yf = new Float32Array(W * H), Uf = new Float32Array(W * H), Vf = new Float32Array(W * H);
-function render() {
-  if (!tv) {
-    for (let i = 0; i < W * H; i++) { const c = C[idx[i]]; px[4 * i] = c[0]; px[4 * i + 1] = c[1]; px[4 * i + 2] = c[2]; px[4 * i + 3] = 255; }
-    return;
-  }
-  for (let i = 0; i < W * H; i++) { const q = YUV[idx[i]]; Yb[i] = q[0]; Ub[i] = q[1]; Vb[i] = q[2]; }
-  for (let y = 0; y < H; y++) {
-    const o = y * W;
-    for (let x = 0; x < W; x++) {
-      let ys = 0, us = 0, vs = 0;
-      for (let t = -1; t <= 1; t++) ys += HY[t + 1] * Yb[o + Math.min(W - 1, Math.max(0, x + t))];
-      for (let t = -2; t <= 2; t++) { const j = o + Math.min(W - 1, Math.max(0, x + t)); us += HC[t + 2] * Ub[j]; vs += HC[t + 2] * Vb[j]; }
-      Yf[o + x] = ys; Uf[o + x] = us; Vf[o + x] = vs;
+
+function Screen(canvas, ship, n, crop) {
+  // crop: the part of the 384 x 272 picture shown, [x, y, w, h]
+  const off = document.createElement("canvas"); off.width = W; off.height = H;
+  const octx = off.getContext("2d"), img = octx.createImageData(W, H), px = img.data;
+  const idx = new Uint8Array(W * H), ctx = canvas.getContext("2d");
+  if (crop) { canvas.width = crop[2] * 3; canvas.height = crop[3] * 3; } else { canvas.width = W; canvas.height = H; }
+  function compose(fr, k, plain) {
+    const base = k * 6 * WH, [si, red, border] = ship[k];
+    idx.fill(border);
+    for (let y = 0; y < WH; y++) {
+      const row = (Y0 + y) * W + X0;
+      for (let s = 0; s < 6; s++) {
+        const v = fr[base + s * WH + y], c = v & 15, g = v & 16;
+        for (let x = D.segx[s]; x < D.segx[s + 1]; x++) idx[row + x] = g && (x & 1) ? 0 : c;
+      }
+    }
+    const sp = D.pairs[si][plain ? 2 : k & 1], pal = SHIP[red];
+    for (let i = 0; i < 252; i++) {
+      const c = +sp[i]; if (!c) continue;
+      const y = Y0 + D.CY - 10 + Math.floor(i / 12), x = X0 + WW / 2 - 12 + (i % 12) * 2;
+      idx[y * W + x] = idx[y * W + x + 1] = pal[c - 1];
     }
   }
-  for (let y = H - 1; y >= 0; y--) {
-    const o = y * W, p = y > 0 ? o - W : o;
-    for (let x = 0; x < W; x++) {
-      const i = o + x, yy = Yf[i], u = (Uf[i] + Uf[p + x]) / 2, v = (Vf[i] + Vf[p + x]) / 2;
-      const r = yy + v / .877, b = yy + u / .492, g = (yy - .299 * r - .114 * b) / .587;
-      px[4 * i] = r * 255; px[4 * i + 1] = g * 255; px[4 * i + 2] = b * 255; px[4 * i + 3] = 255;
+  const y0 = crop ? Math.max(0, crop[1] - 1) : 0, y1 = crop ? crop[1] + crop[3] : H;
+  function render() {
+    if (!tv) {
+      for (let i = y0 * W; i < y1 * W; i++) { const c = C[idx[i]]; px[4 * i] = c[0]; px[4 * i + 1] = c[1]; px[4 * i + 2] = c[2]; px[4 * i + 3] = 255; }
+      return;
+    }
+    for (let y = y0; y < y1; y++) {
+      const o = y * W;
+      for (let x = 0; x < W; x++) {
+        let ys = 0, us = 0, vs = 0;
+        for (let t = -2; t <= 2; t++) {
+          const q = YUV[idx[o + Math.min(W - 1, Math.max(0, x + t))]];
+          if (t > -2 && t < 2) ys += HY[t + 1] * q[0];
+          us += HC[t + 2] * q[1]; vs += HC[t + 2] * q[2];
+        }
+        Yf[o + x] = ys; Uf[o + x] = us; Vf[o + x] = vs;
+      }
+    }
+    for (let y = y0; y < y1; y++) {
+      const o = y * W, p = y > y0 ? o - W : o;
+      for (let x = 0; x < W; x++) {
+        const i = o + x, yy = Yf[i], u = (Uf[i] + Uf[p + x]) / 2, v = (Vf[i] + Vf[p + x]) / 2;
+        const r = yy + v / .877, b = yy + u / .492, g = (yy - .299 * r - .114 * b) / .587;
+        px[4 * i] = r * 255; px[4 * i + 1] = g * 255; px[4 * i + 2] = b * 255; px[4 * i + 3] = 255;
+      }
     }
   }
+  return {
+    n, ship,
+    show(fr, k, plain) {
+      compose(fr, k, plain); render();
+      octx.putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = tv;
+      canvas.classList.toggle("sharp", !tv);
+      if (crop) ctx.drawImage(off, crop[0], crop[1], crop[2], crop[3], 0, 0, canvas.width, canvas.height);
+      else {
+        const sw = W / zoom, sh = H / zoom, cx = X0 + WW / 2, cy = Y0 + D.CY;
+        ctx.drawImage(off, cx - sw / 2, cy - sh / 2, sw, sh, 0, 0, W, H);
+      }
+    }
+  };
 }
-function show(k) {
-  compose(k); render();
-  octx.putImageData(img, 0, 0);
-  ctx.imageSmoothingEnabled = tv;
-  const sw = W / zoom, sh = H / zoom, cx = X0 + WW / 2, cy = Y0 + D.CY;
-  ctx.drawImage(off, cx - sw / 2, cy - sh / 2, sw, sh, 0, 0, W, H);
-}
+const rec = {}, brec = {};
+const main = Screen(document.getElementById("scr"), D.ship, D.n);
+const btop = Y0 + D.bank.top - 14, crop = [X0 - 8, btop, WW + 16, Y0 + D.CY + 13 - btop];
+const bk1 = Screen(document.getElementById("bk1"), D.bank.ship, D.bank.n, crop);
+const bk2 = Screen(document.getElementById("bk2"), D.bank.ship, D.bank.n, crop);
 // ---- playback: one C64 frame per 1/60 s ----
-let t0 = 0, last = -1, shown = [], k0 = 0;
+let t0 = 0, tick0 = 0, step = 0, last = -1, shown = [];
+function frameAt(s, n) { return ((s % n) + n) % n; }
+function draw() {
+  const k = frameAt(step, D.n), b = frameAt(step, D.bank.n);
+  main.show(rec[which], k, which === "plain");
+  bk1.show(brec.all, b, false);
+  bk2.show(brec.notilt, b, false);
+  return [k, b];
+}
 function tick(t) {
   if (!paused) {
-    const k = (k0 + Math.floor((t - t0) * 60 / 1000)) % D.n;
-    if (k !== last) { n = k; show(n); shown.push(t); last = k; }
+    const s = tick0 + Math.floor((t - t0) * 60 / 1000);
+    if (s !== last) { step = s; draw(); shown.push(t); last = s; }
   }
   while (shown.length && shown[0] < t - 1000) shown.shift();
-  const s = D.ship[n];
+  const k = frameAt(step, D.n), sh = D.ship[k];
   document.getElementById("read").textContent =
-    `frame ${String(n).padStart(3, "0")}/${D.n}  ·  roll ${s[3] > 0 ? "+" : ""}${s[3]} of ±8  ·  ${paused ? "paused" : shown.length + " frames/s"}`;
+    `frame ${String(k).padStart(3, "0")}/${D.n}  ·  roll ${sh[3] > 0 ? "+" : ""}${sh[3]} of ±8  ·  ${paused ? "paused" : shown.length + " frames/s"}`;
   requestAnimationFrame(tick);
 }
-function restart() { k0 = n; t0 = performance.now(); last = -1; }
+function restart() { tick0 = step; t0 = performance.now(); last = -1; }
 (async () => {
   for (const [k, v] of Object.entries(D.rec)) rec[k] = await inflate(v);
+  for (const [k, v] of Object.entries(D.bank.rec)) brec[k] = await inflate(v);
   restart(); requestAnimationFrame(tick);
 })();
 // ---- controls ----
 function group(sel, fn) {
   const bs = document.querySelectorAll(sel);
-  bs.forEach(b => b.onclick = () => { bs.forEach(x => x.setAttribute("aria-pressed", x === b)); fn(b); if (paused) show(n); });
+  bs.forEach(b => b.onclick = () => { bs.forEach(x => x.setAttribute("aria-pressed", x === b)); fn(b); if (paused) draw(); });
 }
 group("[data-r]", b => which = b.dataset.r);
-group("[data-t]", b => { tv = b.dataset.t === "1"; cv.classList.toggle("sharp", !tv); });
+group("[data-t]", b => tv = b.dataset.t === "1");
 group("[data-z]", b => zoom = +b.dataset.z);
 document.getElementById("pause").onclick = e => { paused = !paused; e.target.setAttribute("aria-pressed", paused); if (!paused) restart(); };
-function stepBy(d) { if (!paused) document.getElementById("pause").click(); n = (n + d + D.n) % D.n; show(n); }
+function stepBy(d) { if (!paused) document.getElementById("pause").click(); step += d; draw(); }
 document.getElementById("stepb").onclick = () => stepBy(-1);
 document.getElementById("stepf").onclick = () => stepBy(1);
 </script>
