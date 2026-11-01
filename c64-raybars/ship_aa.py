@@ -23,8 +23,7 @@ closest wins.
 
     python3 ship_aa.py              # preview_ship_aa.png (all 81: full
                                     # colour, one frame, the pair as seen)
-    python3 ship_aa.py page.html    # also the live page (the ship flying,
-                                    # its pair swapping 60 times a second)
+    (the live page is flight_video.py's)
 """
 import base64, io, json, math, os, sys
 import numpy as np
@@ -186,18 +185,6 @@ def sheet(path):
     im.save(path, optimize=True)
     return tot_s / len(GRID), tot_p / len(GRID)
 
-def page(path):
-    """A live page: the ship flying through bars on autopilot, its pair
-    swapping 60 times a second."""
-    data = {"rolls": ROLLS, "pitches": PITCHES,
-            "pairs": [["".join(map(str, sum(f, []))) for f in (f0, f1)]
-                      for f0, f1, *_ in pairs()]}
-    tpl = open(os.path.join(HERE, "ship_aa_page.html")).read()
-    open(path, "w").write(tpl.replace("/*DATA*/null", json.dumps(data, separators=(",", ":"))))
-
 if __name__ == "__main__":
     es, ep = sheet(os.path.join(HERE, "preview_ship_aa.png"))
     print(f"wrote preview_ship_aa.png; mean error as seen: one frame {es:.1f}, pair {ep:.1f}")
-    if len(sys.argv) > 1:
-        page(sys.argv[1])
-        print("wrote", sys.argv[1])

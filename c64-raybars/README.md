@@ -399,9 +399,13 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     `SHIPFR` segment for this; the other programs build unchanged.
   * `python3 ship_aa.py` writes `preview_ship_aa.png`: each angle in full
     colour, its sprite, and the pair as a PAL TV shows it.
-    `python3 ship_aa.py page.html` also writes a live page: the ship
-    flying through bars on autopilot (or the arrow keys), its pair
-    swapping 60 times a second, which a GIF can't do.
+    `python3 flight_video.py page.html` records the flight frame by
+    frame and writes a live page that plays it, one C64 frame per 1/60 s,
+    raw or through the PAL CRT model. It has every trick: flicker colours
+    with the phase swapped on alternate lines, the ghost byte on distant
+    and dim bars, the ship's pairs, and the tilt flicker. Two more
+    recordings of the same flight compare it without the tilt flicker and
+    in plain 16 colours.
     `ship3d.py frames.png` still previews the earlier 9 attitudes.
   * Still to check in VICE: the flicker on a real (emulated) PAL frame,
     and the load, which now runs past $A000 (under the BASIC ROM).
@@ -419,6 +423,13 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     pixels, the conversion fills it, so the roll frames stay whole.
   * Looking straight at the tail, the nose is hidden behind the body, so
     the level frame has no white.
+* **Tilt flicker.** The bars' tilt is a whole number of lines per
+  segment, so slight banks look stepped. Each segment's exact offset `x`
+  is now shown as `floor(x + 0.75)` on even frames and `floor(x + 0.25)`
+  on odd ones (`rtilt0..5` hold both halves, 34 entries; the build picks
+  the half by `fcount`'s parity). An offset half way between two lines
+  alternates between them, so the bars bank in half-line steps; a level
+  bar doesn't flicker. Cost: 8 cycles per bar.
 * **Pitch** works like a pilot's stick: up pushes the nose down, down pulls
   it up. It eases the ship's climb speed toward ±1 unit per frame, so
   pushing up makes the bars rise. Each bar's height is relative

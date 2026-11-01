@@ -475,10 +475,13 @@ SEGDX = [-144, -96, -32, 32, 96, 144]
 # roll r = -8 (left) .. 8 (right): the world turns the other way, so the bars'
 # slope is m = -3r/8 lines per 72 pixels; off_k = floor(6 + dx_k/72 * m + 0.5)
 # about the light, 0..12, stored as kb = 12 - off_k (goldship's PAD)
-# (rtilt0..5, index r + 8)
+# (rtilt0..5, index r + 8).  The tilt flickers to antialias it: the exact
+# offset x is floor(x + 0.75) on even frames and floor(x + 0.25) on odd ones
+# (index r + 8 + 17), so an offset half way between two lines alternates
+# between them and the bars bank in half-line steps.
 for k in range(6):
-    emit2(f"rtilt{k}", [12 - int(math.floor(6 + SEGDX[k] / 72 * (-3 * r / 8) + 0.5))
-                        for r in range(-8, 9)])
+    emit2(f"rtilt{k}", [12 - int(math.floor(6 + SEGDX[k] / 72 * (-3 * r / 8) + bias))
+                        for bias in (0.75, 0.25) for r in range(-8, 9)])
 # highlight colour by (distance level, spec level, segment 0..2; 3..5 mirror
 # them): index (lev*9 + s)*3 + k, as fly.inc's hltab with the drop |dx| / 32
 DROP6 = [abs(d) // 32 for d in SEGDX[:3]]
