@@ -21,9 +21,12 @@ pointer change): an edge pixel half covered by the hull is lit in one frame
 only, so it shows at half strength; a pixel split between shadowed and lit
 hull alternates purple and light blue.
 
-    python3 flicker.py    # preview_flicker.png (swatches, bars, ship),
-                          # preview_flicker.gif (the fly-by, as seen),
-                          # preview_flicker_50hz.gif (the real alternation)
+    python3 flicker.py [frames_dir]
+        # preview_flicker.png (swatches, bars, ship), preview_flicker.gif
+        # (the fly-by, as seen), preview_flicker_50hz.gif (the real
+        # alternation; a GIF can't go faster than 50 Hz), and in frames_dir
+        # each moment's two frames and their average, for a web page that
+        # swaps them on every screen refresh
 """
 import math, os
 import numpy as np
@@ -157,8 +160,19 @@ def fonts():
         f = ImageFont.load_default()
         return f, f
 
-def animations(path, path50, step=3):
+def save_png(rgb, path):
+    """A frame as a small indexed PNG (it holds a handful of colours)."""
+    Image.fromarray(rgb).quantize(colors=64, method=Image.Quantize.FASTOCTREE,
+                                  dither=Image.Dither.NONE).save(path, optimize=True)
+
+def animations(path, path50, step=3, frames_dir=None):
+    """The fly-by GIF (16 colours beside flicker colours as seen), the 50 Hz
+    GIF, and with frames_dir each moment's even and odd frames and their
+    average as PNGs (e000.png, o000.png, a000.png), for a page that swaps
+    the two on every screen refresh."""
     font, small = fonts()
+    if frames_dir:
+        os.makedirs(frames_dir, exist_ok=True)
     single_ship = ship3d.render(0, 0)
     s0, s1 = ship_pair(0, 0)
     out, keep = [], None
@@ -174,6 +188,11 @@ def animations(path, path50, step=3):
         both.paste(a, (0, 0))
         both.paste(b, (W2 + 8, 0))
         out.append(both)
+        if frames_dir:
+            k = f // step
+            save_png(fe, os.path.join(frames_dir, f"e{k:03d}.png"))
+            save_png(fo, os.path.join(frames_dir, f"o{k:03d}.png"))
+            save_png(perceived([fe, fo]), os.path.join(frames_dir, f"a{k:03d}.png"))
         if f == 48:
             keep = (fe, fo)
     out[0].save(path, save_all=True, append_images=out[1:], duration=60, loop=0)
@@ -259,5 +278,7 @@ if __name__ == "__main__":
           f"same-level pairs + {sum(1 for c in CANDS if c[3] > 1)} pairs one level apart")
     sheet(os.path.join(HERE, "preview_flicker.png"))
     print("wrote preview_flicker.png")
-    animations(os.path.join(HERE, "preview_flicker.gif"), os.path.join(HERE, "preview_flicker_50hz.gif"))
+    import sys
+    animations(os.path.join(HERE, "preview_flicker.gif"), os.path.join(HERE, "preview_flicker_50hz.gif"),
+               frames_dir=sys.argv[1] if len(sys.argv) > 1 else None)
     print("wrote preview_flicker.gif, preview_flicker_50hz.gif")
