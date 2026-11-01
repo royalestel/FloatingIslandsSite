@@ -69,7 +69,7 @@ badcopy = list(mem[0x8800:0x8800 + len(SHIPFR)]) != SHIPFR or mem[0xBFFF] != 0
 def tab(name, n):
     return [mem[L[name] + i] for i in range(n)]
 ROLLFR, PITCHFR = tab("rollfr", 17), tab("pitchfr", 17)
-badptr = 0
+badptr = badghost = ghosted = 0
 
 over = 0
 frames, worst, pagecross, close, sprite_hit, early = [], 0, 0, 0, 0, 0
@@ -135,6 +135,11 @@ for f in range(FRAMES):
         baddly += dly != (7 if BAND0 <= D - 1 < BAND1 else 8)
         ci = mem[L["soff"] + nb * NSLOT + i]      # loop copy
         slot = ci % NSLOT
+        # the idle byte nextbar set: the ghost byte ($55) for the block's
+        # nearest bar if it is distant or dim, else 0
+        ghost = mem[0xBFFF]
+        badghost += ghost != mem[L["flghost"] + mem[L["st"] + slot]]
+        ghosted += ghost != 0
         # each segment's column pointer: the loads' operands, the same in
         # all three loops, the page the slot's own column (vcp)
         ptrs = []
@@ -164,14 +169,14 @@ for f in range(FRAMES):
                 badrow += starts[r + 1] - starts[r] != exp
             badcell += sum(rows[r][k] != want(k, ln) for k in range(SEGS))
         n = len(rows)
-        ents.append((line, n, rows))
+        ents.append((line, n, rows, ghost))
         early += line < 58
-    for (l1, n1, _), (l2, n2, _) in zip(ents, ents[1:]):
+    for (l1, n1, *_), (l2, n2, *_) in zip(ents, ents[1:]):
         if l2 < l1 + 2 + n1 + 4:            # bexit + nextbar need 4 lines
             close += 1
     # free time: not the top IRQ's lines, nor a block's rows, its 2 IRQ lines
     # and 2 more for bexit + nextbar; less the light's DMA (21 lines x 5)
-    shown = sum(n + 4 for _, n, _ in ents)
+    shown = sum(n + 4 for _, n, *_ in ents)
     budget = (312 - 12 - shown) * LINE - 300 - 21 * 5
     worst = max(worst, 100 * cyc / budget)
     ok &= cyc <= budget
@@ -180,6 +185,8 @@ for f in range(FRAMES):
     mem[L["buf"]] = nb ^ 1
     mem[L["ready"]] = 0
 ok &= pagecross == 0 and close == 0 and early == 0 and not badcopy and badptr == 0
+ok &= badghost == 0
+print(f"blocks with the wrong idle byte {badghost} (ghosted blocks {ghosted})")
 print(f"ship frames copied to $8800 {'wrong' if badcopy else 'ok'} (idle byte 0), "
       f"sprite pointers wrong {badptr}")
 ok &= badrow == 0 and baddly == 0 and badcell == 0 and badop == 0 and badc0 == 0
@@ -204,13 +211,14 @@ def render(f):
     for y in range(max(0, 51 - TOP), min(H, 251 - TOP)):   # the display window
         for x in range(24 + 8, 344 + 8):
             px[x, y] = RGB[0]
-    for line, n, rows in ents:
+    for line, n, rows, ghost in ents:
         for r, row in enumerate(rows):
             yy = line + 2 + r - TOP
             if 0 <= yy < H:
                 for k, c in enumerate(row):
                     for x in range(SEGX[k][0] + 8, SEGX[k][1] + 8):
-                        px[x, yy] = RGB[c]
+                        # the ghost byte $55: every other pixel black
+                        px[x, yy] = RGB[0] if ghost and (x - 32) & 1 else RGB[c]
     spr = mem[0x8000 + ptr * 64: 0x8000 + ptr * 64 + 63]
     MC = {1: RGB[c1 & 15], 2: RGB[c2 & 15], 3: RGB[c3 & 15]}
     for sy in range(21):
@@ -220,13 +228,16 @@ def render(f):
             if v:
                 for dx in (0, 1):
                     px[SPRX + 8 + cx * 2 + dx, SPRY + 1 + sy - TOP] = MC[v]
-    return im.resize((W * SCALE, H * SCALE), Image.NEAREST)
+    return im
 
 def seen(f):
-    """Frames f and f + 1 blended (linear light): the ship's pair as seen."""
+    """Frames f and f + 1 through interlace.py's PAL CRT model (composite
+    blur, the delay line), blended in linear light: as a PAL TV shows the
+    flicker colours, alternating lines, ghost byte and the ship's pair."""
     import numpy as np
-    a, b = (np.asarray(render(g), float) / 255 for g in (f, f + 1))
-    return Image.fromarray((((a ** 2.2 + b ** 2.2) / 2) ** (1 / 2.2) * 255).astype(np.uint8))
+    import interlace as il
+    a = il.seen([np.asarray(render(g)) for g in (f, f + 1)])
+    return Image.fromarray(a).resize((W * SCALE, H * SCALE), Image.LANCZOS)
 
 imgs = [seen(f) for f in range(100, FRAMES - 1, 2)]
 imgs[0].save(os.path.join(HERE, "preview_goldship.gif"), save_all=True,

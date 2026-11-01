@@ -392,11 +392,14 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     compared with the model's own coverage through the same CRT. Averaged
     over the 81 angles, the pair's error is 3.9 against 5.5 for a
     single frame.
-  * Memory: the frames load straight after the program ($7783-$A002) and
+  * Memory: the frames load straight after the program ($8289-$AB08) and
     the start-up copies them, top page first, to `FRAMES` = $8800-$B07F
     in the VIC bank. The variables live in `RAMPS` rather than `BSS`, so
     nothing sits in the copy's path. `raybars.cfg` has an optional
-    `SHIPFR` segment for this; the other programs build unchanged.
+    `SHIPFR` segment for this; the other programs build unchanged. The
+    program itself may run to $8400: the VIC reads only the sprite
+    pointer, the frames and the idle byte from its bank, since with no
+    badlines it fetches no screen.
   * `python3 ship_aa.py` writes `preview_ship_aa.png`: each angle in full
     colour, its sprite, and the pair as a PAL TV shows it.
     `python3 flight_video.py page.html` records the flight frame by
@@ -409,6 +412,30 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     `ship3d.py frames.png` still previews the earlier 9 attitudes.
   * Still to check in VICE: the flicker on a real (emulated) PAL frame,
     and the load, which now runs past $A000 (under the BASIC ROM).
+* **Flicker colours and alternating lines on the bars.** Each profiled
+  colour list (palette x flight frame) now comes twice, for even and odd
+  frames (`flpl0..3` and `flpl4..7`; `par4` = (frame & 1) x 4 picks the
+  half, 5 cycles per bar). Each row shows a pair of C64 colours on
+  alternate frames, the eye's average a colour the C64 doesn't have, with
+  the pair's phase swapped on alternate rows so a PAL TV's delay line
+  blends neighbouring lines too. The pairs are chosen by
+  `flyby3d.profile_pairs` as `interlace.py` chooses them (51 flicker
+  colours, error diffusion line by line through the PAL CRT model, a
+  brightness jump of more than one level between lines penalised), from
+  the same true-perspective renders as before. Highlights stay single
+  colours.
+  * Memory: the paired lists take 11.5 KB against 6.5 KB (an odd flight
+    frame reuses the even one's list at the same height). The bar
+    columns (18 pages) moved to $E000-$F1FF, the RAM under the KERNAL,
+    which needs no space in the file.
+* **The ghost byte.** Each IRQ block now sets the idle byte ($BFFF):
+  $55 for a distant or dim bar (dimmer than 55%: far away, or in the
+  shadow past the ship), which blacks every other pixel of its lines and
+  composite video blurs into a darker shade; 0 otherwise. `compose`
+  stores it per schedule entry from the block's nearest bar (`flghost`,
+  per flight frame) and `nextbar` writes it: 8 cycles, between blocks,
+  where the lines are black so the pattern doesn't show. A merged block
+  takes its nearest bar's.
   * The model is a gull, picked from colour-rendered design variations.
     It has a flat body with the light on its nose, wings that rise to a
     kink and fall to the tips, and an engine pod at each kink.
@@ -507,7 +534,11 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     row, and the worst frame uses 74% of the free time.
   * The ship's frames arrive intact at $8800, the idle byte stays 0, and
     every frame's sprite pointer is the one for its roll, climb speed and
-    frame parity. The preview blends each two frames, as the eye does.
+    frame parity. Every block's idle byte is the ghost byte for its
+    nearest bar's distance, or 0. With the flicker colours, ghost byte
+    and tilt flicker the worst frame uses 74.2% of the free time. The
+    preview shows each two frames through the PAL CRT model, blended as
+    the eye does.
 * **The six-segment display loops.**
   * Each row stores segments 1 to 5 at their left edges, then the next
     row's segment 0 in the right border (`sta $d021,x`, x = 0, so 5

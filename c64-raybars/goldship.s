@@ -93,6 +93,9 @@ FRAMES    = VICBANK + $0800 ; the ship's 162 frames (to $b07f); the screen
                         ; ($8400, only its sprite pointers used) sits below
 SPRPTR    = VICBANK + $0400 + $03f8
 IDLEBYTE  = VICBANK + $3fff
+cols      = $e000       ; a page per column, 2 buffers: 18 pages in the RAM
+                        ; under the KERNAL ($e000-$f1ff; the ROMs are out)
+        .assert <cols = 0, error, "cols must be page aligned"
 SPRX      = 184 - 12    ; ball centred on the screen
 SPRY      = CENTRE - 11
 
@@ -138,6 +141,7 @@ roll:    .res 1                 ; -8 (left) .. 8 (right)
 rolli:   .res 1                 ; roll + 8
 joy:     .res 1                 ; joystick: 1 up, 2 down, 4 left, 8 right
 fcount:  .res 1
+par4:    .res 1                 ; (fcount & 1) * 4: the colour lists' half
 red:     .res 1                 ; a bar ahead is on a collision course
 hitfl:   .res 1                 ; border flash frames left
 yl:      .res 1                 ; |height| of the bar being built
@@ -401,6 +405,11 @@ setv:   sta vy
         sta shipy+1
         ; ---- roll: one step every other frame toward the stick
         inc fcount
+        lda fcount
+        and #1
+        asl
+        asl
+        sta par4                ; this frame's half of the colour lists
         lda fcount
         lsr
         bcs rdone
@@ -785,7 +794,9 @@ sdy:    jsr atan2
         ; (flyprof.inc: decimated true-perspective renders, the dimming by
         ; distance and the shadow past the ship included) ------------------
         ldx s
-        ldy spal,x
+        lda spal,x              ; even frames: lists 0..3, odd: 4..7
+        ora par4
+        tay
         lda fcl
         beq :+
         lda flcll,y             ; near clip: the cut list
@@ -1187,6 +1198,11 @@ ends:   ldy #n1c_0 - n1_0       ; chunk ends: n1 to rb0, b to rb1, n2 to span
         bcs :+
         lda #7
 :       sta sdel,x
+        ldy nr                  ; the ghost byte, for the nearest bar's
+        lda st,y                ;   distance (or the shadow past the ship)
+        tay
+        lda flghost,y
+        sta sgh,x
 
         ; ---- the nearest bar's column pointers, pl_K - dn, into the three
         ; loops' loads (the high bytes are the copy's fixed column pages) --
@@ -1448,6 +1464,8 @@ nextbar:
         sta dly_op
         lda sc0,x
         sta c0
+        lda sgh,x               ; the idle byte: $55 ghosts the block (every
+        sta IDLEBYTE            ;   other pixel black), 0 doesn't
         lda #<irq1
         sta $fffe
         lda #>irq1
@@ -1637,12 +1655,13 @@ rsh:    .repeat 49, HH
         .endrep
 ; the profiled colour lists, per palette: where its address tables are,
 ; and its near-clip list
-flpll:  .lobytes flpl0, flpl1, flpl2, flpl3
-flplh:  .hibytes flpl0, flpl1, flpl2, flpl3
-flphl:  .lobytes flph0, flph1, flph2, flph3
-flphh:  .hibytes flph0, flph1, flph2, flph3
-flcll:  .lobytes flclip0, flclip1, flclip2, flclip3
-flclh:  .hibytes flclip0, flclip1, flclip2, flclip3
+; per palette (0..3) on even frames, then (4..7) on odd ones: flicker colours
+flpll:  .lobytes flpl0, flpl1, flpl2, flpl3, flpl4, flpl5, flpl6, flpl7
+flplh:  .hibytes flpl0, flpl1, flpl2, flpl3, flpl4, flpl5, flpl6, flpl7
+flphl:  .lobytes flph0, flph1, flph2, flph3, flph4, flph5, flph6, flph7
+flphh:  .hibytes flph0, flph1, flph2, flph3, flph4, flph5, flph6, flph7
+flcll:  .lobytes flclip0, flclip1, flclip2, flclip3, flclip4, flclip5, flclip6, flclip7
+flclh:  .hibytes flclip0, flclip1, flclip2, flclip3, flclip4, flclip5, flclip6, flclip7
         .include "flyprof.inc"  ; profiled heights, highlight levels, colours
 ; per loop copy (slot + buffer * NSLOT): its loops' entries
 n1lo:   .lobytes n1_0, n1_1, n1_2, n1_3, n1_4, n1_5
@@ -1654,9 +1673,7 @@ n2hi:   .hibytes n2_0, n2_1, n2_2, n2_3, n2_4, n2_5
 
 ; =============================================================================
 .segment "RAMPS"
-cols:   .res 2*NSLOT*NCOL*256   ; a page per column, 2 buffers
-        .assert <cols = 0, error, "cols must be page aligned"
-; the variables follow in RAMPS, not BSS, which raybars.cfg places after
+; the variables live in RAMPS, not BSS, which raybars.cfg places after
 ; SHIPFR, in the frames' copy target
 dirty:  .res 2*NSLOT            ; per buffer and slot: pads stale (merge, respawn)
 lasth:  .res 2*NSLOT            ;   bar height when last built
@@ -1670,6 +1687,7 @@ sentlo: .res 2*NSLOT
 senthi: .res 2*NSLOT
 sdel:   .res 2*NSLOT
 sc0:    .res 2*NSLOT
+sgh:    .res 2*NSLOT            ; the block's idle byte (ghost byte or 0)
 sx:     .res 1                  ; compose: schedule entry being written
 scount: .res 1
 vis:    .res NSLOT              ; per slot, from doslot: shown?
@@ -1706,7 +1724,10 @@ hf:     .res 1
 lo:     .res 1
 hi:     .res 1
 
-        .assert * <= VICBANK, error, "program runs into the VIC bank"
+        ; the VIC reads only the sprite pointer ($87f8), the ship's frames
+        ; ($8800-) and the idle byte from its bank ($8000-$83ff is unused:
+        ; no badlines, so no screen fetches), so the program may run to $8400
+        .assert * <= VICBANK + $0400, error, "program runs into the screen / sprite pointers"
 
 ; the ship's frames, loaded after everything else and copied to FRAMES
 .segment "SHIPFR"
