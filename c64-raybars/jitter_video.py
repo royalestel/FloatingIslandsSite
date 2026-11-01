@@ -14,6 +14,7 @@ PAL CRT model.
 
     python3 jitter_video.py out.mp4 [fps]         # default 60
     python3 jitter_video.py out.mp4 60 extra      # the flickering extra line
+    python3 jitter_video.py out.mp4 60 ghost      # ... ghosted
 """
 import subprocess, sys
 import numpy as np
@@ -37,10 +38,29 @@ EXTRA = [("Rounded offsets, no extra line", None, None, None),
          ("Tilted: an extra line above each segment, on alternate frames", None, None, "above"),
          ("Tilted: extra lines above and below each segment, on alternate frames", None, None, "both")]
 
+# the extra line ghosted (the idle byte $55: every other pixel black).  The
+# idle byte is one byte for the whole line, so "segment" (the ghost on the
+# extra line's own segment only) is the ideal; "line" ghosts the whole line
+# where any segment's extra line falls, dimming the bar rows beside it too
+# (what the program could do, writing $bfff between chunks of rows)
+GHOST = [("Rounded offsets, no extra line", None, None, None),
+         ("Extra lines above and below, ghosted, on alternate frames (ideal: own segment only)",
+          None, None, dict(where="both", ghost="segment")),
+         ("Extra lines above and below, ghosted, every frame (ideal: own segment only)",
+          None, None, dict(where="both", ghost="segment", steady=True)),
+         ("Extra lines above and below, ghosted, on alternate frames (practical: whole line)",
+          None, None, dict(where="both", ghost="line")),
+         ("Extra lines above and below, not ghosted, on alternate frames (last video)",
+          None, None, dict(where="both"))]
+
 def add_extra(cols, k, roll, extra):
     """The segment columns with the flickering extra line(s) added."""
-    if not extra or roll == 0 or k & 1:
+    if isinstance(extra, str):
+        extra = dict(where=extra)
+    if not extra or roll == 0 or (k & 1 and not extra.get("steady")):
         return cols
+    ghost = 16 if extra.get("ghost") else 0
+    lines = set()
     out = cols.copy()
     on = (cols & 15) != 0
     for s in range(6):
@@ -57,9 +77,14 @@ def add_extra(cols, k, roll, extra):
         runs.append((a, ys[-1]))
         for a, b in runs:
             if a > 0:
-                out[s, a - 1] = cols[s, a]                  # above its top
-            if extra == "both" and b + 1 < fb.H:
-                out[s, b + 1] = cols[s, b]                  # below its bottom
+                out[s, a - 1] = cols[s, a] | ghost          # above its top
+                lines.add(a - 1)
+            if extra["where"] == "both" and b + 1 < fb.H:
+                out[s, b + 1] = cols[s, b] | ghost          # below its bottom
+                lines.add(b + 1)
+    if extra.get("ghost") == "line":
+        for y in lines:
+            out[:, y] |= 16
     return out
 SHIPPAL = [fb.C64RGB[c] for c in (0, 4, 14, 1)]
 Z = 3                                   # scale
@@ -127,4 +152,4 @@ def main(path, fps=60, options=OPTIONS):
 
 if __name__ == "__main__":
     main(sys.argv[1], int(sys.argv[2]) if len(sys.argv) > 2 else 60,
-         EXTRA if len(sys.argv) > 3 and sys.argv[3] == "extra" else OPTIONS)
+         {"extra": EXTRA, "ghost": GHOST}.get(sys.argv[3] if len(sys.argv) > 3 else "", OPTIONS))
