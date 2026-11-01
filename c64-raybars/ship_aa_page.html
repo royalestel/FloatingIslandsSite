@@ -1,201 +1,182 @@
 <title>GOLDSHIP Ship Angles</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: a monitor bay (live sprite + full-colour model + stick) above the 9 x 9 wall of every angle.
+/* Layout: one TV screen with the flight on it, a slim control strip below.
    Single dark look on purpose: a CRT in a dim room. */
 :root {
-  --bg: #0b0a12;          /* room */
-  --panel: #14121e;       /* bezel */
+  --bg: #0b0a12;
+  --panel: #14121e;
   --line: #2a2640;
   --fg: #e4e1ef;
   --dim: #8d88a6;
   --accent: #7c70da;      /* C64 light blue: the lit hull */
-  --hot: #d0dc71;         /* C64 yellow: collision course */
   --display: "Chakra Petch", "Trebuchet MS", sans-serif;
-  --body: "IBM Plex Sans", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, monospace;
   color-scheme: dark;
 }
-body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 48px; }
-.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 28px; }
-h1 { font-family: var(--display); font-weight: 700; font-size: 2rem; letter-spacing: .02em; margin: 0; text-wrap: balance; }
-h2 { font-family: var(--display); font-weight: 500; font-size: 1.15rem; margin: 0 0 6px; letter-spacing: .03em; }
-p { margin: 0; max-width: 68ch; color: var(--dim); }
-p b { color: var(--fg); font-weight: 500; }
-.bay { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 260px; gap: 16px; }
-@media (max-width: 900px) { .bay { grid-template-columns: 1fr; } }
-.screen { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
-.label { font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
-.tube { background: #000; border-radius: 6px; display: grid; place-items: center; aspect-ratio: 8 / 7; overflow: hidden; max-width: 100%; }
-.tube canvas { width: 72%; image-rendering: pixelated; }
-.tube img { width: 100%; height: 100%; object-fit: contain; }
-.tube.soft canvas { filter: blur(1.6px) saturate(1.1); }
-.readout { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--fg); }
-.controls { display: grid; gap: 12px; align-content: start; }
-.seg { display: flex; flex-wrap: wrap; gap: 6px; }
-.seg button, .stickpad button { font: 500 13px var(--mono); color: var(--fg); background: #1d1a2c; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
-.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #0b0a12; }
-.seg button.hot[aria-pressed="true"] { background: var(--hot); border-color: var(--hot); }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--hot); outline-offset: 2px; }
-.stickpad { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); gap: 4px; justify-content: start; touch-action: none; user-select: none; }
-.stickpad button { padding: 0; }
-.stickpad button.on { background: var(--accent); color: #0b0a12; }
-.hint { font-size: 13px; color: var(--dim); }
-.wall { overflow-x: auto; }
-.grid { display: grid; grid-template-columns: 56px repeat(9, minmax(72px, 1fr)); gap: 4px; min-width: 760px; }
-.grid .h { font: 12px var(--mono); color: var(--dim); text-align: center; align-self: end; font-variant-numeric: tabular-nums; }
-.grid .rh { text-align: right; align-self: center; padding-right: 6px; }
-.cell { background: #000; border: 1px solid transparent; border-radius: 4px; padding: 4px; cursor: pointer; display: grid; place-items: center; }
-.cell.cur { border-color: var(--accent); }
-.cell canvas { width: 100%; image-rendering: pixelated; }
-.err { font: 11px var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; }
+body { background: var(--bg); color: var(--fg); font-family: var(--mono); font-size: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; }
+.wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 14px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.6rem; letter-spacing: .02em; margin: 0; }
+.tv { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+canvas { display: block; width: 100%; aspect-ratio: 384 / 272; image-rendering: pixelated; background: #000; border-radius: 6px; max-width: 100%; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.seg { display: flex; gap: 6px; align-items: center; }
+.lab { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+button { font: 500 13px var(--mono); color: var(--fg); background: #1d1a2c; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #0b0a12; }
+button:focus-visible { outline: 2px solid #d0dc71; outline-offset: 2px; }
+.read { color: var(--dim); font-variant-numeric: tabular-nums; margin-left: auto; }
+.hint { color: var(--dim); font-size: 13px; }
 </style>
 
 <div class="wrap">
-  <header style="display:grid;gap:8px">
-    <h1>GOLDSHIP · 81 ship angles</h1>
-    <p>The gull at <b>9 rolls × 9 pitches</b>, from the 3D model. Each angle is a <b>pair of sprite frames</b> swapped every screen refresh, as the C64 swaps them every frame (50 Hz on PAL). Half-covered edge pixels light in one frame only, and pixels split between shadow and light alternate purple and light blue, in opposite phase on neighbouring lines. Fly it with the arrow keys or the pad: the sprite follows the eased roll and climb speed, as in the game.</p>
-  </header>
-
-  <section class="bay">
-    <div class="screen">
-      <div class="label">Sprite · <span id="modeName">flicker pair</span></div>
-      <div class="tube" id="tube"><canvas id="big" width="24" height="21"></canvas></div>
-      <div class="readout" id="read">roll 0° · pitch 0°</div>
-    </div>
-    <div class="screen">
-      <div class="label">Model · full colour</div>
-      <div class="tube"><img id="view" alt="The ship model in full colour at the selected angle"></div>
-      <div class="readout" id="errRead"></div>
-    </div>
-    <div class="screen controls">
-      <div>
-        <div class="label">Show</div>
-        <div class="seg" id="modes">
-          <button id="m-pair" data-m="pair" aria-pressed="true">pair</button>
-          <button id="m-a" data-m="a" aria-pressed="false">frame A</button>
-          <button id="m-b" data-m="b" aria-pressed="false">frame B</button>
-          <button id="m-one" data-m="one" aria-pressed="false">old single</button>
-        </div>
-      </div>
-      <div>
-        <div class="label">Palette</div>
-        <div class="seg">
-          <button id="p-norm" data-p="0" aria-pressed="true">normal</button>
-          <button id="p-red" data-p="1" class="hot" aria-pressed="false">collision</button>
-        </div>
-      </div>
-      <div>
-        <div class="label">TV</div>
-        <div class="seg"><button id="soft" aria-pressed="false">soften</button></div>
-      </div>
-      <div>
-        <div class="label">Stick</div>
-        <div class="stickpad" id="pad">
-          <span></span><button data-d="1" aria-label="stick up: nose down">▲</button><span></span>
-          <button data-d="4" aria-label="stick left: roll left">◀</button><span></span><button data-d="8" aria-label="stick right: roll right">▶</button>
-          <span></span><button data-d="2" aria-label="stick down: nose up">▼</button><span></span>
-        </div>
-      </div>
-      <div class="hint">Stick up = nose down (pilot's convention). Click any cell below to hold that angle; the stick lets go of it.</div>
-    </div>
-  </section>
-
-  <section class="wall">
-    <h2>Every angle, live</h2>
-    <p style="margin-bottom:12px">Roll down the side, pitch across. Under each: the error against the model as a PAL TV shows it, old single frame → pair.</p>
-    <div class="grid" id="grid"></div>
-  </section>
+  <h1>GOLDSHIP</h1>
+  <div class="tv"><canvas id="scr" width="384" height="272"></canvas></div>
+  <div class="bar">
+    <div class="seg"><span class="lab">Ship</span>
+      <button id="f-pair" aria-pressed="true">flicker pair</button>
+      <button id="f-one" aria-pressed="false">one frame</button></div>
+    <div class="seg"><span class="lab">Stick</span>
+      <button id="s-auto" aria-pressed="true">autopilot</button>
+      <button id="s-you" aria-pressed="false">you</button></div>
+    <div class="seg"><span class="lab">View</span>
+      <button id="z-1" aria-pressed="true">whole screen</button>
+      <button id="z-2" aria-pressed="false">close-up</button></div>
+    <div class="seg"><button id="pause" aria-pressed="false">pause</button></div>
+    <span class="read" id="read"></span>
+  </div>
+  <div class="hint">The ship's two frames swap 60 times a second. Arrow keys take the stick (up = nose down); the autopilot comes back after a few seconds.</div>
 </div>
 
 <script>
 const D = /*DATA*/null;
-const PAL = D.pal;
-let mode = "pair", pal = 0, sel = 40, parity = 0;
-const big = document.getElementById("big"), bctx = big.getContext("2d");
-function draw(ctx, s, p) {
-  const img = ctx.createImageData(24, 21), c = PAL[p];
-  for (let i = 0; i < 252; i++) {
-    const v = +s[i], r = Math.floor(i / 12), x = (i % 12) * 2;
-    for (let d = 0; d < 2; d++) {
-      const o = (r * 24 + x + d) * 4;
-      if (v) { img.data[o] = c[v - 1][0]; img.data[o + 1] = c[v - 1][1]; img.data[o + 2] = c[v - 1][2]; }
-      img.data[o + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
+// C64 colours
+const C = [[0,0,0],[255,255,255],[137,64,54],[122,191,199],[138,70,174],[104,169,65],[62,49,162],[208,220,113],
+           [144,95,37],[92,71,0],[187,119,109],[85,85,85],[128,128,128],[172,234,136],[124,112,218],[171,171,171]];
+const SHIP = [[C[4], C[14], C[1]], [C[2], C[8], C[7]]];   // normal, collision
+const W = 384, H = 272, CX = 192, CY = 136;              // screen with border; window 320 x 200
+const WX0 = 32, WX1 = 352, WY0 = 36, WY1 = 236;
+const cv = document.getElementById("scr"), ctx = cv.getContext("2d");
+const off = document.createElement("canvas"); off.width = W; off.height = H;
+const octx = off.getContext("2d"), img = octx.createImageData(W, H), px = img.data;
+let zoom = 1;
+// a gold bar's colour by row (0..1 across it) and nearness (0 far .. 1 near)
+const RAMP = [0, 9, 8, 7, 1];
+const DIMR = [0, 11, 9, 8, 7];
+function barColour(f, near) {
+  const lvl = (1 - Math.abs(2 * f - 1)) * (0.35 + 0.75 * near);
+  const k = Math.max(0, Math.min(4, Math.floor(lvl * 4.6)));
+  return C[near < 0.35 ? DIMR[k] : RAMP[k]];
 }
-// the wall
-const grid = document.getElementById("grid"), cells = [];
-grid.appendChild(document.createElement("span"));
-D.pitches.forEach(p => { const h = document.createElement("div"); h.className = "h"; h.textContent = (p > 0 ? "+" : "") + p + "°"; grid.appendChild(h); });
-D.rolls.forEach((r, i) => {
-  const h = document.createElement("div"); h.className = "h rh"; h.textContent = "roll " + (r > 0 ? "+" : "") + r + "°"; grid.appendChild(h);
-  D.pitches.forEach((p, j) => {
-    const k = i * 9 + j, cell = document.createElement("div"); cell.className = "cell";
-    const cv = document.createElement("canvas"); cv.width = 24; cv.height = 21;
-    const e = document.createElement("div"); e.className = "err"; e.textContent = D.err[k][0].toFixed(1) + "→" + D.err[k][1].toFixed(1);
-    cell.append(cv, e); cell.onclick = () => { stick.roll = r / 25 * 8; stick.vy = p / 30 * 64; stick.hold = true; };
-    grid.appendChild(cell); cells.push(cv.getContext("2d"));
-  });
-});
-// the game's easing: roll one step every other frame, climb speed +-3 a frame toward +-64
-const stick = { bits: 0, roll: 0, vy: 0, f: 0 };
+// ---- the flight (50 Hz, as the C64) ----
+const S = { roll: 0, vy: 0, f: 0, y: 0, bits: 0, auto: true, keyT: 0, hit: 0, red: false };
+const NB = 3, FLY = 240;
+const bars = [];
+function spawn(b, t) { b.t = t; b.y = S.y + (Math.random() < 0.35 ? (Math.random() - 0.5) * 30 : (Math.random() < 0.5 ? -1 : 1) * (40 + Math.random() * 90)); b.hit = false; }
+for (let i = 0; i < NB; i++) { const b = {}; spawn(b, i * FLY / NB); bars.push(b); }
+const depth = t => 12 / (1 + 9 * t / FLY);              // 12 far .. 1.2 at the ship
+// autopilot: stick bits (1 up = nose down, 2 down = nose up, 4 left, 8 right), frames
+const PLAN = [[0, 50], [8, 70], [0, 40], [2, 45], [0, 30], [4, 90], [0, 30], [1, 50], [0, 25],
+              [6, 60], [0, 40], [9, 55], [0, 30], [4, 40], [8, 80], [0, 50], [1, 30], [2, 60], [0, 30]];
+let planI = 0, planT = 0;
+function autoStick() {
+  if (++planT >= PLAN[planI][1]) { planT = 0; planI = (planI + 1) % PLAN.length; }
+  let b = PLAN[planI][0];
+  // dodge: a bar on a collision course close ahead
+  for (const r of bars) if (r.t > FLY * 0.55 && Math.abs(r.y - S.y) < 34) b = (b & 12) | (r.y >= S.y ? 1 : 2);
+  return b;
+}
 function step() {
-  const b = stick.bits;
-  if (b) stick.hold = false;
-  if (stick.hold) return;
-  let up = b & 2, dn = b & 1;            // pad: 1 = stick up = nose down
-  if (dn && !up) stick.vy = Math.max(-64, stick.vy - 3);
-  else if (up && !dn) stick.vy = Math.min(64, stick.vy + 3);
-  else stick.vy = Math.sign(stick.vy) * Math.max(0, Math.abs(stick.vy) - 3);
-  if (++stick.f & 1) return;
-  if (b & 4 && !(b & 8)) stick.roll = Math.max(-8, stick.roll - 1);
-  else if (b & 8 && !(b & 4)) stick.roll = Math.min(8, stick.roll + 1);
-  else stick.roll -= Math.sign(stick.roll);
-}
-const near = (x, s) => Math.max(0, Math.min(8, 4 + Math.sign(x) * Math.floor(Math.abs(x) / s + 0.5)));
-const show = document.getElementById("view"), read = document.getElementById("read"), errRead = document.getElementById("errRead");
-let last = -1, acc = 0, prev = performance.now();
-function frame(t) {
-  acc += Math.min(200, t - prev); prev = t;
-  while (acc >= 20) { step(); acc -= 20; }   // 50 Hz game logic
-  sel = near(Math.round(stick.roll), 2) * 9 + near(Math.round(stick.vy), 16);
-  parity ^= 1;                               // swap on every refresh
-  const P = D.pairs[sel];
-  draw(bctx, mode === "pair" ? P[parity] : mode === "a" ? P[0] : mode === "b" ? P[1] : P[2], pal);
-  if (sel !== last) {
-    if (last >= 0) cells[last].canvas.parentNode.classList.remove("cur");
-    cells[sel].canvas.parentNode.classList.add("cur");
-    show.src = D.views[sel];
-    const r = D.rolls[Math.floor(sel / 9)], p = D.pitches[sel % 9];
-    read.textContent = `roll ${r > 0 ? "+" : ""}${r}° · pitch ${p > 0 ? "+" : ""}${p}° · frames ${2 * sel}/${2 * sel + 1}`;
-    errRead.textContent = `error as seen on a PAL TV: single ${D.err[sel][0]} → pair ${D.err[sel][1]}`;
-    last = sel;
+  if (S.auto && !S.bits) S.stick = autoStick();
+  else S.stick = S.bits;
+  if (!S.bits && !S.auto && performance.now() - S.keyT > 4000) setAuto(true);
+  const b = S.stick, dive = b & 1 && !(b & 2), climb = b & 2 && !(b & 1);
+  if (climb) S.vy = Math.min(64, S.vy + 3);
+  else if (dive) S.vy = Math.max(-64, S.vy - 3);
+  else S.vy = Math.sign(S.vy) * Math.max(0, Math.abs(S.vy) - 3);
+  S.y += S.vy / 64;
+  if (!(++S.f & 1)) {
+    if (b & 4 && !(b & 8)) S.roll = Math.max(-8, S.roll - 1);
+    else if (b & 8 && !(b & 4)) S.roll = Math.min(8, S.roll + 1);
+    else S.roll -= Math.sign(S.roll);
   }
-  cells.forEach((c, k) => draw(c, D.pairs[k][parity], pal));
+  S.red = false;
+  for (const r of bars) {
+    if (++r.t >= FLY) spawn(r, 0);
+    const on = Math.abs(r.y - S.y) < 24;
+    S.red ||= on;
+    if (on && r.t >= FLY - 2 && !r.hit) { r.hit = true; S.hit = 25; }
+  }
+  if (S.hit) S.hit--;
+}
+// ---- drawing ----
+function put(x, y, c) { const o = (y * W + x) * 4; px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = 255; }
+function draw(parity) {
+  const border = S.hit ? C[2] : C[0];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) put(x, y, (x < WX0 || x >= WX1 || y < WY0 || y >= WY1) ? border : C[0]);
+  // the bars, farthest first; the world tilts against the roll, in six segments
+  const slope = -3 * S.roll / 8 / 72;
+  const segs = [[WX0, WX0 + 32], [WX0 + 32, WX0 + 96], [WX0 + 96, CX], [CX, CX + 64], [CX + 64, CX + 128], [CX + 128, WX1]];
+  [...bars].sort((a, b) => a.t - b.t).forEach(r => {
+    const z = depth(r.t), near = Math.min(1, (12 / z - 1) / 9);
+    const yc = CY - (r.y - S.y) / z * 1.0, th = Math.max(2, 48 / z);
+    for (const [x0, x1] of segs) {
+      const off = Math.round(((x0 + x1) / 2 - CX) * slope);
+      const top = Math.round(yc - th / 2 + off);
+      for (let y = Math.max(WY0, top); y < Math.min(WY1, top + th); y++) {
+        const c = barColour((y - top + 0.5) / th, near);
+        for (let x = x0; x < x1; x++) put(x, y, c);
+      }
+    }
+  });
+  // the ship: the pair for the eased roll and climb speed
+  const ri = Math.max(0, Math.min(8, 4 + Math.sign(S.roll) * Math.floor(Math.abs(S.roll) / 2 + 0.5)));
+  const v = S.vy + 4, pi = Math.max(0, Math.min(8, 4 + Math.sign(v) * Math.floor(Math.abs(v) / 16 + 0.5)));
+  const fr = D.pairs[ri * 9 + pi][mode === "pair" ? parity : 0], pal = SHIP[S.red ? 1 : 0];
+  for (let i = 0; i < 252; i++) {
+    const c = +fr[i]; if (!c) continue;
+    const y = CY - 10 + Math.floor(i / 12), x = CX - 12 + (i % 12) * 2;
+    put(x, y, pal[c - 1]); put(x + 1, y, pal[c - 1]);
+  }
+  octx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  const sw = W / zoom, sh = H / zoom;
+  ctx.drawImage(off, CX - sw / 2, CY - sh / 2, sw, sh, 0, 0, W, H);
+  return [D.rolls[ri], D.pitches[pi]];
+}
+// ---- the clock: game at 50 Hz, the ship's frames swap at 60 Hz ----
+let mode = "pair", paused = false, t0 = performance.now(), last = t0, acc = 0, lastSwap = -1, swaps = [], read = "";
+function frame(t) {
+  if (!paused) {
+    acc += Math.min(200, t - last);
+    while (acc >= 20) { step(); acc -= 20; }
+  }
+  last = t;
+  const swap = Math.floor((t - t0) * 60 / 1000);
+  if (swap !== lastSwap) { swaps.push(t); lastSwap = swap; }
+  while (swaps.length && swaps[0] < t - 1000) swaps.shift();
+  const [r, p] = draw(swap & 1);
+  document.getElementById("read").textContent =
+    `roll ${r > 0 ? "+" : ""}${r}°  pitch ${p > 0 ? "+" : ""}${p}°  ·  swaps ${swaps.length}/s`;
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-// controls
-document.querySelectorAll("#modes button").forEach(b => b.onclick = () => {
-  mode = b.dataset.m; document.querySelectorAll("#modes button").forEach(x => x.setAttribute("aria-pressed", x === b));
-  document.getElementById("modeName").textContent = b.textContent;
-});
-document.querySelectorAll("[data-p]").forEach(b => b.onclick = () => {
-  pal = +b.dataset.p; document.querySelectorAll("[data-p]").forEach(x => x.setAttribute("aria-pressed", x === b));
-});
-document.getElementById("soft").onclick = e => {
-  const on = document.getElementById("tube").classList.toggle("soft"); e.target.setAttribute("aria-pressed", on);
-};
+// ---- controls ----
+function pick(on, off) { on.setAttribute("aria-pressed", "true"); off.setAttribute("aria-pressed", "false"); }
+const fp = document.getElementById("f-pair"), fo = document.getElementById("f-one");
+fp.onclick = () => { mode = "pair"; pick(fp, fo); };
+fo.onclick = () => { mode = "one"; pick(fo, fp); };
+const z1 = document.getElementById("z-1"), z2 = document.getElementById("z-2");
+z1.onclick = () => { zoom = 1; pick(z1, z2); };
+z2.onclick = () => { zoom = 3; pick(z2, z1); };
+const sa = document.getElementById("s-auto"), sy = document.getElementById("s-you");
+function setAuto(a) { S.auto = a; a ? pick(sa, sy) : pick(sy, sa); }
+sa.onclick = () => setAuto(true);
+sy.onclick = () => { setAuto(false); S.keyT = performance.now() + 1e9; };
+document.getElementById("pause").onclick = e => { paused = !paused; e.target.setAttribute("aria-pressed", paused); };
 const KEYS = { ArrowUp: 1, ArrowDown: 2, ArrowLeft: 4, ArrowRight: 8 };
-addEventListener("keydown", e => { if (KEYS[e.key]) { stick.bits |= KEYS[e.key]; e.preventDefault(); } });
-addEventListener("keyup", e => { if (KEYS[e.key]) stick.bits &= ~KEYS[e.key]; });
-document.querySelectorAll("#pad button").forEach(b => {
-  const d = +b.dataset.d;
-  b.onpointerdown = e => { stick.bits |= d; b.classList.add("on"); b.setPointerCapture(e.pointerId); };
-  b.onpointerup = b.onpointercancel = () => { stick.bits &= ~d; b.classList.remove("on"); };
-});
+addEventListener("keydown", e => { if (KEYS[e.key]) { S.bits |= KEYS[e.key]; if (S.auto) setAuto(false); S.keyT = performance.now(); e.preventDefault(); } });
+addEventListener("keyup", e => { if (KEYS[e.key]) { S.bits &= ~KEYS[e.key]; S.keyT = Math.min(S.keyT, performance.now()); } });
 </script>

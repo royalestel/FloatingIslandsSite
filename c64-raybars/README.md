@@ -399,8 +399,9 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     `SHIPFR` segment for this; the other programs build unchanged.
   * `python3 ship_aa.py` writes `preview_ship_aa.png`: each angle in full
     colour, its sprite, and the pair as a PAL TV shows it.
-    `python3 ship_aa.py page.html` also writes a live page that swaps
-    the pairs on every screen refresh, which a GIF can't do.
+    `python3 ship_aa.py page.html` also writes a live page: the ship
+    flying through bars on autopilot (or the arrow keys), its pair
+    swapping 60 times a second, which a GIF can't do.
     `ship3d.py frames.png` still previews the earlier 9 attitudes.
   * Still to check in VICE: the flicker on a real (emulated) PAL frame,
     and the load, which now runs past $A000 (under the BASIC ROM).

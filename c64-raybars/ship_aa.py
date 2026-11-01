@@ -23,8 +23,8 @@ closest wins.
 
     python3 ship_aa.py              # preview_ship_aa.png (all 81: full
                                     # colour, one frame, the pair as seen)
-    python3 ship_aa.py page.html    # also the live page (the pairs swap on
-                                    # every screen refresh)
+    python3 ship_aa.py page.html    # also the live page (the ship flying,
+                                    # its pair swapping 60 times a second)
 """
 import base64, io, json, math, os, sys
 import numpy as np
@@ -187,21 +187,11 @@ def sheet(path):
     return tot_s / len(GRID), tot_p / len(GRID)
 
 def page(path):
-    """A live page: the pair swaps on every screen refresh."""
-    from PIL import Image
-    import ship_hires as sh
-    faces = ship3d.model()
-    views = []
-    for r, p in GRID:
-        buf = io.BytesIO()
-        sh.view(faces, r, p).resize((160, 140), Image.LANCZOS).save(buf, "PNG", optimize=True)
-        views.append("data:image/png;base64," + base64.b64encode(buf.getvalue()).decode())
+    """A live page: the ship flying through bars on autopilot, its pair
+    swapping 60 times a second."""
     data = {"rolls": ROLLS, "pitches": PITCHES,
-            "pairs": [["".join(map(str, sum(f, []))) for f in (f0, f1, s)]
-                      for f0, f1, s, *_ in pairs()],
-            "err": [[round(es, 1), round(ep, 1)] for *_, ep, es in pairs()],
-            "views": views,
-            "pal": [[SHIPPAL[k] for k in (1, 2, 3)], [REDPAL[k] for k in (1, 2, 3)]]}
+            "pairs": [["".join(map(str, sum(f, []))) for f in (f0, f1)]
+                      for f0, f1, *_ in pairs()]}
     tpl = open(os.path.join(HERE, "ship_aa_page.html")).read()
     open(path, "w").write(tpl.replace("/*DATA*/null", json.dumps(data, separators=(",", ":"))))
 
