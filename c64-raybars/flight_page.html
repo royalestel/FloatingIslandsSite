@@ -60,7 +60,7 @@ button:focus-visible { outline: 2px solid #d0dc71; outline-offset: 2px; }
   <div class="read" id="read">loading…</div>
   <section class="bank">
     <h2>Banking, one bar</h2>
-    <p class="hint">One bar held at a fixed distance while the ship banks slowly from level to full left, full right and back, a roll step every 8 frames, 60 frames a second, with the Screen and pause settings above. <b>Split jitter</b> delays a row's start by 0 to 3 cycles from frame to frame, so its five inner splits land 0, 8, 16 or 24 pixels further right and each step spreads sideways into shades. <b>Sawtooth</b>: 0, 8, 16, 24, back to 0. <b>Triangle</b>: 0, 8, 16, 24, 16, 8.</p>
+    <p class="hint">One bar held at a fixed distance while the ship banks slowly from level to full left, full right and back, a roll step every 8 frames, 60 frames a second, with the Screen and pause settings above. <b>Split jitter</b> delays a row's start by 0 to 3 cycles from frame to frame, so its five inner splits land 0, 8, 16 or 24 pixels further right and each step spreads sideways into shades. Each step lasts one C64 frame: here 1/60 s, so a 4-step sawtooth repeats 15 times a second and a 3-step one 20 times (on a PAL C64, 12.5 and 16.7). <b>Top and bottom lines</b> jitter whole rows, only where some segments show the bar and others black.</p>
     <div class="tv strips" id="strips"></div>
   </section>
   <div class="hint"><b>All tricks:</b> every bar line picks a flicker pair of C64 colours, with the phase swapped on alternate lines so a PAL TV's delay line blends neighbouring lines; distant and dim bars get the ghost byte (every other pixel black); the ship is an antialiased frame pair; and the <b>tilt flickers</b>: a segment whose exact offset falls between two lines alternates between them every frame, so the bars bank in half-line steps. One C64 frame per screen refresh, 60 a second. <b>PAL TV</b> runs each frame through the PAL CRT model (composite blur, delay line); <b>sharp pixels</b> shows the raw frames.</div>
@@ -165,14 +165,13 @@ function Screen(canvas, ship, n, crop) {
 const rec = {}, brec = {};
 const main = Screen(document.getElementById("scr"), D.ship, D.n);
 const btop = Y0 + D.bank.top - 14, crop = [X0 - 8, btop, WW + 16, Y0 + D.CY + 13 - btop];
-const SAW = [0, 1, 2, 3], TRI = [0, 1, 2, 3, 2, 1];
+const SAW = [0, 1, 2, 3], SAW3 = [0, 1, 2];
 const STRIPS = [
   ["No jitter: rounded offsets", null],
-  ["All lines, sawtooth 0-8-16-24 px", { seq: SAW, where: "all" }],
-  ["All lines, triangle 0-8-16-24-16-8 px", { seq: TRI, where: "all" }],
-  ["All lines, 0 / 16 px on alternate frames", { seq: [0, 2], where: "all" }],
-  ["Top and bottom lines only, whole rows (practical), sawtooth", { seq: SAW, where: "rows" }],
-  ["Top and bottom lines only, each split on its own step (ideal), sawtooth", { seq: SAW, where: "split" }],
+  ["All lines, sawtooth 0-8-16-24 px (4 frames a cycle)", { seq: SAW, where: "all" }],
+  ["All lines, sawtooth 0-8-16 px (3 frames a cycle)", { seq: SAW3, where: "all" }],
+  ["Top and bottom lines only (the stair rows), sawtooth 0-8-16-24 px", { seq: SAW, where: "rows" }],
+  ["Top and bottom lines only (the stair rows), sawtooth 0-8-16 px", { seq: SAW3, where: "rows" }],
 ].map(([label, jit], i) => {
   const box = document.getElementById("strips");
   const l = document.createElement("div"); l.className = "lab"; l.textContent = label;
