@@ -429,7 +429,7 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
   on odd ones (`rtilt0..5` hold both halves, 34 entries; the build picks
   the half by `fcount`'s parity). An offset half way between two lines
   alternates between them, so the bars bank in half-line steps; a level
-  bar doesn't flicker. Cost: 8 cycles per bar.
+  bar doesn't flicker. Cost: about 12 cycles per bar.
 * **Pitch** works like a pilot's stick: up pushes the nose down, down pulls
   it up. It eases the ship's climb speed toward ±1 unit per frame, so
   pushing up makes the bars rise. Each bar's height is relative
