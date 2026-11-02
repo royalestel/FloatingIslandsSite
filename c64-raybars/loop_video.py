@@ -7,8 +7,10 @@ The bars are fixed in space (horizontal, across the view, at random
 heights through a slab), and a chase camera ZS metres behind the ship turns
 with it, so the bars stay horizontal on screen as the loop sweeps the view
 through them.  Bars are glow_video's white-to-blue raster bars, full
-brightness up close until the near clip takes them all at once (no shadow
-past the ship), dimming with distance beyond the ship.
+brightness up close until the near clip (0.4 m from the camera) takes them
+all at once (no shadow past the ship), dimming with distance beyond the
+ship.  The video shows each frame as a CRT would: the PAL signal model,
+then scanlines, beam spot and glow (crt_look).
 
 Distance shown by the idle byte, which can change every line: a bar line
 takes the sparsest pattern that still carries its brightness, and its
@@ -33,7 +35,7 @@ import ship_aa
 import flicker as fl
 
 F, R_BAR = fb.F, fb.R          # focal length (lines), bar radius (metres)
-ZS, NEAR, FAR = fb.ZS, fb.Z1, fb.Z0
+ZS, NEAR, FAR = fb.ZS, 0.4, fb.Z0          # bars clip 0.4 m from the camera
 V = (fb.Z0 - fb.Z1) / (fb.FLYD - 1)     # forward speed, metres a frame (the game's)
 LOOP_R = 1.8                   # loop radius, metres
 PATTERNS = [(1.0, 0x00), (0.5, 0x55), (0.25, 0x77), (0.125, 0x7f)]   # (coverage, idle byte)
@@ -118,6 +120,34 @@ def frame(vis, p):
             img[r, black == 1] = 0
     return img
 
+def crt_look(rgb, z=3):
+    """A frame as a CRT screen shows it, z times the size: the signal through
+    interlace.py's PAL model (composite blur, delay line), then the tube: each
+    line a beam of z rows, brighter lines blooming wider (visible scanlines
+    between dark ones), a soft beam spot along the line, and a glow around
+    bright areas.  Light is added in linear space."""
+    from PIL import ImageFilter
+    sig = iv.tv(rgb).astype(float) / 255
+    lin = sig ** 2.2
+    h, w, _ = lin.shape
+    wide = np.repeat(lin, z, axis=1)                         # along the line
+    lum = (0.3 * lin[..., 0] + 0.59 * lin[..., 1] + 0.11 * lin[..., 2])[..., None]
+    out = np.zeros((h * z, w * z, 3))
+    off = np.arange(z) - (z - 1) / 2                         # row offsets in a line
+    for i, d in enumerate(off):
+        sigma = 0.22 + 0.45 * np.repeat(lum, z, axis=1)      # beam width, lines
+        wgt = np.exp(-0.5 * (d / z / sigma) ** 2)
+        out[i::z] = wide * wgt
+    def blur(a, r):
+        im = Image.fromarray(np.clip(a ** (1 / 2.2) * 255, 0, 255).astype(np.uint8))
+        return (np.asarray(im.filter(ImageFilter.GaussianBlur(r)), float) / 255) ** 2.2
+    k = np.exp(-0.5 * (np.arange(-4, 5) / 1.4) ** 2)        # the beam spot, along
+    k /= k.sum()                                             # the line only
+    spot = sum(w_ * np.roll(out, i - 4, axis=1) for i, w_ in enumerate(k))
+    glow = blur(out, 7)                                      # halation / bloom
+    res = spot * 1.15 + glow * 0.35
+    return Image.fromarray((np.clip(res, 0, 1) ** (1 / 2.2) * 255).astype(np.uint8))
+
 def main(path_out):
     pairs = ship_aa.pairs()
     font, small = fl.fonts()
@@ -149,7 +179,7 @@ def main(path_out):
         dr.text((16, 8), f"{'loop' if looping else 'straight'}   pitch {deg:5.1f} deg   bars in view "
                 f"{len(vis)}: full {n[0]}, 1/2 {n[0x55]}, 1/4 {n[0x77]}, 1/8 {n[0x7f]}",
                 fill=(170, 176, 210), font=small)
-        canvas.paste(Image.fromarray(iv.tv(rgb)).resize((W, H), Image.BILINEAR), (16, 40))
+        canvas.paste(crt_look(rgb, Z), (16, 40))
         v.add(canvas)
         if f % 150 == 0:
             print(f"frame {f}", flush=True)
