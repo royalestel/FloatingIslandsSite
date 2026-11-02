@@ -32,7 +32,26 @@ import swatches_video as sw
 import ship_aa, big_ship
 
 LW = np.array([0.2126, 0.7152, 0.0722])
-DIM_FROM, DIM_FAR = 6.0, 0.35     # light scaled 1 -> DIM_FAR from 6 m to the far end
+# The scene, bigger than loop_video's: thicker bars, spaced further apart,
+# drawn from further away, and clipped closer to the camera.  (Cosmic
+# strings needs no raster splits, so the row loop has cycles for a ghost
+# byte per line.)
+lv.R_BAR = 0.2                    # bar radius, metres (loop_video: 0.12)
+lv.FAR = 20.0                     # bars drawn from 20 m (loop_video: 12)
+lv.NEAR = 0.15                    # near clip (loop_video: 0.4)
+SPACING = 0.5                     # metres between bars along the flight (0.28)
+HOLD = 14.0                       # beyond this a bar is all blue 1/4 on/off
+DIM_FROM, DIM_FAR = 6.0, 0.30     # light scaled 1 -> DIM_FAR from 6 m to HOLD
+
+def world(seed=21):
+    rng = np.random.default_rng(seed)
+    return [(rng.uniform(-8, 8), z) for z in np.arange(-20.0, 90.0, SPACING)]
+
+def fade(d):
+    """loop_video.fade, reaching its far end (dark blue) at HOLD."""
+    if d <= lv.REF + 0.25:
+        return 1.0
+    return 1.0 - (1.0 - lv.FADE_FAR) * min(1.0, (d - lv.REF - 0.25) / (HOLD - lv.REF - 0.25))
 
 def _pattern(name):
     if name == "full":
@@ -53,6 +72,7 @@ def palette():
     return out
 
 PAL = palette()
+HELD = [i for i, p in enumerate(PAL) if p[6] == "blue 1/4 on/off"][0]
 COL = np.array([p[3] for p in PAL])
 LUM = np.array([p[4] for p in PAL])
 WIDE = np.array([p[5] for p in PAL])
@@ -60,13 +80,16 @@ WIDE = np.array([p[5] for p in PAL])
 def dimming(d):
     if d <= DIM_FROM:
         return 1.0
-    return 1.0 - (1.0 - DIM_FAR) * min(1.0, (d - DIM_FROM) / (lv.FAR - DIM_FROM))
+    return 1.0 - (1.0 - DIM_FAR) * min(1.0, (d - DIM_FROM) / (HOLD - DIM_FROM))
 
-def choose(tgt, who, big):
+def choose(tgt, who, big, held):
     """Per line: index into PAL (-1 for no bar)."""
     out = np.full(fb.H, -1)
     err = np.zeros(3)
     for y in range(fb.H):
+        if held[y]:
+            out[y] = HELD
+            continue
         if who[y] < 0:
             err[:] = 0
             continue
@@ -101,15 +124,16 @@ def frame(vis, p):
     who = np.full(fb.H, -1)
     depth = np.full(fb.H, np.inf)
     big = np.zeros(fb.H, bool)
+    held = np.zeros(fb.H, bool)
     for i, (top, h, d) in enumerate(vis):
-        fc, dm = lv.fade(d), dimming(d)
+        fc, dm = fade(d), dimming(d)
         for j in range(h):
             r = top + j
             if lv.WTOP <= r <= lv.WBOT and d < depth[r]:
-                depth[r], who[r], big[r] = d, i, h >= lv.BIG
+                depth[r], who[r], big[r], held[r] = d, i, h >= lv.BIG, d >= HOLD
                 g = gv.glow(fc * (1 - abs(2 * (j + 0.5) / h - 1)) ** 0.9)
                 tgt[r] = fl.lin(g) * dm
-    ks = choose(tgt, who, big)
+    ks = choose(tgt, who, big, held)
     img = np.zeros((fb.H, fb.W), int)
     x = np.arange(fb.W)
     for r in range(fb.H):
@@ -144,7 +168,7 @@ def main(out_crt, out_sharp):
     Z = 3
     W, H = fb.W * Z, fb.H * Z
     vids = [iv.Video(out_crt, W + 32, H + 60), iv.Video(out_sharp, W + 32, H + 60)]
-    state = {"bars": lv.world(), "prev": 0.0, "ships": {}}
+    state = {"bars": world(), "prev": 0.0, "ships": {}}
     for f, sy, sz, phi, looping in lv.path():
         rgb, vis = render(f, sy, sz, phi, looping, state)
         for v, crt in zip(vids, (True, False)):
