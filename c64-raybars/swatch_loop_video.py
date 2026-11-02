@@ -146,6 +146,11 @@ def frame(vis, p):
             img[r, ((byte >> (7 - x % 8)) & 1) == 1] = 0
     return img
 
+# the ship's colours: none, %01 shadow, %10 lit hull, %11 the exhaust glow --
+# the glow register ($D025) written each frame, white and cyan in turn, so
+# the engines shimmer
+SHIP_COLS = [(0, 4, 14, 1), (0, 4, 14, 3)]
+
 def render(f, sy, sz, phi, looping, state):
     vis = lv.view(state["bars"], sy, sz, phi)
     rgb = fb.C64RGB[frame(vis, f & 1)].astype(np.uint8)
@@ -160,7 +165,7 @@ def render(f, sy, sz, phi, looping, state):
         for c in range(fr.shape[1]):
             if fr[r, c]:
                 y, xx = fb.CY - 10 + r, fb.W // 2 - fr.shape[1] + 2 * c
-                rgb[y, xx:xx + 2] = lv.jv_ship(fr[r, c])
+                rgb[y, xx:xx + 2] = fb.C64RGB[SHIP_COLS[f & 1][fr[r, c]]]
     return rgb, vis
 
 def main(out_crt, out_sharp):

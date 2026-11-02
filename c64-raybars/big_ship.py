@@ -15,6 +15,37 @@ import ship3d
 
 SX, SY = ship3d.SX, ship3d.SY
 
+def model():
+    """ship3d's gull with more detail for the two-sprite size: no light on
+    the nose; a canopy hump (dark), twin tail fins, winglets at the tips,
+    and glowing exhausts -- a main nozzle at the back of the body and one
+    at the back of each engine pod ("glow", the sprite's %11 colour)."""
+    L = ship3d.lozenge
+    f = ship3d.loft([(-6, L(4.4, 3.0)), (-1, L(5.0, 3.4)), (6, L(3.0, 2.2)),
+                     (10, L(1.2, 1.0))])
+    # the main nozzle: a short glowing duct out of the tail
+    f += ship3d.loft([(-7.0, L(2.6, 1.6)), (-5.8, L(3.0, 2.0))], "trim",
+                     caps=("glow", "trim"))
+    # canopy: a low hump on the body's top, in shadow
+    f += ship3d.loft([(-0.5, L(1.6, 0.8, 1.9)), (2.0, L(2.0, 1.4, 2.1)),
+                      (4.5, L(1.2, 0.6, 1.4))], "dark", caps=("dark", "dark"))
+    for s in (-1, 1):
+        path = [(s * 2.2, 0.0), (s * 5.2, 1.8), (s * 11.8, -1.6)]
+        for (xa, ya), (xb, yb) in zip(path, path[1:]):
+            f += ship3d.slab([(xa, ya, 4 - abs(xa) * 0.75), (xb, yb, 4 - abs(xb) * 0.75),
+                              (xb, yb, -6.0), (xa, ya, -6.0)], 1.8)
+        # engine pods, glowing at the back
+        f += ship3d.loft([(-7.5, ship3d.octagon(2.6, 2.6, 1.8)), (0, ship3d.octagon(2.6, 2.6, 1.8)),
+                          (2, ship3d.octagon(1.0, 1.0, 1.8))], "trim", caps=("glow", "trim"),
+                         dx=s * 5.2)
+        # twin tail fins, canted out, on the body's back
+        f += ship3d.fin([(s * 1.5, 1.2, -6.0), (s * 2.3, 4.2, -6.8), (s * 2.3, 4.2, -5.2),
+                         (s * 1.5, 1.2, -2.0)], 0.7)
+        # winglets: down-turned tips
+        f += ship3d.fin([(s * 11.8, -1.6, -6.0), (s * 12.2, -3.8, -6.6), (s * 12.2, -3.8, -4.6),
+                         (s * 11.8, -1.6, -2.0)], 0.7, "trim")
+    return f
+
 def sample_counts(roll, pitch, wmc=24, rows=21, scale=1.44):
     """ship3d.sample_counts for a wmc x rows grid; scale 0.96 is the single
     sprite's (3 m), 1.44 the ship 2 m away."""
@@ -26,7 +57,7 @@ def sample_counts(roll, pitch, wmc=24, rows=21, scale=1.44):
     zb = np.full((H, W), np.inf)
     cls = np.zeros((H, W), int)
     ys, xs = np.mgrid[0:H, 0:W] + 0.5
-    for poly, kind in ship3d.model():
+    for poly, kind in model():
         P = []
         for x, y, z in poly:
             y, z = y * cp + z * sp, -y * sp + z * cp
@@ -39,7 +70,8 @@ def sample_counts(roll, pitch, wmc=24, rows=21, scale=1.44):
         n /= np.linalg.norm(n)
         if n[2] > 0:
             n = -n
-        c = 3 if kind == "glow" else 2 if kind == "trim" or n @ L > 0.55 else 1
+        c = 3 if kind == "glow" else 1 if kind == "dark" else \
+            2 if kind == "trim" or n @ L > 0.55 else 1
         S = np.column_stack([(wmc / 2 + P[:, 0] * scale / 2) * SX,
                              (rows / 2 - P[:, 1] * scale) * SY, P[:, 2]])
         for k in range(1, len(S) - 1):
