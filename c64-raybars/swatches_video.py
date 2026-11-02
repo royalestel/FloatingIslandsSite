@@ -57,7 +57,6 @@ BLUE_PATTERNS = [
     ("1/4 on/off", 0.125, lambda r, p: QUART(r) if p == 0 else 0xff),
     ("checker on/off", 0.25, lambda r, p: CHECK(r) if p == 0 else 0xff),
     ("1/4 inverting", 0.25, lambda r, p: QUART(r + p)),
-    ("checkerboard", 0.5, lambda r, p: CHECK(r)),
     ("checker inverting", 0.5, lambda r, p: CHECK(r + p)),
 ]
 
