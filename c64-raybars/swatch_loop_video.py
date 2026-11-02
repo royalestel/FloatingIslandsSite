@@ -39,7 +39,7 @@ LW = np.array([0.2126, 0.7152, 0.0722])
 lv.R_BAR = 0.2                    # bar radius, metres (loop_video: 0.12)
 lv.FAR = 28.0                     # bars drawn from 28 m (loop_video: 12)
 lv.NEAR = 0.15                    # near clip (loop_video: 0.4)
-SPACING = 0.8                     # metres between bars along the flight (0.28)
+SPACING = 1.4                     # metres between bars along the flight (0.28)
 HOLD = 20.0                       # beyond this a bar is all blue 1/4 on/off
 DIM_FROM, DIM_FAR = 6.0, 0.30     # light scaled 1 -> DIM_FAR from 6 m to HOLD
 
