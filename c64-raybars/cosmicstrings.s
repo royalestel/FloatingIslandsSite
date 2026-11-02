@@ -71,6 +71,8 @@ NSH       = $c600
 SHL       = $e000       ; lg shift tables (made at start)
 SHR       = $e800
 NLZ       = $f000
+BND       = $0500       ; per window line tables (made at start)
+VARX      = $0600
 SPRPTR    = $87f8
 SPRBLK    = $20         ; $8800 / 64 in bank 2
 
@@ -186,20 +188,20 @@ pbx:     .res 1
 it1:     .res 1         ; IRQ scratch
 lastfc:  .res 1
 nsteps:  .res 1
+spnl:    .res 1
+spnh:    .res 1
 
 ; =============================================================================
 .segment "BSS"
 recbuf:  .res RECMAX
 bkl:     .res NBMAX     ; per bar: sort key (d >> 8)
 bkh:     .res NBMAX
-btl:     .res NBMAX     ;          top (signed)
-bth:     .res NBMAX
 bhh:     .res NBMAX     ;          height
 ba:      .res NBMAX     ;          clipped start / end line
 be:      .res NBMAX
-brl:     .res NBMAX     ;          ramp
-brh:     .res NBMAX
 bk:      .res NBMAX     ;          row (for the simulator)
+bsl:     .res NBMAX     ;          span source base
+bsh:     .res NBMAX
 ord:     .res NBMAX     ; bars in screen order (by start line)
 act:     .res NBMAX     ; sweep: bars covering the current line
 bline:   .res NBLKMAX   ; blocks being built: irq1 line, first record
@@ -254,6 +256,7 @@ start:  sei
         sta $dc02               ; joystick port: inputs
         jsr gensqr
         jsr genshift
+        jsr genlines
         lda #<SPDBASE
         sta spdl
         lda #>SPDBASE
@@ -584,11 +587,21 @@ build:  lda fcount               ; frames since the last build: move that far
 :       sta nsteps
         lda fcount
         sta lastfc
+        lda #0                  ; the distance: speed summed over the frames
+        sta spnl
+        sta spnh
 @st:    jsr controls
-        jsr sincos
-        jsr move
+        lda spnl
+        clc
+        adc spdl
+        sta spnl
+        lda spnh
+        adc spdh
+        sta spnh
         dec nsteps
         bne @st
+        jsr sincos
+        jsr move
         jsr setmul
         jsr frameconst
         jsr dorows
@@ -845,14 +858,14 @@ move:   lda sv
 @x:     rts
 
 ; rr = spd * mb (16 x 8 -> 24 bits)
-spdmul: lda spdl
+spdmul: lda spnl
         sta ma
         jsr mul8
         lda m0
         sta rr
         lda m1
         sta rr+1
-        lda spdh
+        lda spnh
         sta ma
         jsr mul8
         lda m0
@@ -1251,6 +1264,31 @@ project:
         lda #0
         sbc uu+2
         sta uu+2
+:       lda dd+2                ; off the screen whatever its height:
+        lsr a                   ; |u| > 1.25 d
+        sta t0+1
+        lda dd+1
+        ror a
+        sta t0
+        lda dd
+        ror a
+        lsr t0+1
+        ror t0
+        ror a
+        clc
+        adc dd
+        lda t0
+        adc dd+1
+        sta t0
+        lda t0+1
+        adc dd+2
+        sta t0+1
+        lda t0                  ; (1.25 d) >> 8 vs |u| >> 8
+        cmp uu+1
+        lda t0+1
+        sbc uu+2
+        bcs :+
+        rts
 :       LGM uu, lgl, lgh
         ; q2 = exp(lg u - lg d + LG400): 400 u / d, half lines
         lda lgl
@@ -1395,43 +1433,56 @@ project:
 :       sta ee
         lda #0
         sta aa
-@store: ldx nb                  ; the bar, sorted in nearest first (d >> 8)
+@store: ldx nb                  ; the bar
         cpx #NBMAX
-        bcs @x
-        lda dd+1
+        bcc :+
+        rts
+:       lda dd+1                ; depth key (d >> 8)
         sta bkl,x
         lda dd+2
         sta bkh,x
-        lda tl
-        sta btl,x
-        lda th
-        sta bth,x
         lda hh
         sta bhh,x
         tay
-        lda rampl,y
-        sta brl,x
-        lda ramph,y
-        sta brh,x
         lda aa
         sta ba,x
+        sta t1+1
         lda ee
         sta be,x
         lda krow
         sta bk,x
-        stx t1
+        tya                     ; source base: ramp + h - 1 + top
+        clc
+        adc rampl,y
+        sta t0
+        lda ramph,y
+        adc #0
+        sta t0+1
+        lda t0
+        clc
+        adc tl
+        sta t0
+        lda t0+1
+        adc th
+        sta bsh,x
+        lda t0
+        bne :+
+        dec bsh,x
+:       sec
+        sbc #1
+        sta bsl,x
+        stx t1                  ; into screen order (by first line)
         ldy nb
-@ins:   beq @put
-        ldx ord-1,y             ; screen order: by start line
+        beq @put
+@ins:   ldx ord-1,y
         lda ba,x
-        ldx t1
-        cmp ba,x
+        cmp t1+1
         bcc @put
         beq @put
-        lda ord-1,y
+        txa
         sta ord,y
         dey
-        jmp @ins
+        bne @ins
 @put:   lda t1
         sta ord,y
         inc nb
@@ -1641,16 +1692,10 @@ emitpiece:
         bcs @piece
         jsr blackto
 @piece: ldx pbx
-        lda brl,x
+        lda bsl,x               ; the bar's source base: ramp + h - 1 + top
         sta rp
-        lda brh,x
+        lda bsh,x
         sta rp+1
-        lda bhh,x
-        sta hh
-        lda btl,x
-        sta tl
-        lda bth,x
-        sta th
         lda #1
         sta pbar
         lda ps0
@@ -1701,60 +1746,31 @@ close:  ldy recp
 
 ; records for lines aa..ee (pbar: 0 black, 1 the ramp rp / hh / top),
 ; split at the sprite DMA band
-spans:  lda aa
+spans:  ldy recp
+@lp:    lda aa
+        cmp ee
+        bcs @x
+        tax
+        lda BND,x               ; the line's region ends here (band edges)
         cmp ee
         bcc :+
-        rts
-:       ldx #0                  ; variant: 0 normal, 2 band
         lda ee
-        sta bb
-        lda aa
-        cmp #BAND0
-        bcs :+
-        lda #BAND0              ; normal above the band
-        cmp ee
-        bcs @go
-        sta bb
-        jmp @go
-:       cmp #BAND1
-        bcs @go                 ; below: normal to ee
-        ldx #2
-        lda #BAND1
-        cmp ee
-        bcs @go
-        sta bb
-@go:    lda aa                  ; parity: mock row aa + 11 odd -> O
-        and #1
-        eor #1
-        stx t1
-        ora t1
-        tax                     ; 0 NE, 1 NO, 2 BE, 3 BO
-        ldy recp
+:       sta bb
+        lda VARX,x              ; its line code: normal / band, row parity
+        tax
         lda pbar
-        bne @rmp
-        lda #<zeros
-        sta recbuf,y
-        lda #>zeros
-        sta recbuf+1,y
-        jmp @len
-@rmp:   ; src = ramp + h - (bb - top) - 1  (>= ramp - 1)
-        lda bb
+        beq @blk
+        lda rp                  ; src = base - end
         sec
-        sbc tl
-        sta t0
-        lda hh
-        clc
-        sbc t0                  ; h - (bb - top) - 1
-        sta t1
-        lda #0
-        sbc #0
-        sta t1+1
-        lda rp
-        clc
-        adc t1
+        sbc bb
         sta recbuf,y
         lda rp+1
-        adc t1+1
+        sbc #0
+        sta recbuf+1,y
+        jmp @len
+@blk:   lda #<zeros
+        sta recbuf,y
+        lda #>zeros
         sta recbuf+1,y
 @len:   lda bb
         sec
@@ -1767,10 +1783,38 @@ spans:  lda aa
         tya
         clc
         adc #5
-        sta recp
+        tay
         lda bb
         sta aa
-        jmp spans
+        jmp @lp
+@x:     sty recp
+        rts
+
+; per window line: where its region (above / on / below the ship's
+; lines) ends, and its line code (0 NE, 1 NO, 2 BE, 3 BO)
+genlines:
+        ldx #0
+@l:     lda #BAND0
+        ldy #0
+        cpx #BAND0
+        bcc @p
+        lda #BAND1
+        ldy #2
+        cpx #BAND1
+        bcc @p
+        lda #NLINES
+        ldy #0
+@p:     sta BND,x
+        txa                     ; mock row x + 11 odd -> O
+        and #1
+        eor #1
+        sty t0
+        ora t0
+        sta VARX,x
+        inx
+        cpx #NLINES
+        bne @l
+        rts
 
 entl:   .byte <(l_ne-1), <(l_no-1), <(l_be-1), <(l_bo-1)
 enth:   .byte >(l_ne-1), >(l_no-1), >(l_be-1), >(l_bo-1)

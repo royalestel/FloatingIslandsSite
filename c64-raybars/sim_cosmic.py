@@ -21,7 +21,7 @@ vertical-blank copy, then build for the next frame.  Checks:
 import math, os, sys
 import numpy as np
 from PIL import Image, ImageDraw
-from py65.devices.mpu6502 import MPU
+from c64cpu import MPU
 import flyby3d as fb
 import flicker as fl
 import ideas_video as iv
@@ -98,9 +98,10 @@ def snapshot():
     out = []
     for i in range(mem[L["nb"]]):
         x = mem[L["ord"] + i]
-        top = s16(mem[L["btl"] + x] | mem[L["bth"] + x] << 8)
         h = mem[L["bhh"] + x]
-        rp = mem[L["brl"] + x] | mem[L["brh"] + x] << 8
+        rp = mem[L["rampl"] + h] | mem[L["ramph"] + h] << 8
+        base = mem[L["bsl"] + x] | mem[L["bsh"] + x] << 8
+        top = s16((base - (rp + h - 1)) & 0xFFFF)
         key = mem[L["bkl"] + x] | mem[L["bkh"] + x] << 8
         out.append((key, top, h, rp, mem[L["bk"] + x]))
     return [b[1:] for b in sorted(out, key=lambda b: b[0])]   # nearest first
@@ -235,7 +236,9 @@ for f in range(FRAMES):
             u = ry * c - rz * s
             h = min(255, max(2, lv.bar_lines(d)))
             top = (2 * gc.CYL - 2 * gc.F * u / d - h) / 2
-            ctop = s16(mem[L["btl"] + x_] | mem[L["bth"] + x_] << 8)
+            hh_ = mem[L["bhh"] + x_]
+            rp_ = mem[L["rampl"] + hh_] | mem[L["ramph"] + hh_] << 8
+            ctop = s16(((mem[L["bsl"] + x_] | mem[L["bsh"] + x_] << 8) - (rp_ + hh_ - 1)) & 0xFFFF)
             if abs(ctop - top) > 1.5 or abs(mem[L["bhh"] + x_] - h) > 1.5:
                 stats["badpos"] += 1
         info.append((math.degrees(ang) % 360, (mem[L["spdl"]] | mem[L["spdh"]] << 8) / 185,
