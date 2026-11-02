@@ -17,6 +17,7 @@ import ideas_video as iv
 import loop_video as lv
 import swatch_loop_video as sv
 import gen_cosmic as gc
+gc.ROUND = True                     # round bars at all distances (preview)
 
 SPEED = 0.045                       # metres a frame (cosmicstrings' base speed)
 DNEAR = 2 * sv.lv.R_BAR * gc.F / (gc.HMAX + 0.45)

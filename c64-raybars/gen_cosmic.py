@@ -42,6 +42,46 @@ R_BAR = sv.lv.R_BAR
 def bar_lines(d):
     return lv.bar_lines(d)
 
+# ROUND: every bar keeps its round glow profile at all distances: the
+# colours fade along the glow ramp and the light dims smoothly all the way
+# to FAR, so far away the centre is a dim blue pattern and the edges the
+# dimmest, and the centre grows denser and brighter as the bar comes in
+ROUND = False                      # (onebar_video.py turns it on: a preview)
+DIM_FAR_R = 0.20
+
+def fade_r(d):
+    if d <= lv.REF + 0.25:
+        return 1.0
+    return 1.0 - (1.0 - lv.FADE_FAR) * min(1.0, (d - lv.REF - 0.25) / (sv.lv.FAR - lv.REF - 0.25))
+
+def dim_r(d):
+    if d <= sv.DIM_FROM:
+        return 1.0
+    return 1.0 - (1.0 - DIM_FAR_R) * min(1.0, (d - sv.DIM_FROM) / (sv.lv.FAR - sv.DIM_FROM))
+
+# the ladder: swatches in brightness order along the glow's hues (black,
+# the blue patterns, blue, purple, light blue, cyan, white)
+LADDER = [0, 1, 2, 3, 8, 10, 14, 18, 19, 22, 25, 27, 28]
+
+def ramp_round(h, d):
+    """A round bar h lines tall at distance d: each row's light (the glow
+    ramp's, faded and dimmed for d) on the ladder, ordered-dithered between
+    its two nearest steps (Bayer by row)."""
+    fc, dm = fade_r(d), dim_r(d)
+    lum = np.array([sv.LUM[k] for k in LADDER])
+    out = []
+    for j in range(h):
+        t = fl.lin(gv.glow(fc * (1 - abs(2 * (j + 0.5) / h - 1)) ** 0.9)) * dm
+        lt = float(np.clip(t, 0, 1) @ sv.LW)
+        i = int(np.searchsorted(lum, lt)) - 1
+        if i >= len(LADDER) - 1:
+            out.append(LADDER[-1])
+            continue
+        i = max(i, 0)
+        f = (lt - lum[i]) / (lum[i + 1] - lum[i])
+        out.append(LADDER[i + 1] if f > lv.BAYER4[j % 4] else LADDER[i])
+    return out
+
 def d_of_h(h):
     """The distance a bar h lines tall stands for (inverse of bar_lines)."""
     k = 2 * R_BAR * F
@@ -52,9 +92,12 @@ def d_of_h(h):
 def ramp(h):
     """Swatch indices of a bar h lines tall, top row first."""
     d = d_of_h(h)
-    if h <= HHELD:
-        return [sv.HELD] * h
-    fc, dm = sv.fade(d), sv.dimming(d)
+    if not ROUND:
+        if h <= HHELD:
+            return [sv.HELD] * h
+        fc, dm = sv.fade(d), sv.dimming(d)
+    else:
+        return ramp_round(h, d)
     tgt = np.array([fl.lin(gv.glow(fc * (1 - abs(2 * (j + 0.5) / h - 1)) ** 0.9)) * dm
                     for j in range(h)])
     big = h >= lv.BIG
