@@ -72,13 +72,16 @@ def call(addr):
     return run_until(TRAMP)
 
 def joystick(f):
-    """Autopilot: bits 1 up (nose down), 2 down (nose up), 16 fire."""
+    """Autopilot: bits 1 up (nose down), 2 down (nose up), 16 fire.  A
+    loop-the-loop (held long enough for one full turn), then on forward,
+    weaving up and down between the bars."""
     j = 0
-    if 60 <= f < 320: j |= 2                    # a loop-the-loop
-    if 380 <= f < 450: j |= 16                  # boost
-    if 470 <= f < 520: j |= 1                   # dive
-    if 520 <= f < 600: j |= 2                   # pull out and climb
-    if 600 <= f < 640: j |= 16
+    if 60 <= f < 308:
+        j |= 2                                   # the loop
+    weave = [(340, 365, 2), (365, 415, 1), (415, 465, 2), (465, 515, 1), (515, 540, 2)]
+    for a, b, bit in weave:
+        if a <= f < b:
+            j |= bit
     return j
 
 # start-up: runs to the main loop (it built the first frame)
