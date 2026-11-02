@@ -27,7 +27,8 @@ import ideas_video as iv
 import glow_video as gv
 
 P, GAP, ROWS = 8, 3, 4             # patch size, gap, patches a column
-DARK = (0, 6, 11)                  # black, blue, dark grey: the patterned ones
+DARK = (0, 6, 11)
+DROP = {(3, 15, "full")}           # cyan / light grey: too close to its neighbours                  # black, blue, dark grey: the patterned ones
 
 def patch(a, b, name, light, pbyte):
     """One swatch: the pair a / b (phase swapped by line) under a pattern."""
@@ -72,6 +73,7 @@ def chosen():
               for c in gv.BLUES if c not in (0, 6)]
     items += [t for t in patches() if t[3] == "full"]
     items = dedupe(items)
+    items = [t for t in items if (t[1], t[2], t[3]) not in DROP]
     items.sort(key=lambda t: (brightness(t[4]), t[1], t[2], t[3]))
     return items
 

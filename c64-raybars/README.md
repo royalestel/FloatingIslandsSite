@@ -611,6 +611,16 @@ is the reference; `glow_video.py` has the colours and the cost profile.
 * **Previews:** each frame through the PAL signal model, then a CRT model
   (`loop_video.crt_look`: scanlines that bloom on bright lines, a beam spot
   along the line, glow around bright areas).
+* **The swatch set:** `swatches_video.py` shows the 29 colours the tricks
+  give from the blue family: black, flicker pairs, single colours, and single
+  colours under a ghost-byte pattern (blue 1/4 on/off, blue 1/4 inverting,
+  and half-brightness inverting checkerboards). They are ordered by the
+  colour the eye sees, the two frames blended 50%. Ghost-byte swatches that
+  match another swatch are dropped. `swatch_loop_video.py` flies
+  `loop_video`'s loop drawing every bar line from this set (nearest swatch
+  with error diffusion on small bars, Bayer dither between the bracketing
+  swatches on big ones). Distance dims the light smoothly instead of by
+  pattern bands, so there is no step and the far bars stay as dim blue.
 * **On the C64:** `glow_video.py --profile` estimates the cost. About 10 bars
   in flight fit today's budget; a full slab needs a much cheaper build per
   bar (the colour lists depend only on height and distance; with no tilt,
