@@ -47,7 +47,7 @@ def bar_lines(d):
 # to FAR, so far away the centre is a dim blue pattern and the edges the
 # dimmest, and the centre grows denser and brighter as the bar comes in
 ROUND = False                      # (onebar_video.py turns it on: a preview)
-DIM_FAR_R = 0.20
+DIM_FAR_R = 0.11
 
 def fade_r(d):
     if d <= lv.REF + 0.25:
@@ -61,18 +61,29 @@ def dim_r(d):
 
 # the ladder: swatches in brightness order along the glow's hues (black,
 # the blue patterns, blue, purple, light blue, cyan, white)
-LADDER = [0, 1, 2, 3, 8, 10, 14, 18, 19, 22, 25, 27, 28]
+LADDER = [0, 1, 2, 3, 5, 6, 8, 10, 14, 18, 19, 22, 25, 27, 28]
+
+CONTRAST_FULL = 14.0               # full round profile from here in;
+                                   # flat at FAR (low contrast far away)
+
+def contrast(d):
+    t = min(1.0, max(0.0, (sv.lv.FAR - d) / (sv.lv.FAR - CONTRAST_FULL)))
+    return t * t * (3 - 2 * t)
 
 def ramp_round(h, d):
-    """A round bar h lines tall at distance d: each row's light (the glow
-    ramp's, faded and dimmed for d) on the ladder, ordered-dithered between
-    its two nearest steps (Bayer by row)."""
+    """A round bar h lines tall at distance d: each row's light on the
+    ladder, ordered-dithered between its two nearest steps (Bayer by row).
+    The light: the glow ramp's core, faded and dimmed for d, shaded across
+    the bar by the round profile -- with less contrast far away, so at the
+    very end the bar is one flat dim blue pattern."""
     fc, dm = fade_r(d), dim_r(d)
+    c = contrast(d)
     lum = np.array([sv.LUM[k] for k in LADDER])
+    core = float(fl.lin(gv.glow(fc)) @ sv.LW) * dm
     out = []
     for j in range(h):
-        t = fl.lin(gv.glow(fc * (1 - abs(2 * (j + 0.5) / h - 1)) ** 0.9)) * dm
-        lt = float(np.clip(t, 0, 1) @ sv.LW)
+        prof = float(fl.lin(gv.glow(fc * (1 - abs(2 * (j + 0.5) / h - 1)) ** 0.9)) @ sv.LW) * dm
+        lt = core + c * (prof - core)
         i = int(np.searchsorted(lum, lt)) - 1
         if i >= len(LADDER) - 1:
             out.append(LADDER[-1])

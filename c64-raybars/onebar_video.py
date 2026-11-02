@@ -37,14 +37,15 @@ def main(out_crt, out_sharp, below=0.3):
         img = np.zeros((fb.H, fb.W), int)
         if d >= DNEAR:
             h = max(2, min(gc.HMAX, lv.bar_lines(d)))
-            if h not in ramps:
-                ramps[h] = gc.ramp(h)
+            key = (h, round(d * 2) / 2)          # by distance (0.5 m) as well
+            if key not in ramps:
+                ramps[key] = gc.ramp_round(h, key[1])
             top = int(round((2 * gc.CYL - 2 * gc.F * (-below) / d - h) / 2))
             for j in range(h):
                 ln = top + j
                 if 0 <= ln < gc.NLINES:
                     r = ln + 11                  # mock row
-                    k = ramps[h][j]
+                    k = ramps[key][j]
                     t = tabs[p]
                     img[r] = t[32 * (r & 1) + k]
                     g = t[64 + 32 * (r & 1) + k]
