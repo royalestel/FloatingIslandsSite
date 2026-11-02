@@ -582,6 +582,43 @@ python3 sim_goldship.py      # needs -g -Ln goldship.lbl; renders preview_goldsh
     every colour-register write. On the 6569 (`-model c64`) there are
     none.
 
+## COSMIC STRINGS: glowing bars filling space (look study)
+
+A different take on GOLDSHIP's scene, so far only as mockups (no C64 code
+yet): instead of a few ray-traced gold bars, space is filled with glowing
+classic raster bars, fixed in a slab of space at random heights, and the
+ship flies through them. `loop_video.py` (a loop-the-loop and back to level)
+is the reference; `glow_video.py` has the colours and the cost profile.
+
+* **The bars:** constant thickness, horizontal across the view, no tilt. A
+  glow ramp from deep blue edges through light and pale blue to a white
+  core (`glow_video.glow`).
+* **Distance:** each bar fades along its own ramp, from the full glow up to
+  the ship's distance to all dark blue at 12 m (`loop_video.fade`). Beyond
+  the ship's distance bars grow gently (height as 1/√d: 8 lines at 12 m),
+  and the idle byte per line dims them further ($55, $77, or $77 on
+  alternate frames with the phase swapped on alternate lines). Up close they
+  stay at full brightness until the near clip, 0.4 m from the camera, takes
+  them all at once (about 120 lines tall by then).
+* **Colours:** flicker pairs with the phase swapped on alternate lines, from
+  the blue family: black, blue, purple, light blue, cyan, the greys, white.
+  Small bars use pairs one brightness level apart with error diffusion; bars
+  24 lines and taller also use pairs two levels apart, ordered-dithered line
+  by line, so greys bridge the jump from cyan to purple.
+* **The camera:** a chase camera 3 m behind the ship turns with it. The scene
+  pitches with the climb speed (a lagging camera, up to 32 lines), and in a
+  loop the whole view sweeps through the slab while the bars stay horizontal.
+* **Previews:** each frame through the PAL signal model, then a CRT model
+  (`loop_video.crt_look`: scanlines that bloom on bright lines, a beam spot
+  along the line, glow around bright areas).
+* **On the C64:** `glow_video.py --profile` estimates the cost. About 10 bars
+  in flight fit today's budget; a full slab needs a much cheaper build per
+  bar (the colour lists depend only on height and distance; with no tilt,
+  one column can serve all six segments). The idle byte can change per block
+  for free; per line it needs a store in the row loop, which has no spare
+  cycles yet. Near bars 100+ lines tall take more than half a frame's
+  display time each.
+
 ## FLYBY3D: profiling the bars in true perspective
 
 `flyby3d.py` renders GOLDSHIP's scene for real and decimates it to the C64.

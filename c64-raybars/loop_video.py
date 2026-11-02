@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""The ship flies a loop-the-loop through a slab of glowing bars, then
-straightens out: a look study (60 fps video, one C64 frame per video frame,
+"""COSMIC STRINGS: the ship flies a loop-the-loop through a slab of glowing
+bars, then straightens out: a look study (60 fps video, one C64 frame per video frame,
 through interlace.py's PAL CRT model).
 
 The bars are fixed in space (horizontal, across the view, at random
