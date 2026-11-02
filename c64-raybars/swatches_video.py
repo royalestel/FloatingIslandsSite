@@ -53,7 +53,6 @@ CHECK = lambda r: _byte(2, r % 2)                    # $55 / $aa by line
 QUART = lambda r: _byte(4, 2 * (r % 2))              # $77 / $dd by line
 EIGHT = lambda r: _byte(8, 4 * (r % 2))              # $7f / $f7 by line
 BLUE_PATTERNS = [
-    ("1/8 inverting", 0.125, lambda r, p: EIGHT(r + p)),
     ("1/4 on/off", 0.125, lambda r, p: QUART(r) if p == 0 else 0xff),
     ("checker on/off", 0.25, lambda r, p: CHECK(r) if p == 0 else 0xff),
     ("1/4", 0.25, lambda r, p: QUART(r)),
@@ -63,10 +62,15 @@ BLUE_PATTERNS = [
 ]
 
 def chosen():
-    """The set to show: black; blue alone under each of BLUE_PATTERNS; then
-    every flicker pair and single colour unpatterned -- dark to light."""
-    items = [patch(6, 6, f"blue {n}", l, (lambda f: lambda r, p, bp=False: f(r, p))(f))
-             for n, l, f in BLUE_PATTERNS]
+    """The set to show: black; blue alone under each of BLUE_PATTERNS; every
+    other colour alone under the inverting checkerboard (half brightness,
+    each pixel lit every other frame); then every flicker pair and single
+    colour unpatterned -- dark to light."""
+    wrap = lambda f: lambda r, p, bp=False: f(r, p)
+    items = [patch(6, 6, f"blue {n}", l, wrap(f)) for n, l, f in BLUE_PATTERNS]
+    inv = [t for t in BLUE_PATTERNS if t[0] == "checker inverting"][0]
+    items += [patch(c, c, f"{fl.NAMES[c]} checker inverting", inv[1], wrap(inv[2]))
+              for c in gv.BLUES if c not in (0, 6)]
     items += [t for t in patches() if t[3] == "full"]
     items.sort(key=lambda t: (t[0] @ [0.2126, 0.7152, 0.0722], t[1], t[2], t[3]))
     return items
