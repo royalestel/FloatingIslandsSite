@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Every colour the tricks can make, as 8 x 8 pixel patches ordered dark to
-light, as 60 fps videos (one C64 frame per video frame, so the flicker is
+"""Every colour the tricks make from cosmic strings' colours (the blue family:
+black, blue, purple, light blue, cyan, the greys, white; glow_video.BLUES),
+as 8 x 8 pixel patches ordered dark to light, as 60 fps videos (one C64 frame per video frame, so the flicker is
 real): with the CRT look, and without it (sharp pixels).
 
 A patch: a pair of C64 colours, shown on alternate frames with the phase
@@ -19,13 +20,14 @@ import flyby3d as fb
 import flicker as fl
 import loop_video as lv
 import ideas_video as iv
+import glow_video as gv
 
 P, GAP, COLS = 8, 2, 30            # patch size, gap, patches a row
 
 def patches():
     out = []
-    for a in range(16):
-        for b in range(a, 16):
+    for i, a in enumerate(gv.BLUES):
+        for b in gv.BLUES[i:]:
             if abs(fl.LUMA[a] - fl.LUMA[b]) > 2:
                 continue
             for name, light, pbyte in lv.PATTERNS:
@@ -70,8 +72,8 @@ def video(path, items, crt, seconds=8, Z=4):
     for k in range(int(seconds * 60)):
         canvas = Image.new("RGB", (v.w, v.h), (8, 8, 16))
         dr = ImageDraw.Draw(canvas)
-        dr.text((16, 8), f"{len(items)} colours from flicker pairs, alternating lines and idle-byte "
-                f"patterns, dark to light ({'CRT' if crt else 'sharp pixels'}, 60 frames a second)",
+        dr.text((16, 8), f"Cosmic strings: {len(items)} colours from the blue family with flicker "
+                f"pairs, alternating lines and idle-byte patterns, dark to light ({'CRT' if crt else 'sharp pixels'}, 60 frames a second)",
                 fill=(190, 195, 225), font=small)
         canvas.paste(looks[k & 1], (16, 40))
         v.add(canvas)
