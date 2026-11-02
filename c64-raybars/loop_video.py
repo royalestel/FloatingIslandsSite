@@ -20,9 +20,13 @@ colours are chosen that much brighter --
     $77  1 pixel of 4
     $77 / $ff  1 pixel of 4 on alternate frames, black between, the phase
                swapped on alternate lines (farthest)
-so distant bars keep their hue instead of sinking into dark colours.  The
-colours themselves are flicker pairs with the phase swapped on alternate
-lines (interlace.choose_column), from the blue family.
+on top of the colours fading with distance (fade): the white core gives
+way to light blue, then the whole bar to dark blue far away.  The
+colours themselves are flicker pairs from the blue family (greys included)
+with the phase swapped on alternate lines: one level apart and error
+diffused on small bars; on bars BIG lines and taller also two levels apart
+(bridging cyan and purple with greys) and ordered-dithered line by line.
+Distant bars grow more gently than true perspective (bar_lines).
 
     python3 loop_video.py out.mp4
 """
@@ -52,6 +56,16 @@ def brightness(z):
     if z <= ZS + 0.25:
         return 1.0
     return max(0.0, 1.0 - 0.75 * (z - ZS - 0.25) / (FAR - ZS - 0.25)) ** gv.DIMPOW
+
+def fade(d):
+    """Distance fades a bar's colours along its own glow ramp: 1 (the full
+    white-to-blue ramp) up to just beyond the ship, down to FADE_FAR at the
+    far end, where even the core is dark blue (glow(0.15))."""
+    if d <= ZS + 0.25:
+        return 1.0
+    return 1.0 - (1.0 - FADE_FAR) * min(1.0, (d - ZS - 0.25) / (FAR - ZS - 0.25))
+
+FADE_FAR = 0.15
 
 def pattern(b):
     """The sparsest pattern whose coverage still carries brightness b:
@@ -83,6 +97,93 @@ def path(straight1=150, straight2=210):
         z += V * math.cos(phi)
         yield f, y, z, phi, straight1 <= f < straight1 + loop
 
+GROW = 0.5          # beyond the ship's distance a bar's height goes as d ** -GROW
+
+def bar_lines(d):
+    """A bar's height in lines: true perspective (48 / d) up to the ship's
+    distance, then a gentler curve, so distant bars cover more lines and
+    grow more slowly as they come in (8 lines at 12 m instead of 4)."""
+    h = 2 * R_BAR * F / d if d <= ZS else 2 * R_BAR * F / ZS * (ZS / d) ** GROW
+    return max(2, int(round(h)))
+
+# ---- the colours: flicker pairs, with wider pairs and stronger line dither for
+# big bars.  C64 brightness levels (Pepto): cyan is 6, light blue and grey 4,
+# purple 3 -- nothing at 5, so pairs one level apart can't bridge cyan and
+# purple.  Rows of bars BIG lines or taller also take pairs two levels apart
+# (cyan + grey, cyan + light blue, grey + purple ...) and carry more error to
+# the next line (poor man's dithering); small bars keep the gentle pairs.
+BIG = 24
+LUMA = np.array(fl.LUMA)
+def _cands(maxd):
+    out = []
+    for i, a in enumerate(gv.BLUES):
+        for b in gv.BLUES[i:]:
+            dl = abs(LUMA[a] - LUMA[b])
+            if dl <= maxd:
+                out.append((a, b, (1.0, 1.15, 1.5)[dl]))
+    a, b, c = map(np.array, zip(*out))
+    lin = (fl.lin(fb.C64RGB[a]) + fl.lin(fb.C64RGB[b])) / 2
+    return a, b, c, lin
+CANDS = {1: _cands(1), 2: _cands(2)}
+
+def choose(tgt, who, big):
+    """Per line: (colour on even frames, on odd frames), the pair's phase
+    swapped on odd lines; error diffusion down each bar (stronger on big
+    bars), brightness jumps of more than a level between lines penalised."""
+    out = np.zeros((fb.H, 2), int)
+    err = np.zeros(3)
+    prev = None
+    for y in range(fb.H):
+        if who[y] < 0:
+            err[:] = 0
+            prev = None
+            continue
+        if prev is not None and who[y - 1] != who[y]:
+            err[:] = 0
+        a, b, c, lin = CANDS[2 if big[y] else 1]
+        if big[y]:
+            k = ordered(tgt[y], y, a, b, c, lin)
+            pair = (a[k], b[k]) if y % 2 == 0 else (b[k], a[k])
+            out[y] = pair
+            prev = (a[k], b[k])
+            err[:] = 0
+            continue
+        kd, emax = 0.7, 0.05
+        want = np.clip(tgt[y] + kd * err, 0, 1)
+        sw = fl.srgb(want)
+        cost = il.redmean(fl.srgb(lin), sw) * c ** 2
+        if prev is not None:
+            jump = np.maximum(np.abs(LUMA[a] - LUMA[prev[0]]), np.abs(LUMA[b] - LUMA[prev[1]]))
+            cost = cost * (1 + 0.4 * np.maximum(jump - (2 if big[y] else 1), 0)) ** 2
+        k = int(np.argmin(cost))
+        pair = (a[k], b[k]) if y % 2 == 0 else (b[k], a[k])
+        out[y] = pair
+        prev = (a[k], b[k])
+        err = np.clip(want - lin[k], -emax, emax)
+    return out
+
+BAYER4 = [0.125, 0.625, 0.375, 0.875]          # line thresholds, repeating
+
+def ordered(t, y, a, b, c, lin):
+    """Ordered dither for big bars: among the candidates nearest the target
+    in colour, the two that bracket its brightness; the brighter on lines
+    whose threshold the target's position between them passes."""
+    sw = fl.srgb(np.clip(t, 0, 1))
+    cost = il.redmean(fl.srgb(lin), sw) * c ** 2
+    near = np.argsort(cost)[:6]
+    lum = lin @ np.array([0.2126, 0.7152, 0.0722])
+    lt = float(np.clip(t, 0, 1) @ np.array([0.2126, 0.7152, 0.0722]))
+    lo = [k for k in near if lum[k] <= lt]
+    hi = [k for k in near if lum[k] >= lt]
+    if not lo or not hi:
+        return int(near[0])
+    kl = max(lo, key=lambda k: (lum[k], -cost[k]))
+    kh = min(hi, key=lambda k: (lum[k], cost[k]))
+    if lum[kh] - lum[kl] < 1e-6:
+        return int(kl)
+    f = (lt - lum[kl]) / (lum[kh] - lum[kl])
+    return int(kh if f > BAYER4[y % 4] else kl)
+
 def view(bars, sy, sz, phi):
     """Bars as the chase camera sees them: (top line, height, distance)."""
     fwd = (math.sin(phi), math.cos(phi))        # (y, z)
@@ -95,7 +196,7 @@ def view(bars, sy, sz, phi):
         if not NEAR <= d <= FAR:
             continue                            # clipped all at once
         u = ry * up[0] + rz * up[1]
-        h = max(2, int(round(2 * R_BAR * F / d)))
+        h = bar_lines(d)
         top = int(round(fb.CY - F * u / d - h / 2))
         if top + h <= WTOP or top > WBOT:
             continue
@@ -108,17 +209,18 @@ def frame(vis, p):
     who = np.full(fb.H, -1)
     depth = np.full(fb.H, np.inf)
     byte = np.zeros(fb.H, int)
+    big = np.zeros(fb.H, bool)
     for i, (top, h, d) in enumerate(vis):
-        b = brightness(d)
-        cov, on, off = pattern(b)
+        fc = fade(d)
+        cov, on, off = pattern(brightness(d) ** 0.5)
         for j in range(h):
             r = top + j
             if WTOP <= r <= WBOT and d < depth[r]:
-                depth[r], who[r] = d, i
+                depth[r], who[r], big[r] = d, i, h >= BIG
                 byte[r] = on if (r + p) % 2 == 0 else off
-                g = gv.glow((1 - abs(2 * (j + 0.5) / h - 1)) ** 0.9) * min(1.0, b / cov)
+                g = gv.glow(fc * (1 - abs(2 * (j + 0.5) / h - 1)) ** 0.9)
                 tgt[r] = fv.fl_lin(g)
-    cols, _ = il.choose_column(tgt, who, [False] * len(vis), "full", allowed=gv.BLUES)
+    cols = choose(tgt, who, big)
     img = np.repeat(cols[:, p][:, None], fb.W, axis=1)
     x = np.arange(fb.W)
     for r in range(fb.H):
