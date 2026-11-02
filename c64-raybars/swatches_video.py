@@ -11,7 +11,8 @@ one of loop_video's six idle-byte patterns (full, 1/2 checkerboard, 1/4,
 1/4 on/off, 1/8, 1/8 on/off, staggered from line to line; the on/off ones
 the whole pattern on one frame and black the next) --
 the patterns only on pairs of the darkest three colours (black, blue, dark
-grey).  Ordered up each column from the bottom left, darkest first.  Patches that look the same (the
+grey).  Ordered up each column from the bottom left, darkest first, by the two
+frames blended 50% (the flicker as the eye sees it).  Patches that look the same (the
 same light, averaged over the patch and both frames) are shown once.
 
     python3 swatches_video.py crt.mp4 sharp.mp4
@@ -55,7 +56,6 @@ EIGHT = lambda r: _byte(8, 4 * (r % 2))              # $7f / $f7 by line
 BLUE_PATTERNS = [
     ("1/4 on/off", 0.125, lambda r, p: QUART(r) if p == 0 else 0xff),
     ("checker on/off", 0.25, lambda r, p: CHECK(r) if p == 0 else 0xff),
-    ("1/4", 0.25, lambda r, p: QUART(r)),
     ("1/4 inverting", 0.25, lambda r, p: QUART(r + p)),
     ("checkerboard", 0.5, lambda r, p: CHECK(r)),
     ("checker inverting", 0.5, lambda r, p: CHECK(r + p)),
@@ -72,8 +72,14 @@ def chosen():
     items += [patch(c, c, f"{fl.NAMES[c]} checker inverting", inv[1], wrap(inv[2]))
               for c in gv.BLUES if c not in (0, 6)]
     items += [t for t in patches() if t[3] == "full"]
-    items.sort(key=lambda t: (t[0] @ [0.2126, 0.7152, 0.0722], t[1], t[2], t[3]))
+    items.sort(key=lambda t: (brightness(t[4]), t[1], t[2], t[3]))
     return items
+
+def brightness(frames):
+    """Brightness of a swatch as the eye sees its flicker: the two frames
+    blended 50%, then the blend's mean luminance (linear light)."""
+    blend = (frames[0] + frames[1]) / 2
+    return float(np.mean(fl.lin(blend) @ [0.2126, 0.7152, 0.0722]))
 
 def patches():
     out = []
