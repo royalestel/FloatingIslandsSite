@@ -88,6 +88,8 @@ run_until(L["main"], 5_000_000)
 
 ENTRY = {L["l_ne"]: (0, 0), L["l_no"]: (0, 1), L["l_be"]: (1, 0), L["l_bo"]: (1, 1)}
 HY = [mem[L["hy"] + i] for i in range(256)]
+HELDSW = int(open(os.path.join(HERE, 'cosmic.inc')).read().split('HELDSW   = ')[1].split()[0])
+DHELD = int(open(os.path.join(HERE, 'cosmic.inc')).read().split('DHELD    = ')[1].split()[0])
 def s8(v): return v - 256 if v & 128 else v
 def s16(v): return v - 65536 if v & 0x8000 else v
 
@@ -104,7 +106,8 @@ def snapshot():
         top = s16((base - (rp + h - 1)) & 0xFFFF)
         key = mem[L["bkl"] + x] | mem[L["bkh"] + x] << 8
         out.append((key, top, h, rp, mem[L["bk"] + x]))
-    return [b[1:] for b in sorted(out, key=lambda b: b[0])]   # nearest first
+    held = [(mem[L["hs"] + i], mem[L["he"] + i]) for i in range(mem[L["nh"]])]
+    return [b[1:] for b in sorted(out, key=lambda b: b[0])], held   # nearest first
 snap_built = snapshot()
 irq(L["irqvbl"])                                 # take the first frame
 snap_shown = snap_built
@@ -154,7 +157,7 @@ for f in range(FRAMES):
         cyc_irq += 0
     # what the program built for this frame (its bar list, still in memory
     # from the build before the copy): check the shown lines against it
-    bars = snap_shown
+    bars, held = snap_shown
     if f > 0:
         want = np.zeros(gc.NLINES, int) - 1
         done = np.zeros(gc.NLINES, bool)
@@ -164,6 +167,11 @@ for f in range(FRAMES):
                 if 0 <= ln < gc.NLINES and not done[ln]:
                     done[ln] = True
                     want[ln] = mem[rp + h - 1 - j]
+        for a_, e_ in held:                      # the far layer, behind
+            for ln in range(a_, e_):
+                if not done[ln]:
+                    done[ln] = True
+                    want[ln] = HELDSW
         bad = int(np.sum((shown != want) & ~((shown == 0) & (want == -1))))
         stats["badcell"] += bad
     # --- render the frame (window lines + the ship)
@@ -226,21 +234,26 @@ for f in range(FRAMES):
         cz = mem[L["czi"]] + mem[L["czf"]] / 256 + mem[L["czff"]] / 65536
         kc = mem[L["kc"]]
         wofs = s8(mem[L["wofs"]])
+        far = gc_far = (mem[L["nearonly"]] & 0x80) != 0
         for i in range(nb):
             x_ = mem[L["ord"] + i]
+            if far and (mem[L["bkl"] + x_] | mem[L["bkh"] + x_] << 8) >= (DHELD >> 8):
+                continue                         # reused from the last full build
             k = mem[L["bk"] + x_]
             rz = (gc.ROWSP * s8((k - kc) & 255) - cz) * gc.UNIT
             t = s8((HY[k] - mem[L["cyi"]] - wofs) & 255)
             ry = (t + wofs - (cy - mem[L["cyi"]])) * gc.UNIT
             d = ry * s + rz * c
             u = ry * c - rz * s
-            h = min(255, max(2, lv.bar_lines(d)))
+            h = min(gc.HMAX, max(2, lv.bar_lines(d)))
             top = (2 * gc.CYL - 2 * gc.F * u / d - h) / 2
             hh_ = mem[L["bhh"] + x_]
             rp_ = mem[L["rampl"] + hh_] | mem[L["ramph"] + hh_] << 8
             ctop = s16(((mem[L["bsl"] + x_] | mem[L["bsh"] + x_] << 8) - (rp_ + hh_ - 1)) & 0xFFFF)
             if abs(ctop - top) > 1.5 or abs(mem[L["bhh"] + x_] - h) > 1.5:
                 stats["badpos"] += 1
+                if os.environ.get("DBG") and stats["badpos"] < 12:
+                    print(f"f{f} ang {math.degrees(ang)%360:.1f} k {k} d {d:.2f} u {u:.2f} top {ctop} vs {top:.1f}  h {mem[L['bhh']+x_]} vs {h}")
         info.append((math.degrees(ang) % 360, (mem[L["spdl"]] | mem[L["spdh"]] << 8) / 185,
                      nb, nblk, 100 * cyc / free))
     else:

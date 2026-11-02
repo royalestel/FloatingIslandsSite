@@ -662,14 +662,28 @@ python3 sim_cosmic.py crt.mp4 sharp.mp4   # 6502 simulation, checks, videos
     sprites take 7.
   * Ramps (the swatch per row of a bar h lines tall, h = 2..255) are
     stored two to a page, so `lda (src),y` never crosses one.
-* **Status:** in the simulator every line is the right length, no read
-  crosses a page, every line shows the nearest bar, and every bar is
-  within 1.5 lines of a floating-point projection. But a scene update
-  costs about 30k cycles against about 10k free a frame, so the scene
-  updates about 12 times a second; flicker and patterns still run at
-  50 Hz. Motion is scaled by the frames since the last update, so the
-  speed stays right. Not yet run in VICE: the line timing (`HTUNE`, and
-  `STEAL` = 7 for two sprites) is unchecked.
+* **Far bars:** bars beyond 19.3 m are all one swatch (blue 1/4 on/off),
+  so they need no depth order among themselves. They form one layer of
+  merged line intervals behind the near bars. It is projected on every
+  other build; the builds between reuse it, shifted by 200 lines a radian
+  of pitch since.
+* **Bars** are at most 191 lines tall (nearest 0.42 m). That frees ramp
+  memory for a table of bar height by log distance and the ramp base per
+  height.
+* **Rows** use signed quarter-square tables (squares of -384..383), read
+  with `abs,x` from bases patched once a frame: no sign branches.
+* **Illegal opcodes:** assembled as `6502X`; `c64cpu.py` adds the stable
+  ones to the simulator (LAX, SAX, DCP, ISC, SLO, RLA, SRE, RRA, SBX, ANC,
+  ALR, the NOPs).
+* **Status:** in a 500-frame simulated flight every line is the right
+  length, no read crosses a page, and every line shows the nearest bar (or
+  the far layer). 3 of 1203 bars are more than 1.5 lines off a
+  floating-point projection. A build costs about 22k cycles (reusing the
+  far layer) or 27k (full) against about 10k free a frame: the scene
+  updates about 16 times a second. Flicker and patterns run at 50 Hz, and
+  motion is scaled by the frames since the last update. Not yet run in
+  VICE: the line timing (`HTUNE`, and `STEAL` = 7 for two sprites) is
+  unchecked.
 
 ## FLYBY3D: profiling the bars in true perspective
 

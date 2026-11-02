@@ -48,7 +48,7 @@
 ;  Untested on real hardware or VICE so far: line timing (HTUNE, STEAL)
 ;  is checked only in the simulator (sim_cosmic.py).
 ; =============================================================================
-        .setcpu "6502"
+        .setcpu "6502X"         ; with the stable illegal opcodes
         .include "cosmic.inc"
 
 GAPMIN    = 6           ; black gaps shorter than this stay inside a block
@@ -59,6 +59,9 @@ RECMAX    = 224         ; page 1 bytes for span records ($0100-$01df)
 NBMAX     = 32          ; bars kept per frame
 NPMAX     = 48          ; pieces
 NBLKMAX   = 24
+NBUCK     = (NLINES + 7) / 8
+NFMAX     = 16
+NHMAX     = 16
 SPDBASE   = 185         ; 0.72 units (0.045 m) a frame, 8.8
 SPDMAX    = 555         ; fire: 3x
 SPDACC    = 10
@@ -73,6 +76,8 @@ SHR       = $e800
 NLZ       = $f000
 BND       = $0500       ; per window line tables (made at start)
 VARX      = $0600
+SQSL      = $9800       ; signed squares (x^2)/4, x = -384..383 (made at start)
+SQSH      = $9b00
 SPRPTR    = $87f8
 SPRBLK    = $20         ; $8800 / 64 in bank 2
 
@@ -188,6 +193,23 @@ pbx:     .res 1
 it1:     .res 1         ; IRQ scratch
 lastfc:  .res 1
 nsteps:  .res 1
+ii:      .res 1
+nearonly: .res 1
+nfar:    .res 1
+ext:     .res 1
+ref2:    .res 1
+nbe:     .res 1
+t2:      .res 1
+q0:      .res 1
+q1:      .res 1
+hcur:    .res 1
+hlim:    .res 1
+hp:      .res 1
+nh:      .res 1
+nfh:     .res 1
+fangl:   .res 1
+fangh:   .res 1
+shift:   .res 1
 spnl:    .res 1
 spnh:    .res 1
 
@@ -204,6 +226,12 @@ bsl:     .res NBMAX     ;          span source base
 bsh:     .res NBMAX
 ord:     .res NBMAX     ; bars in screen order (by start line)
 act:     .res NBMAX     ; sweep: bars covering the current line
+head:    .res NBUCK     ; screen-order buckets (first line / 8)
+nextb:   .res NBMAX
+hs:      .res NHMAX     ; the far layer: sorted line intervals
+he:      .res NHMAX
+fhs:     .res NHMAX     ; ... kept from the last full build
+fhe:     .res NHMAX
 bline:   .res NBLKMAX   ; blocks being built: irq1 line, first record
 bss:     .res NBLKMAX
 dline:   .res NBLKMAX   ; blocks shown
@@ -257,6 +285,7 @@ start:  sei
         jsr gensqr
         jsr genshift
         jsr genlines
+        jsr gensqs
         lda #<SPDBASE
         sta spdl
         lda #>SPDBASE
@@ -604,8 +633,85 @@ build:  lda fcount               ; frames since the last build: move that far
         jsr move
         jsr setmul
         jsr frameconst
-        jsr dorows
+        lda nearonly            ; far bars on every other build
+        eor #$ff
+        sta nearonly
+        bit nearonly            ; the far layer: kept, or made afresh
+        bmi @keep
+        lda #0
+        sta nh
+        jmp @rows
+@keep:  lda angl                ; the scene turned since: shift the layer
+        sec                     ; by 200 * (angle change), lines
+        sbc fangl
+        sta t0
+        lda angh
+        sbc fangh
+        sta t0+1                ; dang (signed); * 5 / 256
+        lda t0
+        asl a
+        sta t1
+        lda t0+1
+        rol a
+        sta t1+1
+        asl t1
+        rol t1+1
+        lda t1
+        clc
+        adc t0
+        lda t1+1
+        adc t0+1
+        sta shift               ; (dang * 5) >> 8
+        ldx #0
+        ldy #0
+@cp1:   cpx nfh
+        bcs @cpd
+        lda fhs,x
+        jsr shl1
+        sta hs,y
+        lda fhe,x
+        jsr shl1
+        sta he,y
+        cmp hs,y
+        beq :+                  ; shifted out of the window
+        iny
+:       inx
+        bne @cp1
+@cpd:   sty nh
+@rows:  jsr dorows
+        bit nearonly
+        bmi @done
+        lda angl                ; full build: keep its far layer
+        sta fangl
+        lda angh
+        sta fangh
+        ldx nh
+        stx nfh
+        beq @done
+@cp2:   lda hs-1,x
+        sta fhs-1,x
+        lda he-1,x
+        sta fhe-1,x
+        dex
+        bne @cp2
+@done:
         jmp sweep
+
+; line A + shift, clipped to the window
+shl1:   clc
+        adc shift
+        bit shift
+        bmi @n
+        bcs @hi                 ; past 255
+        cmp #NLINES
+        bcc @x
+@hi:    lda #NLINES
+@x:     rts
+@n:     bcs :+                  ; below 0
+        lda #0
+:       cmp #NLINES
+        bcs @hi
+        rts
 
 ; joystick: pitch rate and speed, eased
 controls:
@@ -1182,46 +1288,108 @@ patch4: ldx #3
         jsr patch4
 .endmacro
 
-setops: PATCH dpp, sgns, 0      ; t >= 0: d += t S sin, u += t C cos
-        PATCH upp, sgnc, 0
-        PATCH dpn, sgns, 1      ; t < 0: the other way
-        PATCH upn, sgnc, 1
-        rts
+
+
+; signed products t * S, t * C: (t + m)^2/4 - (t - m)^2/4 from the signed
+; square tables, X = t + 128; the bases patched per frame (setsq)
+.macro SPROD pl, ml, ph, mh
+pl:     lda SQSL+256,x
+        sec
+ml:     sbc SQSL+256,x
+        sta m0
+ph:     lda SQSH+256,x
+mh:     sbc SQSH+256,x
+        sta m1
+        asl a                   ; the sign, for the top byte
+        lda #0
+        adc #$ff
+        eor #$ff
+        sta ext
+.endmacro
+
+.macro ADD24 base, dst
+        lda m0
+        clc
+        adc base
+        sta dst
+        lda m1
+        adc base+1
+        sta dst+1
+        lda ext
+        adc base+2
+        sta dst+2
+.endmacro
+
+; patch the bases: +m at SQS + 256 + m, -m at SQS + 256 - m (m signed)
+.macro SETBASE mag, sgn, pl, ml, ph, mh
+        lda mag
+        ldx #0
+        bit sgn
+        bpl :+
+        eor #$ff
+        clc
+        adc #1
+        ldx #$ff
+        cmp #0
+        bne :+
+        inx                     ; -0
+:       stx t0+1
+        sta t0
+        clc
+        adc #<(SQSL+256)
+        sta pl+1
+        sta ph+1
+        lda t0+1
+        adc #>(SQSL+256)
+        sta pl+2
+        clc
+        adc #>(SQSH-SQSL)
+        sta ph+2
+        lda #<(SQSL+256)
+        sec
+        sbc t0
+        sta ml+1
+        sta mh+1
+        lda #>(SQSL+256)
+        sbc t0+1
+        sta ml+2
+        clc
+        adc #>(SQSH-SQSL)
+        sta mh+2
+.endmacro
 
 dorows: lda #0
         sta nb
-        jsr setops
+        SETBASE sv, sgns, dpl, dml, dph, dmh
+        SETBASE cv, sgnc, upl, uml, uph, umh
+        lda ref
+        sec
+        sbc #128
+        sta ref2
         lda rows
         bne :+
         rts
-:       ldx krow
-drow:   lda hy,x                ; t = height - (cy + wofs), wrapping
+:       ldy krow
+drow:   lda hy,y                ; X = t + 128, t = height - (cy + wofs)
         sec
-        sbc ref
-        bmi dtn
-        tay
-        sty at0
-        MULS psl, psh, nsl, nsh
-        ACCUM dpp, kd, dd
+        sbc ref2
+        tax
+        SPROD dpl, dml, dph, dmh
+        ADD24 kd, dd
         CULL dskip
-        ldy at0
-        MULS pcl, pch, ncl, nch
-        ACCUM upp, ku, uu
-        jmp dpr
-dtn:    eor #$ff
-        clc
-        adc #1
-        tay
-        sty at0
-        MULS psl, psh, nsl, nsh
-        ACCUM dpn, kd, dd
-        CULL dskip
-        ldy at0
-        MULS pcl, pch, ncl, nch
-        ACCUM upn, ku, uu
-dpr:    stx krow
+        bit nearonly            ; near-only build: far rows keep last time's
+        bpl :+
+        lda dd+1
+        cmp #<FARKEY
+        lda dd+2
+        sbc #>FARKEY
+        bcc :+
+        jmp dskip
+:       SPROD upl, uml, uph, umh
+        ADD24 ku, uu
+        sty krow
         jsr project
-        ldx krow
+        ldy krow
 dskip:  lda kd                  ; next row
         clc
         adc sd
@@ -1242,7 +1410,7 @@ dskip:  lda kd                  ; next row
         lda ku+2
         adc su+2
         sta ku+2
-        inx
+        iny
         dec rows
         beq :+
         jmp drow
@@ -1328,51 +1496,18 @@ project:
 @q0:    lda #0
         sta q2l
         sta q2h
-@h:     ; height: d <= 3 m: 80 / d; beyond: 26.7 sqrt(3 / d)
-        lda dd+2
-        bne @far
-        lda dd+1
-        cmp #>D3
-        bcs @far
-        lda #<(LGHN+EXPOFF)
+@h:     lda ldl                 ; height: a table by log d
         sec
-        sbc ldl
+        sbc #<LDMIN
         sta ep
-        lda #>(LGHN+EXPOFF)
-        sbc ldh
-        jmp @hx
-@far:   lda #<LG3               ; (LG3 - ld) / 2 (signed)
-        sec
-        sbc ldl
-        sta ep
-        lda #>LG3
-        sbc ldh
-        cmp #$80
-        ror a
-        ror ep
-        tax
-        lda ep
+        lda ldh
+        sbc #>LDMIN
         clc
-        adc #<(LGHF+EXPOFF)
-        sta ep
-        txa
-        adc #>(LGHF+EXPOFF)
-@hx:    clc
-        adc #>expl
+        adc #>htab
         sta ep+1
         ldy #0
         lda (ep),y
-        tax
-        lda ep+1
-        adc #>(exph-expl)
-        sta ep+1
-        lda (ep),y
-        beq :+
-        ldx #255
-:       cpx #2
-        bcs :+
-        ldx #2
-:       stx hh
+        sta hh
         ; top = (CYL2 + 1 - h -/+ q2) >> 1
         lda #<(CYL2+1)
         sec
@@ -1433,7 +1568,11 @@ project:
 :       sta ee
         lda #0
         sta aa
-@store: ldx nb                  ; the bar
+@store: lda hh                  ; a far bar: into the held layer
+        cmp #HHELD+1
+        bcs :+
+        jmp addheld
+:       ldx nb                  ; the bar
         cpx #NBMAX
         bcc :+
         rts
@@ -1451,30 +1590,21 @@ project:
         sta be,x
         lda krow
         sta bk,x
-        tya                     ; source base: ramp + h - 1 + top
-        clc
-        adc rampl,y
-        sta t0
-        lda ramph,y
-        adc #0
-        sta t0+1
-        lda t0
+        lda rbl,y               ; source base: ramp + h - 1 + top
         clc
         adc tl
-        sta t0
-        lda t0+1
+        sta bsl,x
+        lda rbh,y
         adc th
         sta bsh,x
-        lda t0
-        bne :+
-        dec bsh,x
-:       sec
-        sbc #1
-        sta bsl,x
-        stx t1                  ; into screen order (by first line)
+        jmp insord
+@x:     rts
+
+; bar x (first line in t1+1) into screen order; nb + 1
+insord: stx t1
         ldy nb
         beq @put
-@ins:   ldx ord-1,y
+@ins:   lax ord-1,y
         lda ba,x
         cmp t1+1
         bcc @put
@@ -1486,7 +1616,12 @@ project:
 @put:   lda t1
         sta ord,y
         inc nb
-@x:     rts
+        rts
+
+; far bars (d >= DHELD: all blue 1/4 on/off, under a line a frame) are
+; projected on every other build; the builds between reuse them
+FARKEY = DHELD >> 8
+
 
 .segment "CODE"
 ; shift tables for lg: SHL page k = i << k, SHR page k = i >> (8 - k);
@@ -1544,17 +1679,64 @@ genshift:
 ;  sweep: bars in screen order; on each stretch of lines the nearest of the
 ;  bars covering it (the active ones) is shown, until it ends or a nearer
 ;  one starts.  Each stretch becomes span records (emitpiece).
-sweep:  lda #0
+sweep:
+        lda #0
         sta recp
         sta nblk
         sta inb
         sta cend
         sta nxt
-        sta nact
+        sta hp
+        sta hcur
+; bars in screen order; one that ends before the next starts is shown
+; whole (the usual case), overlapping ones go through the cluster sweep
+sw_top: ldy nxt
+        cpy nb
+        bcc :+
+        jmp sw_done
+:       lax ord,y
+        lda be,x
+        sta stop
+        iny
+        cpy nb
+        bcs @fast
+        stx t1
+        lax ord,y               ; the next bar starts before this one ends?
+        lda ba,x
+        ldx t1
+        cmp stop
+        bcc @clus
+@fast:  sty nxt
+        lda ba,x
+        sta ps0
+        lda stop
+        sta ps1
+        jsr emitnear
+        jmp sw_top
+@clus:  ; the cluster: bars from nxt while they start before its end so far
+@ce:    lax ord,y
+        lda be,x
+        cmp stop
+        bcc :+
+        sta stop
+:       iny
+        cpy nb
+        bcs @cx
+        lax ord,y
+        lda ba,x
+        cmp stop
+        bcc @ce
+@cx:    sty nbe
+        lax nxt                 ; starts at its first bar
+        lda ord,x
+        tax
+        lda ba,x
         sta cur
+        lda #0
+        sta nact
 sw_loop:
 @add:   ldy nxt                 ; bars starting at or above cur join
-        cpy nb
+        cpy nbe
         bcs @addx
         ldx ord,y
         lda ba,x
@@ -1601,16 +1783,17 @@ sw_loop:
 @scx:   ldx own
         bpl @have
         ldy nxt                 ; none: skip to the next start, or done
-        cpy nb
-        bcs sw_done
-        ldx ord,y
+        cpy nbe
+        bcc :+
+        jmp sw_top
+:       ldx ord,y
         lda ba,x
         sta cur
         jmp sw_loop
 @have:  lda be,x                ; until it ends, or a nearer bar starts
         sta stop
         ldy nxt
-@up:    cpy nb
+@up:    cpy nbe
         bcs @upx
         ldx ord,y
         lda ba,x
@@ -1631,17 +1814,139 @@ sw_loop:
         lda stop
         sta ps1
         ldx own
-        jsr emitpiece
+        jsr emitnear
         lda stop
         sta cur
         jmp sw_loop
 sw_done:
+        lda #NLINES             ; the far layer's lines after the last bar
+        jsr heldto
         lda inb
         beq :+
         jsr close
 :       lda recp
         sta nrec
         rts
+
+; the far layer: [aa, ee) merged into the sorted intervals hs / he
+addheld:
+        ldy #0
+@f:     cpy nh                  ; the first interval reaching aa
+        bcs @ins
+        lda he,y
+        cmp aa
+        bcs @ov
+        iny
+        bne @f
+@ov:    lda hs,y                ; starts after ee: insert before it
+        cmp ee
+        beq @mg
+        bcs @ins
+@mg:    sty t0                  ; merge: absorb those starting <= ee
+        cmp aa
+        bcc :+
+        lda aa
+:       sta ps0
+        lda ee
+        sta ps1
+@ab:    cpy nh
+        bcs @ad
+        lda hs,y
+        cmp ee
+        beq :+
+        bcs @ad
+:       lda he,y
+        cmp ps1
+        bcc :+
+        sta ps1
+:       iny
+        bne @ab
+@ad:    ldx t0                  ; [t0] = merged; shift the rest down
+        lda ps0
+        sta hs,x
+        lda ps1
+        sta he,x
+        inx
+@sl:    cpy nh
+        bcs @sd
+        lda hs,y
+        sta hs,x
+        lda he,y
+        sta he,x
+        iny
+        inx
+        bne @sl
+@sd:    stx nh
+        rts
+@ins:   sty t0+1                ; insert at y
+        ldx nh
+        cpx #NHMAX
+        bcs @x
+@sr:    cpx t0+1
+        beq @put
+        lda hs-1,x
+        sta hs,x
+        lda he-1,x
+        sta he,x
+        dex
+        jmp @sr
+@put:   lda aa
+        sta hs,x
+        lda ee
+        sta he,x
+        inc nh
+@x:     rts
+
+; a near piece ps0..ps1 of bar x, the far layer's lines before it first
+emitnear:
+        stx t2
+        lda ps0
+        sta q0
+        lda ps1
+        sta q1
+        lda q0
+        jsr heldto
+        lda q0
+        sta ps0
+        lda q1
+        sta ps1
+        ldx t2
+        jsr emitpiece
+        lda q1
+        sta hcur
+        rts
+
+; the far layer's lines from hcur up to A
+heldto: sta hlim
+@l:     ldy hp
+        cpy nh
+        bcs @x
+        lda he,y
+        cmp hcur
+        bcc @adv
+        beq @adv
+        lda hs,y
+        cmp hlim
+        bcs @x
+        cmp hcur
+        bcs :+
+        lda hcur
+:       sta ps0
+        lda he,y
+        cmp hlim
+        bcc :+
+        lda hlim
+:       sta ps1
+        ldx #$ff
+        jsr emitpiece
+        ldy hp
+        lda he,y
+        cmp hlim
+        beq @adv
+        bcs @x
+@adv:   inc hp
+        jmp @l
+@x:     rts
 
 ; records for lines ps0..ps1 of bar x: black in between if the gap since
 ; the last piece is short, else a new block
@@ -1692,12 +1997,15 @@ emitpiece:
         bcs @piece
         jsr blackto
 @piece: ldx pbx
+        bmi @held
         lda bsl,x               ; the bar's source base: ramp + h - 1 + top
         sta rp
         lda bsh,x
         sta rp+1
         lda #1
-        sta pbar
+        bne @pb
+@held:  lda #2                  ; the far bars' layer: one swatch
+@pb:    sta pbar
         lda ps0
         sta aa
         lda ps1
@@ -1760,6 +2068,8 @@ spans:  ldy recp
         tax
         lda pbar
         beq @blk
+        cmp #2
+        beq @hld
         lda rp                  ; src = base - end
         sec
         sbc bb
@@ -1771,6 +2081,11 @@ spans:  ldy recp
 @blk:   lda #<zeros
         sta recbuf,y
         lda #>zeros
+        sta recbuf+1,y
+        jmp @len
+@hld:   lda #<heldpg
+        sta recbuf,y
+        lda #>heldpg
         sta recbuf+1,y
 @len:   lda bb
         sec
@@ -1788,6 +2103,63 @@ spans:  ldy recp
         sta aa
         jmp @lp
 @x:     sty recp
+        rts
+
+; signed squares: SQS[i] = SQ[|i - 384|], i = 0..767
+gensqs: lda #0
+        sta sqx
+        sta sqx+1
+@l:     lda sqx                 ; t0 = |i - 384|
+        sec
+        sbc #<384
+        sta t0
+        lda sqx+1
+        sbc #>384
+        sta t0+1
+        bpl :+
+        lda #0
+        sec
+        sbc t0
+        sta t0
+        lda #0
+        sbc t0+1
+        sta t0+1
+:       lda #<SQL
+        clc
+        adc t0
+        sta sp
+        lda #>SQL
+        adc t0+1
+        sta sp+1
+        lda #<SQSL
+        clc
+        adc sqx
+        sta t1
+        lda #>SQSL
+        adc sqx+1
+        sta t1+1
+        ldy #0
+        lda (sp),y
+        sta (t1),y
+        lda sp+1
+        clc
+        adc #>(SQH-SQL)
+        sta sp+1
+        lda t1+1
+        clc
+        adc #>(SQSH-SQSL)
+        sta t1+1
+        lda (sp),y
+        sta (t1),y
+        inc sqx
+        bne :+
+        inc sqx+1
+:       lda sqx+1
+        cmp #>768
+        bne @l
+        lda sqx
+        cmp #<768
+        bne @l
         rts
 
 ; per window line: where its region (above / on / below the ship's

@@ -34,7 +34,7 @@ WTOPR, NLINES = 62, 189            # bar window: raster lines 62..250
 CYL = 88                           # screen centre, window line (row 99)
 SPRY = 139                         # ship sprites: display rows 140..160
 BAND0, BAND1 = SPRY - WTOPR, SPRY - WTOPR + 21   # window lines with sprite DMA
-HMAX = 255
+HMAX = 191                         # tallest bar (nearest 0.42 m)
 HHELD = 10                         # h <= 10: beyond HOLD, blue 1/4 on/off
 EXPOFF, EXPN = 256, 1400
 R_BAR = sv.lv.R_BAR
@@ -84,23 +84,20 @@ def ramp(h):
     return out
 
 def pack_ramps():
-    """Pages of ramps, stored bottom row first: [(page bytes, {h: offset})]."""
+    """Pages of ramps, stored bottom row first, first fit from the tallest,
+    at page offsets 1..255: [(page bytes, {h: offset})]."""
     pages = []
-    for h in range(2, 128):
-        pages.append((h, 255 - h))
-    pages += [(254,), (255,)]
-    out = []
-    for hs in pages:
-        b = bytearray(256)
-        offs, o = {}, 1
-        for h in hs:
-            r = ramp(h)[::-1]
-            b[o:o + h] = bytes(r)
-            offs[h] = o
-            o += h
-        assert o <= 256
-        out.append((bytes(b), offs))
-    return out
+    for h in range(HMAX, 1, -1):
+        for pg in pages:
+            if pg[2] + h <= 256:
+                break
+        else:
+            pg = [bytearray(256), {}, 1]
+            pages.append(pg)
+        pg[0][pg[2]:pg[2] + h] = bytes(ramp(h)[::-1])
+        pg[1][h] = pg[2]
+        pg[2] += h
+    return [(bytes(b), offs) for b, offs, _ in pages]
 
 def swatch_tables():
     """Two pages (frame parity p): colour by row parity (E: even mock row,
@@ -192,11 +189,11 @@ def main():
                   LGHF=round(128 * math.log2(2 * R_BAR * F / lv.REF)),
                   LG3=round(128 * math.log2(D3)), D3=D3,
                   DNEAR=math.ceil(2 * R_BAR * F / (HMAX + 0.45) / DUNIT),
-                  DFAR=round(sv.lv.FAR / DUNIT), HELDSW=sv.HELD)
+                  DFAR=round(sv.lv.FAR / DUNIT), DHELD=round(d_of_h(HHELD + 0.5) / DUNIT), HELDSW=sv.HELD, HMAX=HMAX, HHELD=HHELD)
     for k, v in consts.items():
         L.append(f"{k:8s} = {v}")
     L += ["", '.segment "RAMPS1"']
-    split = 107                                # pages in RAMPS1 ($1500-$7fff)
+    split = 999                                # all in RAMPS1
     ptr = {}
     for i, (b, offs) in enumerate(pages):
         if i == split:
@@ -216,6 +213,26 @@ def main():
     L += ["        .byte " + ",".join(f">({ptr[h][0]}+{ptr[h][1]})" if h in ptr else "0"
                                      for h in range(i, i + 8)) for i in range(0, 256, 8)]
     L += byte_lines("hy", hy)
+    L += ['', '.segment "TABLES2"', '        .align 256']
+    L += byte_lines("heldpg", bytes([sv.HELD]) * 256)
+    ldmin = math.floor(128 * math.log2(consts["DNEAR"])) - 4
+    ldmax = math.ceil(128 * math.log2(consts["DFAR"])) + 4
+    ht = []
+    for ld in range(ldmin, ldmax + 1):
+        d = 2 ** (ld / 128) * DUNIT
+        ht.append(max(2, min(HMAX, bar_lines(d))))
+    L.append(f"LDMIN    = {ldmin}")
+    L += byte_lines("htab", bytes(ht))
+    rb = [0] * 256
+    for h in range(2, HMAX + 1):
+        rb[h] = ptr[h]
+    L.append("rbl:")
+    L += ["        .byte " + ",".join(f"<({ptr[h][0]}+{ptr[h][1]}+{h-1})" if h in ptr else "0"
+                                     for h in range(i, i + 8)) for i in range(0, 256, 8)]
+    L.append("rbh:")
+    L += ["        .byte " + ",".join(f">({ptr[h][0]}+{ptr[h][1]}+{h-1})" if h in ptr else "0"
+                                     for h in range(i, i + 8)) for i in range(0, 256, 8)]
+    L += ['', '.segment "TABLES"']
     L += byte_lines("lmf", bytes(LMF(m) for m in range(256)))
     kmin, nrow = row_ranges()
     L += byte_lines("kmin", bytes(kmin))
