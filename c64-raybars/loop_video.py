@@ -15,12 +15,11 @@ then scanlines, beam spot and glow (crt_look).
 Distance shown by the idle byte, which can change every line, by distance
 band (pattern_at, PAT_BANDS): full up to 7 m, then --
     $00  every pixel        (near)
-    $55  1 pixel of 2
-    $77  1 pixel of 4
-    $77 / $ff  1 pixel of 4 on alternate frames, black between, the phase
-               swapped on alternate lines
-    $7f|$f7 / $ff  1 pixel of 8, shifted by 4 every other line (a dither),
-               on alternate frames (the dimmest, 11-12 m)
+    $55|$aa  1 pixel of 2, a checkerboard (the byte alternating by line)
+    $77|$dd  1 pixel of 4, staggered
+    $77|$dd / $ff  the same on even frames, black on odd ones
+    $7f|$f7  1 pixel of 8, shifted by 4 every other line (a dither)
+    $7f|$f7 / $ff  the same on even frames, black on odd ones (the dimmest)
 The chase camera is 2 m behind the ship, so the ship is drawn 1.5 times
 larger, across two sprites side by side (big_ship.py).
 on top of the colours fading with distance (fade): the white core gives
@@ -52,16 +51,30 @@ REF = fb.ZS                       # 3 m: where the fade and the gentler growth s
 V = (fb.Z0 - fb.Z1) / (fb.FLYD - 1)     # forward speed, metres a frame (the game's)
 LOOP_R = 1.8                   # loop radius, metres
 # The idle-byte patterns: (name, light, byte(line, frame parity)).  Bits set
-# show black.  The flickering ones show their pattern on alternate frames
-# and black ($ff) between, the phase swapped on alternate lines; the 1-of-8
-# dither shifts its lit pixel by 4 every other shown line ($7f / $f7).
-def _flicker(byte_on):
-    return lambda r, p: byte_on(r) if (r + p) % 2 == 0 else 0xff
+# show black.  The byte alternates from line to line so the lit pixels
+# stagger (a checkerboard for 1 of 2) instead of lining up in vertical
+# stripes.  The on/off ones show the whole pattern on even frames and black
+# ($ff) on odd ones: nothing moves vertically between frames.
+def _onoff(pat):
+    return lambda r, p: pat(r) if p % 2 == 0 else 0xff
+
+def _stagger(stride, seq):
+    """An idle byte lighting 1 pixel in stride, offset by seq[line % 4]:
+    the offsets cycle over 4 lines so that neither every line nor every
+    other line (a flicker pair's colour) lines its pixels up."""
+    def byte(r):
+        sh = seq[r % 4]
+        return sum(1 << (7 - x) for x in range(8) if (x - sh) % stride)
+    return byte
+_HALF = _stagger(2, (0, 1, 1, 0))       # 1 x 2 checkerboard cells
+_QUARTER = _stagger(4, (0, 2, 1, 3))
+_EIGHTH = _stagger(8, (0, 4, 2, 6))
 PATTERNS = [("full", 1.0, lambda r, p: 0x00),
-            ("1/2", 0.5, lambda r, p: 0x55),
-            ("1/4", 0.25, lambda r, p: 0x77),
-            ("1/4 flickering", 0.125, _flicker(lambda r: 0x77)),
-            ("1/8 dithered, flickering", 0.0625, _flicker(lambda r: 0x7f if (r // 2) % 2 == 0 else 0xf7))]
+            ("1/2", 0.5, lambda r, p: _HALF(r)),
+            ("1/4", 0.25, lambda r, p: _QUARTER(r)),
+            ("1/4 on/off", 0.125, _onoff(_QUARTER)),
+            ("1/8", 0.125, lambda r, p: _EIGHTH(r)),
+            ("1/8 on/off", 0.0625, _onoff(_EIGHTH))]
 WTOP, WBOT = 11, 199           # the bars' window lines (mockup.py)
 
 def brightness(z):
@@ -81,7 +94,7 @@ def fade(d):
 FADE_FAR = 0.15
 # the idle-byte pattern by distance: full, 1 of 2, 1 of 4, and 1 of 4 on
 # alternate frames (alternate lines) for the dimmest
-PAT_BANDS = [(7.0, 0), (8.5, 1), (10.0, 2), (11.0, 3), (99.0, 4)]
+PAT_BANDS = [(7.0, 0), (8.5, 1), (9.5, 2), (10.5, 3), (11.25, 4), (99.0, 5)]
 
 def pattern_at(d):
     for edge, k in PAT_BANDS:
