@@ -25,7 +25,7 @@ import loop_video as lv
 import ideas_video as iv
 import glow_video as gv
 
-P, GAP, ROWS = 8, 2, 4             # patch size, gap, patches a column
+P, GAP, ROWS = 8, 3, 4             # patch size, gap, patches a column
 DARK = (0, 6, 11)                  # black, blue, dark grey: the patterned ones
 
 def patch(a, b, name, light, pbyte):
@@ -42,13 +42,34 @@ def patch(a, b, name, light, pbyte):
     lin = np.mean([fl.lin(f) for f in frames], axis=(0, 1, 2))
     return (lin, a, b, name, frames)
 
+def _byte(stride, shift):
+    """An idle byte lighting 1 pixel in stride, the first at shift."""
+    return sum(1 << (7 - x) for x in range(8) if (x - shift) % stride)
+
+# blue alone under a pattern (no flicker pair, so nothing moves between
+# lines): f(line, frame parity).  "on/off": the pattern on even frames,
+# black on odd ones; "inverting": the pattern's other half on odd frames.
+CHECK = lambda r: _byte(2, r % 2)                    # $55 / $aa by line
+QUART = lambda r: _byte(4, 2 * (r % 2))              # $77 / $dd by line
+EIGHT = lambda r: _byte(8, 4 * (r % 2))              # $7f / $f7 by line
+BLUE_PATTERNS = [
+    ("1/8 inverting", 0.125, lambda r, p: EIGHT(r + p)),
+    ("1/4 on/off", 0.125, lambda r, p: QUART(r) if p == 0 else 0xff),
+    ("checker on/off", 0.25, lambda r, p: CHECK(r) if p == 0 else 0xff),
+    ("1/4", 0.25, lambda r, p: QUART(r)),
+    ("1/4 inverting", 0.25, lambda r, p: QUART(r + p)),
+    ("checkerboard", 0.5, lambda r, p: CHECK(r)),
+    ("checker inverting", 0.5, lambda r, p: CHECK(r + p)),
+]
+
 def chosen():
-    """The set to show: black; blue alone under the 1-of-8 pattern on even
-    frames and black on odd ones (10000000, 00001000 by line); then the rest
-    from the old 10th (the 2nd to 9th, dark patterned pairs, dropped)."""
-    items = patches()
-    blue = patch(6, 6, *[t for t in lv.PATTERNS if t[0] == "1/8 on/off"][0])
-    return [items[0], blue] + items[9:]
+    """The set to show: black; blue alone under each of BLUE_PATTERNS; then
+    every flicker pair and single colour unpatterned -- dark to light."""
+    items = [patch(6, 6, f"blue {n}", l, (lambda f: lambda r, p, bp=False: f(r, p))(f))
+             for n, l, f in BLUE_PATTERNS]
+    items += [t for t in patches() if t[3] == "full"]
+    items.sort(key=lambda t: (t[0] @ [0.2126, 0.7152, 0.0722], t[1], t[2], t[3]))
+    return items
 
 def patches():
     out = []
@@ -108,6 +129,11 @@ def video(path, items, crt, seconds=8, Z=6):
                                "CRT" if crt else "sharp pixels, 60 frames/s"]):
             dr.text((16, 6 + 18 * i), t, fill=(190, 195, 225), font=small)
         canvas.paste(looks[k & 1], (16, 64))
+        for i in range(len(items)):
+            c, kk = divmod(i, ROWS)
+            r = ROWS - 1 - kk
+            dr.text((16 + (GAP + c * (P + GAP)) * Z, 64 + (GAP + r * (P + GAP)) * Z - 15),
+                    str(i + 1), fill=(150, 155, 185), font=small)
         v.add(canvas)
     v.close()
     print("wrote", path)
