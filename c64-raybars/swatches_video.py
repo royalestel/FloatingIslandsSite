@@ -72,8 +72,27 @@ def chosen():
     items += [patch(c, c, f"{fl.NAMES[c]} checker inverting", inv[1], wrap(inv[2]))
               for c in gv.BLUES if c not in (0, 6)]
     items += [t for t in patches() if t[3] == "full"]
+    items = dedupe(items)
     items.sort(key=lambda t: (brightness(t[4]), t[1], t[2], t[3]))
     return items
+
+def blended(frames):
+    """The swatch's colour (sRGB) as the eye sees it: frames blended 50%,
+    averaged over the patch."""
+    return fl.srgb(np.mean(fl.lin((frames[0] + frames[1]) / 2), axis=(0, 1)))
+
+def dedupe(items, tol=1.0):
+    """Drop ghost-byte (patterned) swatches whose blended colour and
+    brightness match another's: plain ones are kept first, then inverting
+    patterns, then on/off ones."""
+    order = lambda t: (t[3] != "full", "on/off" in t[3])
+    kept = []
+    for t in sorted(items, key=order):
+        c = blended(t[4])
+        if t[3] != "full" and any(np.abs(c - blended(k[4])).max() <= tol for k in kept):
+            continue
+        kept.append(t)
+    return kept
 
 def brightness(frames):
     """Brightness of a swatch as the eye sees its flicker: the two frames
