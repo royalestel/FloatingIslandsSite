@@ -109,11 +109,12 @@ def redmean(a, b):
     rm = (a[..., 0] + b[..., 0]) / 2
     return (2 + rm / 256) * d[..., 0] ** 2 + 4 * d[..., 1] ** 2 + (2 + (255 - rm) / 256) * d[..., 2] ** 2
 
-def choose_column(targets, bar, ghost_of, mode):
+def choose_column(targets, bar, ghost_of, mode, allowed=None):
     """Per screen line: (colour on even frames, on odd frames).
     targets: H x 3 linear light; bar: H ints (-1: no bar);
     ghost_of: per bar, ghosted?  mode: 'single' (16 colours), 'flicker'
-    (51, nearest each), 'full' (51 + lines + ghost, error-diffused)."""
+    (51, nearest each), 'full' (51 + lines + ghost, error-diffused).
+    allowed: optionally, the C64 colours the pairs may use."""
     H = len(targets)
     out = np.zeros((H, 2), int)
     ghosted = np.zeros(H, bool)
@@ -121,6 +122,8 @@ def choose_column(targets, bar, ghost_of, mode):
     prev = [np.zeros(3), np.zeros(3)]                # sRGB shown on the line above
     pghost = False
     cands = np.arange(16) if mode == "single" else np.arange(NC)
+    if allowed is not None:                      # only pairs of these colours
+        cands = cands[np.isin(CA[cands], allowed) & np.isin(CB[cands], allowed)]
     for y in range(H):
         if bar[y] < 0:
             out[y] = 0
