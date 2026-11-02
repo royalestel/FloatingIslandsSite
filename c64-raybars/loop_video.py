@@ -29,6 +29,8 @@ diffused on small bars; on bars BIG lines and taller also two levels apart
 Distant bars grow more gently than true perspective (bar_lines).
 
     python3 loop_video.py out.mp4
+    python3 loop_video.py out.mp4 quarter   # far bars down to the 1-of-4
+                                            # pattern ($77), no flicker level
 """
 import math, sys
 import numpy as np
@@ -66,6 +68,8 @@ def fade(d):
     return 1.0 - (1.0 - FADE_FAR) * min(1.0, (d - ZS - 0.25) / (FAR - ZS - 0.25))
 
 FADE_FAR = 0.15
+PAT_POW = 0.5          # the patterns follow brightness ** PAT_POW
+QUARTER = False        # the check version: steeper, down to 1 of 4, no flicker
 
 def pattern(b):
     """The sparsest pattern whose coverage still carries brightness b:
@@ -212,7 +216,9 @@ def frame(vis, p):
     big = np.zeros(fb.H, bool)
     for i, (top, h, d) in enumerate(vis):
         fc = fade(d)
-        cov, on, off = pattern(brightness(d) ** 0.5)
+        cov, on, off = pattern(brightness(d) ** PAT_POW)
+        if QUARTER and cov < 0.25:
+            cov, on, off = PATTERNS[2]               # 1 of 4, no flicker
         for j in range(h):
             r = top + j
             if WTOP <= r <= WBOT and d < depth[r]:
@@ -301,4 +307,6 @@ def jv_ship(val):
     return fb.C64RGB[(0, 4, 14, 1)[val]]
 
 if __name__ == "__main__":
+    if len(sys.argv) > 2 and sys.argv[2] == "quarter":
+        PAT_POW, QUARTER = 0.8, True
     main(sys.argv[1])
