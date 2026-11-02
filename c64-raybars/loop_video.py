@@ -68,7 +68,7 @@ def _stagger(stride, seq):
     return byte
 _HALF = _stagger(2, (0, 1, 1, 0))       # 1 x 2 checkerboard cells
 _QUARTER = _stagger(4, (0, 2, 1, 3))
-_EIGHTH = _stagger(8, (0, 4, 2, 6))
+_EIGHTH = _stagger(8, (0, 4, 0, 4))       # 10000000, 00001000 (lit) by line
 PATTERNS = [("full", 1.0, lambda r, p: 0x00),
             ("1/2", 0.5, lambda r, p: _HALF(r)),
             ("1/4", 0.25, lambda r, p: _QUARTER(r)),
