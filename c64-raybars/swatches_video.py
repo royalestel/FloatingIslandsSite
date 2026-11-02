@@ -42,7 +42,7 @@ def patches():
                     img = np.zeros((P, P, 3))
                     for r in range(P):
                         c = fb.C64RGB[a if (r + p) % 2 == 0 else b]
-                        byte = pbyte(r, p)
+                        byte = pbyte(r, p, a != b)
                         for x in range(P):
                             img[r, x] = 0 if (byte >> (7 - x % 8)) & 1 else c
                     frames.append(img)

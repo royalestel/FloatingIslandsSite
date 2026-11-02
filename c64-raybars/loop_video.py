@@ -56,7 +56,7 @@ LOOP_R = 1.8                   # loop radius, metres
 # stripes.  The on/off ones show the whole pattern on even frames and black
 # ($ff) on odd ones: nothing moves vertically between frames.
 def _onoff(pat):
-    return lambda r, p: pat(r) if p % 2 == 0 else 0xff
+    return lambda r, p, bp=False: pat(r, bp) if p % 2 == 0 else 0xff
 
 def _stagger(stride, seq):
     """An idle byte lighting 1 pixel in stride, offset by seq[line % 4]:
@@ -68,12 +68,21 @@ def _stagger(stride, seq):
     return byte
 _HALF = _stagger(2, (0, 1, 1, 0))       # 1 x 2 checkerboard cells
 _QUARTER = _stagger(4, (0, 2, 1, 3))
-_EIGHTH = _stagger(8, (0, 4, 0, 4))       # 10000000, 00001000 (lit) by line
-PATTERNS = [("full", 1.0, lambda r, p: 0x00),
-            ("1/2", 0.5, lambda r, p: _HALF(r)),
-            ("1/4", 0.25, lambda r, p: _QUARTER(r)),
-            ("1/4 on/off", 0.125, _onoff(_QUARTER)),
-            ("1/8", 0.125, lambda r, p: _EIGHTH(r)),
+_EIGHTH_L = _stagger(8, (0, 4, 0, 4))     # 10000000, 00001000 (lit) by line
+_EIGHTH_2 = _stagger(8, (0, 0, 4, 4))     # ... every second line
+
+def _EIGHTH(r, bp=False):
+    """1 of 8, the lit pixel moving by 4 on each line that shows the same
+    colour: every line for a single colour, every second line for a flicker
+    pair of two colours (bp), whose colours take alternate lines."""
+    return (_EIGHTH_2 if bp else _EIGHTH_L)(r)
+
+# pattern bytes: f(line, frame parity, bp = the line's flicker pair is two colours)
+PATTERNS = [("full", 1.0, lambda r, p, bp=False: 0x00),
+            ("1/2", 0.5, lambda r, p, bp=False: _HALF(r)),
+            ("1/4", 0.25, lambda r, p, bp=False: _QUARTER(r)),
+            ("1/4 on/off", 0.125, _onoff(lambda r, bp: _QUARTER(r))),
+            ("1/8", 0.125, lambda r, p, bp=False: _EIGHTH(r, bp)),
             ("1/8 on/off", 0.0625, _onoff(_EIGHTH))]
 WTOP, WBOT = 11, 199           # the bars' window lines (mockup.py)
 
@@ -235,6 +244,7 @@ def frame(vis, p):
     who = np.full(fb.H, -1)
     depth = np.full(fb.H, np.inf)
     byte = np.zeros(fb.H, int)
+    pfun = {}
     big = np.zeros(fb.H, bool)
     for i, (top, h, d) in enumerate(vis):
         fc = fade(d)
@@ -243,10 +253,12 @@ def frame(vis, p):
             r = top + j
             if WTOP <= r <= WBOT and d < depth[r]:
                 depth[r], who[r], big[r] = d, i, h >= BIG
-                byte[r] = pbyte(r, p)
+                pfun[r] = pbyte
                 g = gv.glow(fc * (1 - abs(2 * (j + 0.5) / h - 1)) ** 0.9)
                 tgt[r] = fv.fl_lin(g)
     cols = choose(tgt, who, big)
+    for r, f_ in pfun.items():                  # bp: the pair is two colours
+        byte[r] = f_(r, p, cols[r, 0] != cols[r, 1])
     img = np.repeat(cols[:, p][:, None], fb.W, axis=1)
     x = np.arange(fb.W)
     for r in range(fb.H):
