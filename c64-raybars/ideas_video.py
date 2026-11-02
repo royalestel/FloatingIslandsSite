@@ -29,6 +29,8 @@ a time as the ship drifts.
     python3 ideas_video.py sections out.mp4      # banking demo, then a flight
     python3 ideas_video.py steps out.mp4         # 4 / 6-line steps, excised
                                                  # middle colours, fast scroll
+    python3 ideas_video.py gaps out.mp4          # 1-5 line steps to a gap,
+                                                 # then a flight through gaps
 """
 import math, subprocess, sys
 import numpy as np
@@ -69,7 +71,12 @@ def frame_cols(bars, shipy, roll, p, taper, shipx=0.0):
         for i, (b, z, yrel, h0) in enumerate(vis):
             skip = (0, 0)
             keep = None
-            if isinstance(taper, dict):
+            if isinstance(taper, dict) and taper.get("gap"):
+                d = gap_thin(b, z, SEGC[k], shipx, taper["step"], h0)
+                if d >= h0:
+                    continue                        # thinned to nothing: a gap
+                h, keep = h0, d
+            elif isinstance(taper, dict):
                 d = section_thin(b, z, k, shipx, taper["step"])
                 if d is None:
                     continue
@@ -195,6 +202,163 @@ def section_thin(b, z, k, shipx, step=None):
         return SECTIONS[i]
     e = max(0, 10 - i, i - 29)                  # sections into the tapering end
     return step * e
+
+# ---- bars that thin to nothing: gaps to fly through ---------------------------------
+# A bar: a full-thickness middle of GM sections, a taper at each end losing
+# `step` lines a section (at the ship's distance; farther bars in proportion,
+# so the gaps stay put in the world as the bar comes in) down to nothing,
+# and a gap of GG sections before the next bar.
+GM, GG = 14, 2
+HREF = mk.FLYH[min(range(fb.FLYD), key=lambda t: abs(fb.zof(t) - fb.ZS))]
+
+def gap_layout(step):
+    t = -(-HREF // step)                         # taper sections: ceil(HREF/step)
+    return t, t + GM + t + GG                    # taper, period
+
+def gap_e(step, u):
+    """Sections into the taper at position u of the period; None in the gap."""
+    t, period = gap_layout(step)
+    u %= period
+    if u < t:
+        return t - u
+    if u < t + GM:
+        return 0
+    if u < t + GM + t:
+        return u - (t + GM) + 1
+    return None
+
+def gap_thin(b, z, px, shipx, step, h0):
+    """Lines off a bar of h0 lines at screen x px from the centre."""
+    w = 64 * z / fb.F
+    e = gap_e(step, int(math.floor((shipx - b.x0) / w + px / 64)))
+    return h0 if e is None else min(h0, int(round(h0 * step * e / HREF)))
+
+def gap_sketch(dr, x0, y0, b, z, shipx, step, cw=4):
+    t, period = gap_layout(step)
+    w = 64 * z / fb.F
+    on = {int(math.floor((shipx - b.x0) / w + px / 64)) % period for px in SEGC}
+    for i in range(period):
+        e = gap_e(step, i)
+        hh = 0 if e is None else max(0, HREF - step * e) * 9 / HREF
+        col = (230, 225, 255) if i in on else (200, 170, 90)
+        if hh:
+            dr.rectangle([x0 + i * cw, y0 - hh, x0 + i * cw + cw - 2, y0 + hh], fill=col)
+        elif i in on:
+            dr.line([x0 + i * cw, y0, x0 + i * cw + cw - 2, y0], fill=col)
+
+GAPSTEPS = [(f"{n} line{'s' if n > 1 else ''} thinner each step", n) for n in (1, 2, 3, 4, 5)]
+
+def fly_gaps(nframes, step, warmup=240, seed=5):
+    """A flight with gap bars: on a collision course the autopilot banks for
+    the nearest gap it can reach in time, else climbs or dives."""
+    rng = np.random.default_rng(seed)
+    shipx, shipy, vy, roll = 0.0, 0.0, 0, 0
+    vx = VX * 3
+    bars, spawn_i, events = [], 0, []
+    for f in range(warmup + nframes):
+        if f % 80 == 0:
+            b = mk.Bar(shipy + mk.SPAWN[spawn_i % len(mk.SPAWN)] * 0.5,
+                       mk.PALC[spawn_i % len(mk.PALC)] & 3, 0)
+            b.x0 = shipx + rng.uniform(-20, 20)
+            b.done = False
+            bars.append(b)
+            spawn_i += 1
+        stick = 0
+        ahead = [b for b in bars if b.st > 90 and not b.done and abs(b.y - shipy) < 34]
+        if ahead:
+            b = max(ahead, key=lambda b: b.st)
+            left = fb.FLYD - 2 - b.st
+            reach = left * vx * 0.5
+            w = 64 * fb.ZS / fb.F                # a section at the ship's depth
+            best = None
+            for s in range(-40, 41):
+                x = shipx + s * w / 2
+                if abs(x - shipx) <= reach and gap_e(step, int(math.floor((x - b.x0) / w))) is None:
+                    if best is None or abs(x - shipx) < abs(best - shipx):
+                        best = x
+            if best is not None:
+                if abs(best - shipx) > w * 0.2:
+                    stick = 8 if best > shipx else 4
+            else:
+                stick = 1 if b.y >= shipy else 2
+        if stick & 2 and not stick & 1:
+            vy = min(64, vy + 3)
+        elif stick & 1 and not stick & 2:
+            vy = max(-64, vy - 3)
+        else:
+            vy = max(0, vy - 3) if vy > 0 else min(0, vy + 3)
+        shipy += vy / 64
+        if f % 2 == 0:
+            if stick & 4 and not stick & 8:
+                roll = max(-8, roll - 1)
+            elif stick & 8 and not stick & 4:
+                roll = min(8, roll + 1)
+            else:
+                roll -= (roll > 0) - (roll < 0)
+        shipx += roll / 8 * vx
+        for b in bars:
+            if b.st == fb.FLYD - 2 and not b.done:   # the bar reaches the ship
+                b.done = True
+                if abs(b.y - shipy) >= mk.HITR:
+                    events.append((f, "over / under"))
+                elif gap_thin(b, fb.ZS, 0, shipx, step, HREF) >= HREF:
+                    events.append((f, "through a gap"))
+                else:
+                    events.append((f, "HIT"))
+        if f >= warmup:
+            last = events[-1] if events and f - events[-1][0] < 90 else None
+            yield list(bars), shipx, shipy, roll, vy, last
+        for b in bars:
+            b.st += 1
+        bars = [b for b in bars if b.st < fb.FLYD]
+
+def gaps_video(path, flight_frames=900, flight_step=3):
+    """The banking demo with each step size, stacked, then a flight."""
+    global VX
+    pairs = ship_aa.pairs()
+    font, small = fl.fonts()
+    Z, lab = 3, 26
+    top = int(fb.CY - 26 / fb.zof(fv.BANK_T)) - 16
+    bot = fb.CY + 13
+    sh, sw = (bot - top) * Z, fb.W * Z
+    W, H = fb.W * Z, fb.H * Z
+    v = Video(path, sw + 32, max(len(GAPSTEPS) * (sh + lab) + 16, H + 60))
+    for loop in range(2):
+        xs = [6.0] * len(GAPSTEPS)
+        for k, (bars, shipy, roll, vy, red, hit) in enumerate(fv.bank()):
+            b = bars[0]
+            b.x0 = 0.0
+            z = fb.zof(b.st)
+            canvas = Image.new("RGB", (v.w, v.h), (11, 10, 18))
+            dr = ImageDraw.Draw(canvas)
+            for i, (text, step) in enumerate(GAPSTEPS):
+                opt = dict(step=step, gap=True)
+                img = jv.frame_image(frame_cols(bars, shipy, roll, k & 1, opt, xs[i]), k,
+                                     ship_pair(pairs, roll, vy, k), None, None)
+                y = 8 + i * (sh + lab)
+                dr.text((16, y + 5), f"{text}, thins to a gap   roll {roll:+d}",
+                        fill=(200, 196, 220), font=small)
+                gap_sketch(dr, sw - 250, y + 12, b, z, xs[i], step)
+                canvas.paste(Image.fromarray(tv(img, top, bot)).resize((sw, sh), Image.BILINEAR),
+                             (16, y + lab))
+                xs[i] += roll / 8 * VX * 3
+            v.add(canvas)
+    opt = dict(step=flight_step, gap=True)
+    for k, (bars, shipx, shipy, roll, vy, ev) in enumerate(fly_gaps(flight_frames, flight_step)):
+        img = jv.frame_image(frame_cols(bars, shipy, roll, k & 1, opt, shipx), k,
+                             ship_pair(pairs, roll, vy, k), None, None)
+        canvas = Image.new("RGB", (v.w, v.h), (11, 10, 18))
+        dr = ImageDraw.Draw(canvas)
+        dr.text((16, 8), f"Flight: {flight_step}-line steps, gaps; the autopilot banks for a "
+                f"gap it can reach, else climbs or dives.   roll {roll:+d}",
+                fill=(200, 196, 220), font=small)
+        if ev:
+            dr.text((16, 28), f"last bar: {ev[1]}", fill=(208, 220, 113) if ev[1] != "HIT"
+                    else (255, 110, 100), font=font)
+        canvas.paste(Image.fromarray(tv(img)).resize((W, H), Image.BILINEAR), (16, 56))
+        v.add(canvas)
+    v.close()
+    print("wrote", path)
 
 STEPS = [("4-line steps, middle colours excised", dict(step=4, mode="excise", vx=1)),
          ("6-line steps, middle colours excised", dict(step=6, mode="excise", vx=1)),
@@ -520,4 +684,4 @@ def long_flight_video(path, name="plateau", nframes=900):
 
 if __name__ == "__main__":
     {"taper": taper_video, "density": density_video, "longbank": long_bank_video,
-     "longflight": long_flight_video, "sections": sections_video, "steps": steps_video}[sys.argv[1]](sys.argv[2])
+     "longflight": long_flight_video, "sections": sections_video, "steps": steps_video, "gaps": gaps_video}[sys.argv[1]](sys.argv[2])
