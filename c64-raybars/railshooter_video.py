@@ -15,7 +15,9 @@ flight_video.py / ideas_video.py.
     lag shifts every bar the same number of lines (the vanishing point
     moves), on top of the parallax of rising and sinking.
 
-    python3 railshooter_video.py out.mp4
+    python3 railshooter_video.py out.mp4             # thinning to gaps
+    python3 railshooter_video.py out.mp4 constant    # constant thickness,
+                                                     # plain gaps, far bars dimmer
 """
 import math, sys
 import numpy as np
@@ -36,8 +38,31 @@ PITCH_LAG = 0.12               # the camera eases this fraction of the way each 
 VXF = iv.VX * 3                # sideways drift at full bank, metres a frame
 W_S = 64 * fb.ZS / fb.F        # a section's width at the ship's distance, metres
 T, PERIOD = iv.gap_layout(STEP)
-GAP_U = T + iv.GM + T + iv.GG / 2  # a gap's centre, in sections from x0
-MID_U = T + iv.GM / 2              # the full middle's centre
+# STYLE "thin": bars thin 3 lines a section to their gaps; "constant": full
+# thickness, broken by gaps GAPW sections wide at the same places.  DIMPOW
+# steepens the dimming with distance (brightness ** DIMPOW).
+STYLE, GAPW, DIMPOW = "thin", 3, 1.0
+
+def gap_u():
+    """A gap's centre, in sections from x0."""
+    return T + iv.GM + T + iv.GG / 2 if STYLE == "thin" else PERIOD - GAPW / 2
+
+def mid_u():
+    """The full middle's centre."""
+    return T + iv.GM / 2 if STYLE == "thin" else (PERIOD - GAPW) / 2
+
+def in_gap(u):
+    return iv.gap_e(STEP, u) is None if STYLE == "thin" else u % PERIOD >= PERIOD - GAPW
+
+def lines_off(b, z, px, sx, h0):
+    """Lines off a bar of h0 lines at screen x px (h0 or more: a gap)."""
+    if STYLE == "thin":
+        return iv.gap_thin(b, z, px, sx, STEP, h0)
+    w = 64 * z / fb.F
+    return h0 if in_gap(int(math.floor((sx - b.x0) / w + px / 64))) else 0
+
+def dim(z):
+    return fb.bright(z) ** DIMPOW
 
 class Bar:
     def __init__(self, y, pal, x0, wave):
@@ -47,11 +72,11 @@ class Bar:
 
 def gap_bar(lane_y, dy, x_gap, pal, wave):
     """A bar dy above the lane with a gap centred at world x x_gap."""
-    return Bar(lane_y + dy, pal, x_gap - GAP_U * W_S, wave)
+    return Bar(lane_y + dy, pal, x_gap - gap_u() * W_S, wave)
 
 def full_bar(lane_y, dy, x_mid, pal, wave):
     """A bar dy above the lane with its full middle at world x x_mid."""
-    return Bar(lane_y + dy, pal, x_mid - MID_U * W_S, wave)
+    return Bar(lane_y + dy, pal, x_mid - mid_u() * W_S, wave)
 
 # the waves: (frame, name, [(kind, dy, x offset from the ship at spawn, palette)])
 WAVES = []
@@ -106,7 +131,7 @@ def run():
             for s in range(-60, 61):
                 x = shipx + s * W_S / 3
                 u = int(math.floor((x - b.x0) / W_S))
-                if iv.gap_e(STEP, u) is None and (best is None or abs(x - shipx) < abs(best - shipx)):
+                if in_gap(u) and (best is None or abs(x - shipx) < abs(best - shipx)):
                     best = x
             if best is not None and abs(best - shipx) > W_S * 0.25:
                 # aim to arrive: bank harder the farther and the sooner
@@ -133,7 +158,7 @@ def run():
                 b.done = True
                 if abs(b.y - shipy) >= mk.HITR:
                     outcome.append("clear")
-                elif iv.gap_thin(b, fb.ZS, 0, shipx, STEP, iv.HREF) >= iv.HREF:
+                elif lines_off(b, fb.ZS, 0, shipx, iv.HREF) >= iv.HREF:
                     outcome.append("through a gap")
                 else:
                     outcome.append("HIT")
@@ -156,7 +181,7 @@ def frame_cols(bars, roll, p, cam):
     for b in bars:
         st, yrel, sx = b.shown
         vis.append((b, fb.zof(st), yrel, mk.FLYH[st], sx))
-    ghost_of = [fb.bright(z) < il.GHOST_BELOW for _, z, _, _, _ in vis]
+    ghost_of = [dim(z) < il.GHOST_BELOW for _, z, _, _, _ in vis]
     offs = fv.offsets(roll, p, False)
     out = np.zeros((6, fb.H), np.uint8)
     for k in range(6):
@@ -164,12 +189,12 @@ def frame_cols(bars, roll, p, cam):
         who = np.full(fb.H, -1)
         depth = np.full(fb.H, np.inf)
         for i, (b, z, yrel, h0, sx) in enumerate(vis):
-            d = iv.gap_thin(b, z, iv.SEGC[k], sx, STEP, h0)
+            d = lines_off(b, z, iv.SEGC[k], sx, h0)
             if d >= h0:
                 continue                                    # a gap
             top = int(round(fb.CY + cam - yrel / z - h0 / 2)) + offs[k] + d // 2
             hl = mk.highlight(yrel, z, h0, k)
-            base = mk.BANDS[b.pal] * fb.bright(z)
+            base = mk.BANDS[b.pal] * dim(z)
             rows = [fb.C64RGB[hl[j]] if j in hl else base[j * 48 // h0] for j in range(h0)]
             for jj, j in enumerate(iv.excise(rows, d)):
                 row = top + jj
@@ -207,4 +232,6 @@ def main(path):
     print("wrote", path)
 
 if __name__ == "__main__":
+    if len(sys.argv) > 2 and sys.argv[2] == "constant":
+        STYLE, DIMPOW = "constant", 1.8
     main(sys.argv[1])
