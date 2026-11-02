@@ -18,8 +18,11 @@ colours are chosen that much brighter --
     $00  every pixel        (near)
     $55  1 pixel of 2
     $77  1 pixel of 4
-    $7f  1 pixel of 8       (farthest)
-so distant bars keep their hue instead of sinking into dark colours.
+    $77 / $ff  1 pixel of 4 on alternate frames, black between, the phase
+               swapped on alternate lines (farthest)
+so distant bars keep their hue instead of sinking into dark colours.  The
+colours themselves are flicker pairs with the phase swapped on alternate
+lines (interlace.choose_column), from the blue family.
 
     python3 loop_video.py out.mp4
 """
@@ -38,7 +41,10 @@ F, R_BAR = fb.F, fb.R          # focal length (lines), bar radius (metres)
 ZS, NEAR, FAR = fb.ZS, 0.4, fb.Z0          # bars clip 0.4 m from the camera
 V = (fb.Z0 - fb.Z1) / (fb.FLYD - 1)     # forward speed, metres a frame (the game's)
 LOOP_R = 1.8                   # loop radius, metres
-PATTERNS = [(1.0, 0x00), (0.5, 0x55), (0.25, 0x77), (0.125, 0x7f)]   # (coverage, idle byte)
+# (coverage, idle byte on its "on" frames, on its "off" frames): the farthest
+# level flickers -- $77 on alternate frames, black ($ff) between, the phase
+# swapped on alternate lines -- instead of a 1-of-8 dot pattern
+PATTERNS = [(1.0, 0x00, 0x00), (0.5, 0x55, 0x55), (0.25, 0x77, 0x77), (0.125, 0x77, 0xff)]
 WTOP, WBOT = 11, 199           # the bars' window lines (mockup.py)
 
 def brightness(z):
@@ -48,11 +54,12 @@ def brightness(z):
     return max(0.0, 1.0 - 0.75 * (z - ZS - 0.25) / (FAR - ZS - 0.25)) ** gv.DIMPOW
 
 def pattern(b):
-    """The sparsest pattern whose coverage still carries brightness b."""
-    for cov, byte in reversed(PATTERNS):
-        if cov >= b:
-            return cov, byte
-    return 1.0, 0x00
+    """The sparsest pattern whose coverage still carries brightness b:
+    (coverage, idle byte on, idle byte off)."""
+    for pat in reversed(PATTERNS):
+        if pat[0] >= b:
+            return pat
+    return PATTERNS[0]
 
 def world(seed=21):
     """Bars fixed in space: (height, distance along the flight), one every
@@ -103,11 +110,12 @@ def frame(vis, p):
     byte = np.zeros(fb.H, int)
     for i, (top, h, d) in enumerate(vis):
         b = brightness(d)
-        cov, pat = pattern(b)
+        cov, on, off = pattern(b)
         for j in range(h):
             r = top + j
             if WTOP <= r <= WBOT and d < depth[r]:
-                depth[r], who[r], byte[r] = d, i, pat
+                depth[r], who[r] = d, i
+                byte[r] = on if (r + p) % 2 == 0 else off
                 g = gv.glow((1 - abs(2 * (j + 0.5) / h - 1)) ** 0.9) * min(1.0, b / cov)
                 tgt[r] = fv.fl_lin(g)
     cols, _ = il.choose_column(tgt, who, [False] * len(vis), "full", allowed=gv.BLUES)
@@ -173,11 +181,12 @@ def main(path_out):
         canvas = Image.new("RGB", (v.w, v.h), (8, 8, 16))
         dr = ImageDraw.Draw(canvas)
         deg = math.degrees(phi) % 360
-        n = {k: 0 for k in (0x00, 0x55, 0x77, 0x7f)}
+        n = {k: 0 for k in (1.0, 0.5, 0.25, 0.125)}
         for top, h, d in vis:
-            n[pattern(brightness(d))[1]] += 1
+            n[pattern(brightness(d))[0]] += 1
         dr.text((16, 8), f"{'loop' if looping else 'straight'}   pitch {deg:5.1f} deg   bars in view "
-                f"{len(vis)}: full {n[0]}, 1/2 {n[0x55]}, 1/4 {n[0x77]}, 1/8 {n[0x7f]}",
+                f"{len(vis)}: full {n[1.0]}, 1/2 {n[0.5]}, 1/4 {n[0.25]}, "
+                f"1/4 flickering {n[0.125]}",
                 fill=(170, 176, 210), font=small)
         canvas.paste(crt_look(rgb, Z), (16, 40))
         v.add(canvas)
