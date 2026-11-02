@@ -25,8 +25,30 @@ import loop_video as lv
 import ideas_video as iv
 import glow_video as gv
 
-P, GAP, ROWS = 8, 2, 8             # patch size, gap, patches a column
+P, GAP, ROWS = 8, 2, 4             # patch size, gap, patches a column
 DARK = (0, 6, 11)                  # black, blue, dark grey: the patterned ones
+
+def patch(a, b, name, light, pbyte):
+    """One swatch: the pair a / b (phase swapped by line) under a pattern."""
+    frames = []
+    for p in (0, 1):
+        img = np.zeros((P, P, 3))
+        for r in range(P):
+            c = fb.C64RGB[a if (r + p) % 2 == 0 else b]
+            byte = pbyte(r, p, a != b)
+            for x in range(P):
+                img[r, x] = 0 if (byte >> (7 - x % 8)) & 1 else c
+        frames.append(img)
+    lin = np.mean([fl.lin(f) for f in frames], axis=(0, 1, 2))
+    return (lin, a, b, name, frames)
+
+def chosen():
+    """The set to show: black; blue alone under the 1-of-8 pattern on even
+    frames and black on odd ones (10000000, 00001000 by line); then the rest
+    from the old 10th (the 2nd to 9th, dark patterned pairs, dropped)."""
+    items = patches()
+    blue = patch(6, 6, *[t for t in lv.PATTERNS if t[0] == "1/8 on/off"][0])
+    return [items[0], blue] + items[9:]
 
 def patches():
     out = []
@@ -91,6 +113,6 @@ def video(path, items, crt, seconds=8, Z=6):
     print("wrote", path)
 
 if __name__ == "__main__":
-    items = patches()
+    items = chosen()
     video(sys.argv[1], items, True)
     video(sys.argv[2], items, False)
