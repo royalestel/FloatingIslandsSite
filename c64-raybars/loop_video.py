@@ -12,14 +12,17 @@ all at once (no shadow past the ship), dimming with distance beyond the
 ship.  The video shows each frame as a CRT would: the PAL signal model,
 then scanlines, beam spot and glow (crt_look).
 
-Distance shown by the idle byte, which can change every line: a bar line
-takes the sparsest pattern that still carries its brightness, and its
-colours are chosen that much brighter --
+Distance shown by the idle byte, which can change every line, by distance
+band (pattern_at, PAT_BANDS): full up to 7 m, then --
     $00  every pixel        (near)
     $55  1 pixel of 2
     $77  1 pixel of 4
     $77 / $ff  1 pixel of 4 on alternate frames, black between, the phase
-               swapped on alternate lines (farthest)
+               swapped on alternate lines
+    $7f|$f7 / $ff  1 pixel of 8, shifted by 4 every other line (a dither),
+               on alternate frames (the dimmest, 11-12 m)
+The chase camera is 2 m behind the ship, so the ship is drawn 1.5 times
+larger, across two sprites side by side (big_ship.py).
 on top of the colours fading with distance (fade): the white core gives
 way to light blue, then the whole bar to dark blue far away.  The
 colours themselves are flicker pairs from the blue family (greys included)
@@ -29,8 +32,6 @@ diffused on small bars; on bars BIG lines and taller also two levels apart
 Distant bars grow more gently than true perspective (bar_lines).
 
     python3 loop_video.py out.mp4
-    python3 loop_video.py out.mp4 quarter   # far bars down to the 1-of-4
-                                            # pattern ($77), no flicker level
 """
 import math, sys
 import numpy as np
@@ -41,43 +42,51 @@ import glow_video as gv
 import interlace as il
 import ideas_video as iv
 import ship_aa
+import big_ship
 import flicker as fl
 
 F, R_BAR = fb.F, fb.R          # focal length (lines), bar radius (metres)
-ZS, NEAR, FAR = fb.ZS, 0.4, fb.Z0          # bars clip 0.4 m from the camera
+ZS, NEAR, FAR = 2.0, 0.4, fb.Z0   # the chase camera 2 m behind the ship; bars
+                                  # clip 0.4 m from the camera
+REF = fb.ZS                       # 3 m: where the fade and the gentler growth start
 V = (fb.Z0 - fb.Z1) / (fb.FLYD - 1)     # forward speed, metres a frame (the game's)
 LOOP_R = 1.8                   # loop radius, metres
-# (coverage, idle byte on its "on" frames, on its "off" frames): the farthest
-# level flickers -- $77 on alternate frames, black ($ff) between, the phase
-# swapped on alternate lines -- instead of a 1-of-8 dot pattern
-PATTERNS = [(1.0, 0x00, 0x00), (0.5, 0x55, 0x55), (0.25, 0x77, 0x77), (0.125, 0x77, 0xff)]
+# The idle-byte patterns: (name, light, byte(line, frame parity)).  Bits set
+# show black.  The flickering ones show their pattern on alternate frames
+# and black ($ff) between, the phase swapped on alternate lines; the 1-of-8
+# dither shifts its lit pixel by 4 every other shown line ($7f / $f7).
+def _flicker(byte_on):
+    return lambda r, p: byte_on(r) if (r + p) % 2 == 0 else 0xff
+PATTERNS = [("full", 1.0, lambda r, p: 0x00),
+            ("1/2", 0.5, lambda r, p: 0x55),
+            ("1/4", 0.25, lambda r, p: 0x77),
+            ("1/4 flickering", 0.125, _flicker(lambda r: 0x77)),
+            ("1/8 dithered, flickering", 0.0625, _flicker(lambda r: 0x7f if (r // 2) % 2 == 0 else 0xf7))]
 WTOP, WBOT = 11, 199           # the bars' window lines (mockup.py)
 
 def brightness(z):
     """1 up to just beyond the ship, then dimming with distance (no shadow)."""
-    if z <= ZS + 0.25:
+    if z <= REF + 0.25:
         return 1.0
-    return max(0.0, 1.0 - 0.75 * (z - ZS - 0.25) / (FAR - ZS - 0.25)) ** gv.DIMPOW
+    return max(0.0, 1.0 - 0.75 * (z - REF - 0.25) / (FAR - REF - 0.25)) ** gv.DIMPOW
 
 def fade(d):
     """Distance fades a bar's colours along its own glow ramp: 1 (the full
     white-to-blue ramp) up to just beyond the ship, down to FADE_FAR at the
     far end, where even the core is dark blue (glow(0.15))."""
-    if d <= ZS + 0.25:
+    if d <= REF + 0.25:
         return 1.0
-    return 1.0 - (1.0 - FADE_FAR) * min(1.0, (d - ZS - 0.25) / (FAR - ZS - 0.25))
+    return 1.0 - (1.0 - FADE_FAR) * min(1.0, (d - REF - 0.25) / (FAR - REF - 0.25))
 
 FADE_FAR = 0.15
-PAT_POW = 0.5          # the patterns follow brightness ** PAT_POW
-QUARTER = False        # the check version: steeper, down to 1 of 4, no flicker
+# the idle-byte pattern by distance: full, 1 of 2, 1 of 4, and 1 of 4 on
+# alternate frames (alternate lines) for the dimmest
+PAT_BANDS = [(7.0, 0), (8.5, 1), (10.0, 2), (11.0, 3), (99.0, 4)]
 
-def pattern(b):
-    """The sparsest pattern whose coverage still carries brightness b:
-    (coverage, idle byte on, idle byte off)."""
-    for pat in reversed(PATTERNS):
-        if pat[0] >= b:
-            return pat
-    return PATTERNS[0]
+def pattern_at(d):
+    for edge, k in PAT_BANDS:
+        if d < edge:
+            return PATTERNS[k]
 
 def world(seed=21):
     """Bars fixed in space: (height, distance along the flight), one every
@@ -107,7 +116,7 @@ def bar_lines(d):
     """A bar's height in lines: true perspective (48 / d) up to the ship's
     distance, then a gentler curve, so distant bars cover more lines and
     grow more slowly as they come in (8 lines at 12 m instead of 4)."""
-    h = 2 * R_BAR * F / d if d <= ZS else 2 * R_BAR * F / ZS * (ZS / d) ** GROW
+    h = 2 * R_BAR * F / d if d <= REF else 2 * R_BAR * F / REF * (REF / d) ** GROW
     return max(2, int(round(h)))
 
 # ---- the colours: flicker pairs, with wider pairs and stronger line dither for
@@ -216,14 +225,12 @@ def frame(vis, p):
     big = np.zeros(fb.H, bool)
     for i, (top, h, d) in enumerate(vis):
         fc = fade(d)
-        cov, on, off = pattern(brightness(d) ** PAT_POW)
-        if QUARTER and cov < 0.25:
-            cov, on, off = PATTERNS[2]               # 1 of 4, no flicker
+        pname, light, pbyte = pattern_at(d)
         for j in range(h):
             r = top + j
             if WTOP <= r <= WBOT and d < depth[r]:
                 depth[r], who[r], big[r] = d, i, h >= BIG
-                byte[r] = on if (r + p) % 2 == 0 else off
+                byte[r] = pbyte(r, p)
                 g = gv.glow(fc * (1 - abs(2 * (j + 0.5) / h - 1)) ** 0.9)
                 tgt[r] = fv.fl_lin(g)
     cols = choose(tgt, who, big)
@@ -272,6 +279,7 @@ def main(path_out):
     W, H = fb.W * Z, fb.H * Z
     v = iv.Video(path_out, W + 32, H + 60)
     prev_phi = 0.0
+    ships = {}
     for f, sy, sz, phi, looping in path():
         vis = view(bars, sy, sz, phi)
         idx = frame(vis, f & 1)
@@ -280,21 +288,24 @@ def main(path_out):
         dphi = (phi - prev_phi) % (2 * math.pi)
         prev_phi = phi
         vy = int(min(64, dphi / (2 * math.pi / 200) * 40)) if looping else 0
-        pair = iv.ship_pair(pairs, 0, vy, f)
-        for r, line in enumerate(pair):
-            for c, val in enumerate(line):
-                if val:
-                    y, x = fb.CY - 10 + r, fb.W // 2 - 12 + 2 * c
-                    rgb[y, x:x + 2] = jv_ship(val)
+        # the ship, 2 m away: two sprites side by side (big_ship.py)
+        pi = ship_aa.pitch_index((vy + 64) >> 3)
+        if pi not in ships:
+            ships[pi] = big_ship.pair(0, ship_aa.PITCHES[pi])
+        fr = ships[pi][f & 1]
+        for r in range(fr.shape[0]):
+            for c in range(fr.shape[1]):
+                if fr[r, c]:
+                    y, x = fb.CY - 10 + r, fb.W // 2 - fr.shape[1] + 2 * c
+                    rgb[y, x:x + 2] = jv_ship(fr[r, c])
         canvas = Image.new("RGB", (v.w, v.h), (8, 8, 16))
         dr = ImageDraw.Draw(canvas)
         deg = math.degrees(phi) % 360
-        n = {k: 0 for k in (1.0, 0.5, 0.25, 0.125)}
+        n = {name: 0 for name, _, _ in PATTERNS}
         for top, h, d in vis:
-            n[pattern(brightness(d))[0]] += 1
+            n[pattern_at(d)[0]] += 1
         dr.text((16, 8), f"{'loop' if looping else 'straight'}   pitch {deg:5.1f} deg   bars in view "
-                f"{len(vis)}: full {n[1.0]}, 1/2 {n[0.5]}, 1/4 {n[0.25]}, "
-                f"1/4 flickering {n[0.125]}",
+                f"{len(vis)}: " + ", ".join(f"{k} {c}" for k, c in n.items()),
                 fill=(170, 176, 210), font=small)
         canvas.paste(crt_look(rgb, Z), (16, 40))
         v.add(canvas)
@@ -307,6 +318,4 @@ def jv_ship(val):
     return fb.C64RGB[(0, 4, 14, 1)[val]]
 
 if __name__ == "__main__":
-    if len(sys.argv) > 2 and sys.argv[2] == "quarter":
-        PAT_POW, QUARTER = 0.8, True
     main(sys.argv[1])
