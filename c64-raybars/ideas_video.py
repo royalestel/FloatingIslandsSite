@@ -22,6 +22,11 @@ a constant middle; banking drifts the ship sideways so different parts of
 it pass by (fast on near bars, slowly on far ones).
     python3 ideas_video.py longbank out.mp4      # the banking demo
     python3 ideas_video.py longflight out.mp4    # a flight
+
+Sections.  The same with the bar made of segment-wide sections, each 1 or
+2 lines thinner than the next one in (rows trimmed), stepping a section at
+a time as the ship drifts.
+    python3 ideas_video.py sections out.mp4      # banking demo, then a flight
 """
 import math, subprocess, sys
 import numpy as np
@@ -60,7 +65,15 @@ def frame_cols(bars, shipy, roll, p, taper, shipx=0.0):
         who = np.full(fb.H, -1)
         depth = np.full(fb.H, np.inf)
         for i, (b, z, yrel, h0) in enumerate(vis):
-            if taper in LONG:
+            skip = (0, 0)
+            if taper == "sections":
+                d = section_thin(b, z, k, shipx)
+                if d is None:
+                    continue
+                d = min(d, h0 - 2)                  # at least 2 lines left
+                skip = (d // 2, d - d // 2)         # rows trimmed: top, bottom
+                h = h0
+            elif taper in LONG:
                 f = long_factor(taper, b, z, k, shipx)
                 if f <= 0:
                     continue
@@ -70,7 +83,7 @@ def frame_cols(bars, shipy, roll, p, taper, shipx=0.0):
             top = int(round(fb.CY - yrel / z - h / 2)) + offs[k]
             hl = mk.highlight(yrel, z, h, k)
             base = mk.BANDS[b.pal] * fb.bright(z)
-            for j in range(h):
+            for j in range(skip[0], h - skip[1]):
                 row = top + j
                 if mk.WTOP <= row <= mk.WBOT and z < depth[row]:
                     depth[row] = z
@@ -116,6 +129,72 @@ def profile_sketch(dr, x0, y0, w, name, shipx, b, z):
     c = (shipx - b.x0 + half) / BAR_L + 0.5
     xa, xc = x0 + a * (w - 1), x0 + c * (w - 1)
     dr.rectangle([xa, y0 - 12, xc, y0 + 12], outline=(124, 112, 218))
+
+# ---- sections, each 1 or 2 lines thinner than its neighbour ----------------------
+# A bar of 40 sections, each one screen segment wide (64 px) at the bar's
+# distance: a full-thickness middle of 20, and 10 at each end, each 1 or 2
+# lines thinner than the next one in.  A section is thinned by trimming its
+# outermost rows (the bar's own colours stay).  Banking right drifts the ship
+# right, so the profile steps left a section at a time (near bars step
+# sooner than far ones).
+THIN = [0, 1, 2, 4, 5, 7, 8, 10, 11, 13]        # lines off, from the middle out
+SECTIONS = THIN[::-1] + [0] * 20 + THIN         # 40 sections
+
+def section_index(b, z, k, shipx):
+    w = 64 * z / fb.F                            # a section's width, metres
+    return int(math.floor((shipx - b.x0) / w + SEGC[k] / 64 + len(SECTIONS) / 2))
+
+def section_thin(b, z, k, shipx):
+    i = section_index(b, z, k, shipx)
+    return SECTIONS[i] if 0 <= i < len(SECTIONS) else None
+
+def sections_sketch(dr, x0, y0, b, z, shipx, cw=6):
+    """The 40 sections' thickness, the six on screen outlined."""
+    on = {section_index(b, z, k, shipx) for k in range(6)}
+    for i, d in enumerate(SECTIONS):
+        hh = 13 - d
+        col = (200, 170, 90) if i not in on else (230, 225, 255)
+        dr.rectangle([x0 + i * cw, y0 - hh, x0 + i * cw + cw - 2, y0 + hh], fill=col)
+
+def sections_video(path, flight_frames=720):
+    """The banking demo (one bar at a fixed distance), then a flight."""
+    pairs = ship_aa.pairs()
+    font, small = fl.fonts()
+    Z = 3
+    W, H = fb.W * Z, fb.H * Z
+    top = int(fb.CY - 26 / fb.zof(fv.BANK_T)) - 16
+    bot = fb.CY + 13
+    v = Video(path, W + 32, H + 72)
+    note = ("Sections 1-2 lines thinner than the next one in; bank right and the thin "
+            "sections step left")
+    def frame(img, title, sketch):
+        canvas = Image.new("RGB", (v.w, v.h), (11, 10, 18))
+        dr = ImageDraw.Draw(canvas)
+        dr.text((16, 8), title, fill=(200, 196, 220), font=small)
+        dr.text((16, 28), note, fill=(140, 136, 160), font=small)
+        if sketch:
+            sketch(dr)
+        canvas.paste(img, (16, 64))
+        v.add(canvas)
+    # 1. the banking demo, close up: one bar at a fixed distance
+    shipx = 10.0
+    for k, (bars, shipy, roll, vy, red, hit) in enumerate(fv.bank()):
+        b = bars[0]
+        b.x0 = 0.0
+        z = fb.zof(b.st)
+        img = jv.frame_image(frame_cols(bars, shipy, roll, k & 1, "sections", shipx), k,
+                             ship_pair(pairs, roll, vy, k), None, None)
+        frame(Image.fromarray(tv(img)).resize((W, H), Image.BILINEAR), f"One bar, banking: roll {roll:+d}, sideways {shipx:+5.1f} m",
+              lambda dr: sections_sketch(dr, W - 230, 40, b, z, shipx))
+        shipx += roll / 8 * VX
+    # 2. a flight
+    for k, (bars, shipx, shipy, roll, vy) in enumerate(fly_long(flight_frames)):
+        img = jv.frame_image(frame_cols(bars, shipy, roll, k & 1, "sections", shipx), k,
+                             ship_pair(pairs, roll, vy, k), None, None)
+        frame(Image.fromarray(tv(img)).resize((W, H), Image.BILINEAR),
+              f"Flight: roll {roll:+d}, sideways {shipx:+6.1f} m", None)
+    v.close()
+    print("wrote", path)
 
 def tv(img, top=0, bot=None):
     pad = np.pad(img[max(0, top - 1):bot], ((0, 0), (8, 8), (0, 0)))
@@ -332,4 +411,4 @@ def long_flight_video(path, name="plateau", nframes=900):
 
 if __name__ == "__main__":
     {"taper": taper_video, "density": density_video, "longbank": long_bank_video,
-     "longflight": long_flight_video}[sys.argv[1]](sys.argv[2])
+     "longflight": long_flight_video, "sections": sections_video}[sys.argv[1]](sys.argv[2])
