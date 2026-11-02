@@ -629,6 +629,48 @@ is the reference; `glow_video.py` has the colours and the cost profile.
   cycles yet. Near bars 100+ lines tall take more than half a frame's
   display time each.
 
+### cosmicstrings.s: the C64 program (work in progress)
+
+```sh
+python3 gen_cosmic.py        # cosmic.inc: ramps, swatch tables, maths, the ship
+cl65 -g -t none -C cosmic.cfg -Ln cosmic.lbl -o cosmicstrings.prg cosmicstrings.s
+python3 sim_cosmic.py crt.mp4 sharp.mp4   # 6502 simulation, checks, videos
+```
+
+* **Controls:** joystick in port 2. Down pulls the nose up and up pushes it
+  down, so holding it flies a loop. Fire boosts the speed up to 3x.
+* **3D in real time:** the camera only pitches, so each bar is a point in
+  the y-z plane: depth `d = ry sin + rz cos`, height `u = ry cos - rz sin`.
+  * Rows of bars are evenly spaced in z (1.375 m), so the z terms step by a
+    constant from row to row.
+  * Each row costs one 8x8 quarter-square multiply for d and one for u.
+  * The perspective divide (400 u / d) and the bar height (80 / d, or
+    26.7 sqrt(3 / d) beyond 3 m) come from log and exp tables in 1/128
+    octave steps.
+  * The slab repeats every 16 m up and down; 256 rows repeat every 352 m.
+* **Occlusion:** a sweep down the screen. Bars are sorted by their first
+  line, and each stretch of lines shows the nearest bar covering it.
+* **Display:** each stretch becomes a span record (source, length, line
+  code). A run of bars is one block with its own raster IRQ, and black
+  gaps cost no CPU time.
+  * The records are copied to page 1 in the vertical blank. The block's
+    IRQ points the stack at them, and each line does `lda (src),y`, then
+    the colour and idle byte from the swatch tables.
+  * When a span ends the next one comes off the stack: 3 `pla` and an
+    `rts` into its line code, 26 cycles.
+  * Lines are 63 cycles, or 56 on the ship's 21 lines, where the two
+    sprites take 7.
+  * Ramps (the swatch per row of a bar h lines tall, h = 2..255) are
+    stored two to a page, so `lda (src),y` never crosses one.
+* **Status:** in the simulator every line is the right length, no read
+  crosses a page, every line shows the nearest bar, and every bar is
+  within 1.5 lines of a floating-point projection. But a scene update
+  costs about 30k cycles against about 10k free a frame, so the scene
+  updates about 12 times a second; flicker and patterns still run at
+  50 Hz. Motion is scaled by the frames since the last update, so the
+  speed stays right. Not yet run in VICE: the line timing (`HTUNE`, and
+  `STEAL` = 7 for two sprites) is unchecked.
+
 ## FLYBY3D: profiling the bars in true perspective
 
 `flyby3d.py` renders GOLDSHIP's scene for real and decimates it to the C64.
