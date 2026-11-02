@@ -37,15 +37,15 @@ LW = np.array([0.2126, 0.7152, 0.0722])
 # strings needs no raster splits, so the row loop has cycles for a ghost
 # byte per line.)
 lv.R_BAR = 0.2                    # bar radius, metres (loop_video: 0.12)
-lv.FAR = 20.0                     # bars drawn from 20 m (loop_video: 12)
+lv.FAR = 28.0                     # bars drawn from 28 m (loop_video: 12)
 lv.NEAR = 0.15                    # near clip (loop_video: 0.4)
-SPACING = 0.5                     # metres between bars along the flight (0.28)
-HOLD = 14.0                       # beyond this a bar is all blue 1/4 on/off
+SPACING = 0.8                     # metres between bars along the flight (0.28)
+HOLD = 20.0                       # beyond this a bar is all blue 1/4 on/off
 DIM_FROM, DIM_FAR = 6.0, 0.30     # light scaled 1 -> DIM_FAR from 6 m to HOLD
 
 def world(seed=21):
     rng = np.random.default_rng(seed)
-    return [(rng.uniform(-8, 8), z) for z in np.arange(-20.0, 90.0, SPACING)]
+    return [(rng.uniform(-8, 8), z) for z in np.arange(-20.0, 120.0, SPACING)]
 
 def fade(d):
     """loop_video.fade, reaching its far end (dark blue) at HOLD."""

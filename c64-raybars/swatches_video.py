@@ -83,14 +83,18 @@ def blended(frames):
     return fl.srgb(np.mean(fl.lin((frames[0] + frames[1]) / 2), axis=(0, 1)))
 
 def dedupe(items, tol=1.0):
-    """Drop ghost-byte (patterned) swatches whose blended colour and
-    brightness match another's: plain ones are kept first, then inverting
-    patterns, then on/off ones."""
-    order = lambda t: (t[3] != "full", "on/off" in t[3])
+    """Of swatches whose blended colour and brightness match, keep one:
+    plain single colours first, then inverting patterns (steady, no
+    boiling), then flicker pairs (which boil up and down a bar), then
+    on/off patterns."""
+    def order(t):
+        if t[3] == "full":
+            return 0 if t[1] == t[2] else 2
+        return 3 if "on/off" in t[3] else 1
     kept = []
     for t in sorted(items, key=order):
         c = blended(t[4])
-        if t[3] != "full" and any(np.abs(c - blended(k[4])).max() <= tol for k in kept):
+        if order(t) and any(np.abs(c - blended(k[4])).max() <= tol for k in kept):
             continue
         kept.append(t)
     return kept
