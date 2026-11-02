@@ -22,7 +22,7 @@ gc.ROUND = True                     # round bars at all distances (preview)
 SPEED = 0.045                       # metres a frame (cosmicstrings' base speed)
 DNEAR = 2 * sv.lv.R_BAR * gc.F / (gc.HMAX + 0.45)
 
-def main(out_crt, out_sharp, below=0.3):
+def main(out_crt, out_sharp, below=0.3, start=None, split=False):
     tabs = [np.frombuffer(t, np.uint8) for t in gc.swatch_tables()]
     ramps = {}
     spr = gc.sprites()
@@ -30,7 +30,7 @@ def main(out_crt, out_sharp, below=0.3):
     Z = 3
     W, H = fb.W * Z, fb.H * Z
     vids = [iv.Video(out_crt, W + 32, H + 60), iv.Video(out_sharp, W + 32, H + 60)]
-    d, f = sv.lv.FAR, 0
+    d, f = (start or sv.lv.FAR), 0
     x = np.arange(fb.W)
     while d > DNEAR - 2 * SPEED:
         p = f & 1
@@ -39,18 +39,22 @@ def main(out_crt, out_sharp, below=0.3):
             h = max(2, min(gc.HMAX, lv.bar_lines(d)))
             key = (h, round(d * 2) / 2)          # by distance (0.5 m) as well
             if key not in ramps:
-                ramps[key] = gc.ramp_round(h, key[1])
+                ramps[key] = (gc.ramp_round(h, key[1]),
+                              gc.ramp_smooth(h, key[1]) if split else gc.ramp_round(h, key[1]))
             top = int(round((2 * gc.CYL - 2 * gc.F * (-below) / d - h) / 2))
             for j in range(h):
                 ln = top + j
                 if 0 <= ln < gc.NLINES:
                     r = ln + 11                  # mock row
-                    k = ramps[key][j]
                     t = tabs[p]
-                    img[r] = t[32 * (r & 1) + k]
-                    g = t[64 + 32 * (r & 1) + k]
-                    if g:
-                        img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
+                    for side, (x0, x1) in enumerate(((0, 160), (160, 320)) if split else ((0, 320),)):
+                        k = ramps[key][side][j]
+                        img[r, x0:x1] = t[32 * (r & 1) + k]
+                        g = t[64 + 32 * (r & 1) + k]
+                        if g:
+                            xs = x[x0:x1]
+                            row = img[r, x0:x1]
+                            row[((g >> (7 - xs % 8)) & 1) == 1] = 0
         rgb = fb.C64RGB[img].astype(np.uint8)
         cols = {1: 4, 2: 14, 3: (1, 3)[p]}
         for side in (0, 1):
@@ -68,8 +72,12 @@ def main(out_crt, out_sharp, below=0.3):
             canvas = Image.new("RGB", (v.w, v.h), (8, 8, 16))
             dr = ImageDraw.Draw(canvas)
             label = f"{d:5.2f} m   {h} lines" if d >= DNEAR else "clipped"
-            dr.text((16, 8), f"one cosmic string, {below:.2f} m below the ship:   {label}   "
-                    f"{'CRT' if crt else 'sharp'}", fill=(170, 176, 210), font=small)
+            if split:
+                dr.text((16, 8), f"left: now (15-step ladder)   right: all 29, centre-out   "
+                        f"{label}   {'CRT' if crt else 'sharp'}", fill=(170, 176, 210), font=small)
+            else:
+                dr.text((16, 8), f"one cosmic string, {below:.2f} m below the ship:   {label}   "
+                        f"{'CRT' if crt else 'sharp'}", fill=(170, 176, 210), font=small)
             look = lv.crt_look(rgb, Z) if crt else Image.fromarray(rgb).resize((W, H), Image.NEAREST)
             canvas.paste(look, (16, 40))
             v.add(canvas)
@@ -84,4 +92,6 @@ def main(out_crt, out_sharp, below=0.3):
     print("wrote", out_crt, out_sharp, f, "frames")
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2], float(sys.argv[3]) if len(sys.argv) > 3 else 0.3)
+    import os
+    main(sys.argv[1], sys.argv[2], float(sys.argv[3]) if len(sys.argv) > 3 else 0.3,
+         float(os.environ["START"]) if "START" in os.environ else None, "SPLIT" in os.environ)

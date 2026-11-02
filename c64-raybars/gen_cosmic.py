@@ -93,6 +93,30 @@ def ramp_round(h, d):
         out.append(LADDER[i + 1] if f > lv.BAYER4[j % 4] else LADDER[i])
     return out
 
+def ramp_smooth(h, d):
+    """ramp_round, smoother up close: all 29 swatches by brightness (the
+    greys and grey mixes fill the gaps), and the error carried from the
+    centre row outward, mirrored top and bottom, so the pattern stays put
+    as the bar grows."""
+    fc, dm = fade_r(d), dim_r(d)
+    c = contrast(d)
+    lum = np.array(sv.LUM)
+    core = float(fl.lin(gv.glow(fc)) @ sv.LW) * dm
+    def light(j):
+        prof = float(fl.lin(gv.glow(fc * (1 - abs(2 * (j + 0.5) / h - 1)) ** 0.9)) @ sv.LW) * dm
+        return core + c * (prof - core)
+    half = (h + 1) // 2
+    lower = []                             # rows from the centre down
+    err = 0.0
+    for i in range(half):
+        j = h - half + i                   # centre row first (odd h: the middle)
+        want = light(j) + err
+        k = int(np.argmin(np.abs(lum - want)))
+        lower.append(k)
+        err = 0.8 * (want - lum[k])
+    upper = lower[::-1] if h % 2 == 0 else lower[:0:-1]
+    return upper + lower
+
 def d_of_h(h):
     """The distance a bar h lines tall stands for (inverse of bar_lines)."""
     k = 2 * R_BAR * F
