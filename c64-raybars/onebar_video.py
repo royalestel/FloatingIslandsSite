@@ -80,6 +80,12 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
                         f"{'CRT' if crt else 'sharp'}", fill=(170, 176, 210), font=small)
             look = lv.crt_look(rgb, Z) if crt else Image.fromarray(rgb).resize((W, H), Image.NEAREST)
             canvas.paste(look, (16, 40))
+            # the distance, large, in the empty top right of the window
+            big = f"{d:5.2f} m" if d >= DNEAR else "clipped"
+            dr.text((v.w - 200, 56), big, fill=(235, 235, 120), font=font)
+            if split:
+                dr.text((16 + 40, 56), "now", fill=(200, 200, 220), font=font)
+                dr.text((16 + W // 2 + 40, 56), "all 29", fill=(200, 200, 220), font=font)
             v.add(canvas)
             last.append(canvas)
         d -= SPEED
