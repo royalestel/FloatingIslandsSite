@@ -27,6 +27,8 @@ Sections.  The same with the bar made of segment-wide sections, each 1 or
 2 lines thinner than the next one in (rows trimmed), stepping a section at
 a time as the ship drifts.
     python3 ideas_video.py sections out.mp4      # banking demo, then a flight
+    python3 ideas_video.py steps out.mp4         # 4 / 6-line steps, excised
+                                                 # middle colours, fast scroll
 """
 import math, subprocess, sys
 import numpy as np
@@ -66,7 +68,18 @@ def frame_cols(bars, shipy, roll, p, taper, shipx=0.0):
         depth = np.full(fb.H, np.inf)
         for i, (b, z, yrel, h0) in enumerate(vis):
             skip = (0, 0)
-            if taper == "sections":
+            keep = None
+            if isinstance(taper, dict):
+                d = section_thin(b, z, k, shipx, taper["step"])
+                if d is None:
+                    continue
+                d = min(d, h0 - 2)
+                h = h0
+                if taper["mode"] == "trim":
+                    skip = (d // 2, d - d // 2)
+                else:
+                    keep = d
+            elif taper == "sections":
                 d = section_thin(b, z, k, shipx)
                 if d is None:
                     continue
@@ -83,8 +96,13 @@ def frame_cols(bars, shipy, roll, p, taper, shipx=0.0):
             top = int(round(fb.CY - yrel / z - h / 2)) + offs[k]
             hl = mk.highlight(yrel, z, h, k)
             base = mk.BANDS[b.pal] * fb.bright(z)
-            for j in range(skip[0], h - skip[1]):
-                row = top + j
+            src = list(range(skip[0], h - skip[1]))
+            if keep:                                # excise keep rows, centred
+                src = excise([fb.C64RGB[hl[j]] if j in hl else base[j * 48 // h]
+                              for j in range(h)], keep)
+                top += keep // 2
+            for jj, j in enumerate(src):
+                row = top + jj
                 if mk.WTOP <= row <= mk.WBOT and z < depth[row]:
                     depth[row] = z
                     who[row] = i
@@ -140,13 +158,104 @@ def profile_sketch(dr, x0, y0, w, name, shipx, b, z):
 THIN = [0, 1, 2, 4, 5, 7, 8, 10, 11, 13]        # lines off, from the middle out
 SECTIONS = THIN[::-1] + [0] * 20 + THIN         # 40 sections
 
+def excise(rows, d):
+    """Indices of the rows kept when d rows go.  The bars are drawn on black,
+    so contrast is brightness: the dimmest rows go first (black reflection
+    gaps, dull bands), a row repeating its neighbour's colour before a
+    unique one, while the bright highlights stay; the top and bottom rows,
+    the bar's outline, stay until only 3 rows are left."""
+    lum = [(0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255
+           for c in (np.asarray(r, float) for r in rows)]
+    idx = list(range(len(rows)))
+    for _ in range(d):
+        if len(idx) <= 1:
+            break
+        def cost(i):
+            j = idx[i]
+            dup = any(0 <= n < len(idx) and np.allclose(rows[idx[n]], rows[j])
+                      for n in (i - 1, i + 1))
+            edge = len(idx) > 3 and i in (0, len(idx) - 1)
+            return lum[j] - (0.1 if dup else 0) + (2 if edge else 0)
+        idx.pop(min(range(len(idx)), key=cost))
+    return idx
+
 def section_index(b, z, k, shipx):
     w = 64 * z / fb.F                            # a section's width, metres
     return int(math.floor((shipx - b.x0) / w + SEGC[k] / 64 + len(SECTIONS) / 2))
 
-def section_thin(b, z, k, shipx):
+def section_thin(b, z, k, shipx, step=None):
+    """Lines off for the section under segment k: the profile above, or with
+    step the end sections step lines thinner each, from the middle out."""
     i = section_index(b, z, k, shipx)
-    return SECTIONS[i] if 0 <= i < len(SECTIONS) else None
+    if step is not None:                        # bars repeat end to end
+        i %= len(SECTIONS)
+    if not 0 <= i < len(SECTIONS):
+        return None
+    if step is None:
+        return SECTIONS[i]
+    e = max(0, 10 - i, i - 29)                  # sections into the tapering end
+    return step * e
+
+STEPS = [("4-line steps, middle colours excised", dict(step=4, mode="excise", vx=1)),
+         ("6-line steps, middle colours excised", dict(step=6, mode="excise", vx=1)),
+         ("4-line steps, middle colours excised, 3x faster scroll", dict(step=4, mode="excise", vx=3)),
+         ("4-line steps, edges trimmed (the colours lost)", dict(step=4, mode="trim", vx=1))]
+
+def steps_sketch(dr, x0, y0, b, z, shipx, step, cw=5):
+    on = {section_index(b, z, k, shipx) % len(SECTIONS) for k in range(6)}
+    for i in range(len(SECTIONS)):
+        hh = max(1, 9 - step * max(0, 10 - i, i - 29) // 3)
+        col = (200, 170, 90) if i not in on else (230, 225, 255)
+        dr.rectangle([x0 + i * cw, y0 - hh, x0 + i * cw + cw - 2, y0 + hh], fill=col)
+
+def steps_video(path, flight_frames=720):
+    """The banking demo, four ways stacked, then a flight (4-line steps,
+    excised, fast scroll)."""
+    global VX
+    pairs = ship_aa.pairs()
+    font, small = fl.fonts()
+    Z, lab = 3, 30
+    top = int(fb.CY - 26 / fb.zof(fv.BANK_T)) - 16
+    bot = fb.CY + 13
+    sh, sw = (bot - top) * Z, fb.W * Z
+    W, H = fb.W * Z, fb.H * Z
+    vw, vh = sw + 32, max(len(STEPS) * (sh + lab) + 16, H + 60)
+    v = Video(path, vw, vh)
+    xs = [10.0] * len(STEPS)
+    for loop in range(2):
+        xs = [10.0] * len(STEPS)
+        for k, (bars, shipy, roll, vy, red, hit) in enumerate(fv.bank()):
+            b = bars[0]
+            b.x0 = 0.0
+            z = fb.zof(b.st)
+            canvas = Image.new("RGB", (v.w, v.h), (11, 10, 18))
+            dr = ImageDraw.Draw(canvas)
+            for i, (text, opt) in enumerate(STEPS):
+                img = jv.frame_image(frame_cols(bars, shipy, roll, k & 1, opt, xs[i]), k,
+                                     ship_pair(pairs, roll, vy, k), None, None)
+                y = 8 + i * (sh + lab)
+                dr.text((16, y + 6), f"{text}   roll {roll:+d}", fill=(200, 196, 220), font=small)
+                steps_sketch(dr, sw - 190, y + 14, b, z, xs[i], opt["step"])
+                canvas.paste(Image.fromarray(tv(img, top, bot)).resize((sw, sh), Image.BILINEAR),
+                             (16, y + lab))
+                xs[i] += roll / 8 * VX * opt["vx"]
+            v.add(canvas)
+    opt = STEPS[2][1]
+    vx0, VX = VX, VX * opt["vx"]
+    try:
+        for k, (bars, shipx, shipy, roll, vy) in enumerate(fly_long(flight_frames)):
+            img = jv.frame_image(frame_cols(bars, shipy, roll, k & 1, opt, shipx), k,
+                                 ship_pair(pairs, roll, vy, k), None, None)
+            canvas = Image.new("RGB", (v.w, v.h), (11, 10, 18))
+            dr = ImageDraw.Draw(canvas)
+            dr.text((16, 8), f"Flight: {STEPS[2][0]}   roll {roll:+d}", fill=(200, 196, 220),
+                    font=small)
+            canvas.paste(Image.fromarray(tv(img)).resize((W, H), Image.BILINEAR), (16, 34))
+            v.add(canvas)
+    finally:
+        VX = vx0
+    v.close()
+    print("wrote", path)
 
 def sections_sketch(dr, x0, y0, b, z, shipx, cw=6):
     """The 40 sections' thickness, the six on screen outlined."""
@@ -411,4 +520,4 @@ def long_flight_video(path, name="plateau", nframes=900):
 
 if __name__ == "__main__":
     {"taper": taper_video, "density": density_video, "longbank": long_bank_video,
-     "longflight": long_flight_video, "sections": sections_video}[sys.argv[1]](sys.argv[2])
+     "longflight": long_flight_video, "sections": sections_video, "steps": steps_video}[sys.argv[1]](sys.argv[2])
