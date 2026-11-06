@@ -124,6 +124,9 @@ def build_rows(merged):
         rows = [r for i, r in enumerate(rows, 1) if i not in (5, 8)]
         rows = [yw if r is c else r for r in rows]
         rows.insert([i for i, r in enumerate(rows) if r is a][0] + 1, lgy)
+        # eighth pass (numbers of the 25-swatch video): swap 14 and 15, 17 and 18, 7 and 8
+        for x, y in ((14, 15), (17, 18), (7, 8)):
+            rows[x - 1], rows[y - 1] = rows[y - 1], rows[x - 1]
     return rows
 
 def main(path, seconds=6, merged=False):
