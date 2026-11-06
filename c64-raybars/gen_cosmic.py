@@ -198,55 +198,43 @@ def ramp_v3(h, d, ladder=None):
     upper = lower[::-1] if h % 2 == 0 else lower[:0:-1]
     return upper + lower
 
-# ---- v5 (preview): v3 with the extra far patterns, and white brought into
-# the core early as WHITE ON/OFF: solid white on one frame, black the next
-# (no dither pattern).  From the centre out, once the core's light reaches
-# it, the core rows go white over cyan, then white.
-def _white_over_cyan():
-    """White flickering over cyan: every line white on one frame and cyan on
-    the next (the whole bar in step, unlike the cyan / white pair, whose
-    phase swaps line by line).  Halfway between cyan and white."""
+# ---- v6 (preview): every swatch we have, in order of linear light (the two
+# frames' light averaged, as the eye sums a 50 Hz flicker).  The light is
+# planned twice over: by distance (the core's L* through V6_ANCHORS, against
+# log distance) and from the centre of the bar to its edge (the round
+# profile, its contrast fading in from flat at FAR).  Each row takes the
+# nearest swatch with the error carried from the centre outward, mirrored,
+# never brighter than the row inside it -- so a new, brighter swatch starts
+# on the centre line and spreads evenly.  White comes in through cyan / white.
+V6_ANCHORS = [(28.0, 6.5), (20.0, 22.0), (5.0, 62.0), (0.42, 100.0)]
+
+def lum_linear(k):
     import swatches_video as sw
-    name = "cyan / white, whole lines"
-    if not any(p[6] == name for p in sv.PAL):
-        frames = []
-        for p in (0, 1):
-            frames.append(np.tile(sv.fb.C64RGB[1 if p == 0 else 3], (sw.P, sw.P, 1)))
-        sv.PAL.append((1, 3, lambda r, p: 0, sw.blended(frames), sw.brightness(frames), 0, name))
-        sv.COL = np.array([p[3] for p in sv.PAL])
-        sv.LUM = np.array([p[4] for p in sv.PAL])
-        sv.WIDE = np.array([p[5] for p in sv.PAL])
-    return [i for i, p in enumerate(sv.PAL) if p[6] == name][0]
-WONOFF = _white_over_cyan()             # (was white on/off: too much contrast)
-assert len(sv.PAL) <= 32
-WHITES = [WONOFF, 28]                    # white over cyan, white
-CORE_R = 0.4                             # rows within this of the centre may go white
-WHITE_IN = [(6.5, 0.0), (5.5, 0.09), (1.5, 0.4)]   # white core half-width (of the bar) by distance
+    a, b, pat, *_ = sv.PAL[k]
+    t = sw.patch(a, b, "", 0, lambda r, p, bp=False: pat(r, p))
+    return float(np.mean([fl.lin(f) @ sv.LW for f in t[4]]))
 
-def white_width(d):
-    ds, ws = zip(*WHITE_IN[::-1])
-    return float(np.interp(np.log(d), np.log(ds), ws))
+LUMLIN = np.array([lum_linear(k) for k in range(len(sv.PAL))])
+ALL_L = sorted(range(len(sv.PAL)), key=lambda k: LUMLIN[k])
 
-def ramp_v5(h, d):
-    lad_e = LADDER_P
-    lum_e = np.array([sv.LUM[k] for k in lad_e])
-    lum_w = np.array([sv.LUM[k] for k in WHITES])
+def row_v6(d, r):
+    global V3_ANCHORS
+    keep, V3_ANCHORS = V3_ANCHORS, V6_ANCHORS
+    try:
+        return row_v3(d, r)
+    finally:
+        V3_ANCHORS = keep
+
+def ramp_v6(h, d):
+    lum = LUMLIN[ALL_L]
     half = (h + 1) // 2
-    lower, err, lmax, white_ok = [], 0.0, 9.0, True
+    lower, err, lmax = [], 0.0, 9.0
     for i in range(half):
         j = h - half + i
-        r = 2 * (j + 0.5) / h - 1
-        want = row_v3(d, r) + err
-        if white_ok and (abs(r) < white_width(d) or i == 0 and white_width(d) > 0):
-            lad, lum = WHITES, lum_w
-        else:
-            lad, lum, white_ok = lad_e, lum_e, False
+        want = row_v6(d, 2 * (j + 0.5) / h - 1) + err
         cost = np.where(lum <= lmax + 1e-9, np.abs(lum - want), np.inf)
-        if not np.isfinite(cost).any():
-            lad, lum, white_ok = lad_e, lum_e, False
-            cost = np.where(lum <= lmax + 1e-9, np.abs(lum - want), np.inf)
         k = int(np.argmin(cost))
-        lower.append(lad[k])
+        lower.append(ALL_L[k])
         lmax = lum[k]
         err = 0.8 * (want - lum[k])
     upper = lower[::-1] if h % 2 == 0 else lower[:0:-1]

@@ -42,7 +42,7 @@ def blurry(im):
 
 PURPLE = "PURPLE" in os.environ       # left v3, right v3 with purple / light blue 1/4 inverting
 STOP = float(os.environ.get("STOP", 0))
-V5 = "V5" in os.environ               # v3 + patterns with the white on/off core (ramp_v5)
+V6 = "V6" in os.environ               # every swatch by linear light (ramp_v6)
 SPEED = 0.045                       # metres a frame (cosmicstrings' base speed)
 DNEAR = 2 * sv.lv.R_BAR * gc.F / (gc.HMAX + 0.45)
 
@@ -62,8 +62,8 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
         if d >= DNEAR:
             h = max(2, min(gc.HMAX, lv.bar_lines(d)))
             key = (h, round(d * 10) / 10)        # by distance (0.1 m) as well
-            if key not in ramps and V5 and not split:
-                ramps[key] = (gc.ramp_v5(h, key[1]),) * 2
+            if key not in ramps and V6 and not split:
+                ramps[key] = (gc.ramp_v6(h, key[1]),) * 2
             if key not in ramps:
                 alt = gc.ramp_v3 if V3 else gc.ramp_smooth
                 if PURPLE:                           # v3 vs v3 with the extra patterns
