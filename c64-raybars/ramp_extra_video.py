@@ -59,6 +59,10 @@ def name(e):
 # 20 yellow 1/4 inverting, 28 yellow checker inverting, 32 light red / yellow
 MOVE_DARKER = [(20, 4), (28, 4), (32, 4)]
 
+# the next pass: numbers of the video that had the moves above
+TOSS = [21, 32, 36]                                # light red / dark grey, yellow / grey, light grey / white
+MOVES = [(24, -4), (16, -4), (18, -4), (28, 4)]    # yellow checker, yellow 1/4, light red checker up; light red / yellow down
+
 def build_rows(merged):
     rows = []                                          # (label, entry or red index)
     for i in range(r25.N):
@@ -76,6 +80,20 @@ def build_rows(merged):
         rows = [r for r in rows if all(r is not m for _, m in moved)]
         for pos, item in moved:
             rows.insert(pos, item)
+        # second pass, by the numbers of the video before it (1-based): toss, then move
+        # (negative = up / darker, positive = down / lighter; places among the swatches left)
+        tossed = [rows[n - 1] for n in TOSS]
+        shifts = []
+        for n, d in MOVES:
+            item = rows[n - 1]
+            before = sum(1 for m in TOSS if m < n)
+            shifts.append((n - 1 - before + d, item))
+        keep = [r for r in rows if all(r is not t for t in tossed)]
+        movers = [m for _, m in shifts]
+        keep = [r for r in keep if all(r is not m for m in movers)]
+        for pos, item in sorted(shifts, key=lambda t: t[0]):
+            keep.insert(max(0, pos), item)
+        rows = keep
     return rows
 
 def main(path, seconds=6, merged=False):
