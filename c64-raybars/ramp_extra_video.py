@@ -103,6 +103,10 @@ def build_rows(merged):
         rows = [r for i, r in enumerate(rows, 1) if i not in TOSS2]    # third pass: toss by the numbers of the video before it
         rows = [r for i, r in enumerate(rows, 1) if i not in TOSS3]    # fourth pass, likewise
         rows = [r for i, r in enumerate(rows, 1) if i not in TOSS4]    # fifth pass, likewise
+        # sixth pass (numbers of the 27-swatch video): 12 up 3 places, 18 tossed
+        moved12 = rows[11]
+        rows = [r for i, r in enumerate(rows, 1) if i not in (12, 18)]
+        rows.insert(12 - 1 - 3, moved12)
     return rows
 
 def main(path, seconds=6, merged=False):
