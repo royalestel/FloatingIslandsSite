@@ -54,7 +54,7 @@ def screen_y(z):
     if z >= Z_HOLD:
         return _y_mix(z)
     return screen_y(z + SPACING) + _half(z) + _half(z + SPACING) + GAP
-SPEED = SPACING / 96            # one spacing every 96 frames: a seamless loop
+SPEED = 0.0                     # the camera stays put (was SPACING / 96: gliding forward)
 ZMAX = 40.0
 SUB = 8
 
@@ -90,8 +90,10 @@ def lines(cam_z):
 def main(path, seconds=8):
     v = iv.Video(path, W * Z, H * Z)
     n = seconds * 60
+    cache = {}
     for f in range(n):
-        idx = lines(f * SPEED)
+        z = f * SPEED
+        idx = cache.setdefault(z, lines(z))
         img = np.zeros((H, W), int)
         for y, i in enumerate(idx):
             img[y] = v7.colour(RAMP[i], y & 1, f & 1)
