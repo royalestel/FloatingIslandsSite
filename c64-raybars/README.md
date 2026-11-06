@@ -771,3 +771,29 @@ python3 flicker.py   # preview_flicker.png, preview_flicker.gif (as seen),
 * Everything else (`R`, the orbit amplitudes, the light depth, the Phong
   exponent and the env map) is in `gen_tables.py` and at the top of `raybars.s`.
   Keep `R` in sync between the two files.
+
+## ANIM: the anim0 film as a C64 program (stages 1 and 2)
+
+`anim_params.py` holds every number of the film (times, radii, bar spacing, the
+wave); `anim_gen.py` / `wave_gen.py` turn it into the `.inc` and `.bin` files the
+programs include; `make -f anim.mk` rebuilds both `.prg`s, `make -f anim.mk sim`
+also runs the 6502 simulators, which check every frame against the Python model.
+
+* **anim0.prg** (stage 1, plain raster code): blanked screen, one `$d020` colour a
+  line.  The scene is precalculated (24 KB of bar lists: address of the bar's
+  colours, first line, rows); `update` clears a 200-byte line buffer and copies each
+  bar's colours into it, far to near (black = not drawn); 200 speedcode rows of
+  `lda linebuf+n / sta $d020`, 63 cycles each, behind a stable double IRQ.
+  Simulated: all 1730 frames equal the reference, update worst 5213 cycles of the
+  6528 between the last line and the next IRQ (80 %).  `sim_anim0.mp4` is what the
+  simulated C64 draws (384 px: the whole line is border).
+* **animsplit.prg** (stage 2, raster splits): the finished floor's wave.  Plain rows
+  (own code per frame parity, so the still floor needs no copy) and split rows
+  (6 colours a line from six segment buffers), each 63 cycles and ending in a
+  `jmp`; the band of lines the moving strings touch is entered and left by
+  patching two `jmp` operands.  Simulated: all 100 wave frames match the reference
+  segment by segment, every row 63 cycles, the six writes at cycles 8..48.
+  **Not fast enough yet**: the band compose (clear, then blit each string into
+  each of 6 buffers) needs up to 24,275 cycles against 6,528; 49 of 100 frames are
+  over (bands up to 130 lines while the near strings tilt).  `sim_animsplit.mp4`.
+* Untested in VICE: the exact x position of the splits (`HTUNE`) as before.
