@@ -32,8 +32,11 @@ HORIZON = 14                    # screen line of the horizon
 # to their thickness) the further they are.
 Z_NEAR, Z_FAR, Y_NEAR, Y_FAR = 0.45, 18.0, H + 40, HORIZON
 A = (Y_NEAR - Y_FAR) / (np.sqrt(Z_FAR) - np.sqrt(Z_NEAR))
+MIX = 0.5                       # 0: true perspective, 1: the sqrt remap
 def screen_y(z):
-    return Y_NEAR - A * (np.sqrt(z) - np.sqrt(Z_NEAR))
+    true = HORIZON + F * CAM_H / z
+    remap = Y_NEAR - A * (np.sqrt(z) - np.sqrt(Z_NEAR))
+    return (1 - MIX) * true + MIX * remap
 SPEED = SPACING / 96            # one spacing every 96 frames: a seamless loop
 ZMAX = 40.0
 SUB = 8
