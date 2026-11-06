@@ -3,7 +3,7 @@
 so the red ones keep 1..25: purple 26.., then yellow, each family ordered by
 measured light.  Types: solid, a / b flicker pair (phase swapped line to line),
 "x + white every other", and [ghost] ones (an idle byte darkens part of the line:
-the blue ramp's 1/4 and checker patterns).  Two lines a swatch, CRT look.
+the blue ramp's 1/4 and checker patterns).  Three lines a swatch, CRT look.
 
     python3 ramp_extra_video.py out.mp4 [--merged]     (--merged: one ramp, dark to light)
 """
@@ -104,7 +104,7 @@ def build_rows(merged):
 
 def main(path, seconds=6, merged=False):
     rows = build_rows(merged)
-    ROWS, Z, PAD = 2, 7, 4
+    ROWS, Z, PAD = 3, 7, 4
     font, small = fl.fonts()
     txt = [f"{i + 1:2d}   {n}   L* {ls:.0f}" for i, (n, ls, _) in enumerate(rows)]
     tw = int(max(small.getlength(t) for t in txt)) + 4         # the labels' width in pixels
@@ -144,7 +144,7 @@ def still(path, merged=True, scale=2):
     from PIL import ImageFont
     import ramp_extra_video as me
     rows = me.build_rows(merged)
-    ROWS, Z, PAD = 2, 7 * scale, 4
+    ROWS, Z, PAD = 3, 7 * scale, 4
     font = ImageFont.truetype("DejaVuSans-Bold.ttf", 15 * scale)
     txt = [f"{i + 1:2d}  {n}  L* {ls:.0f}" for i, (n, ls, _) in enumerate(rows)]
     tw = int(max(font.getlength(t) for t in txt)) + 4
