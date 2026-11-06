@@ -124,9 +124,15 @@ def build_rows(merged):
         rows = [r for i, r in enumerate(rows, 1) if i not in (5, 8)]
         rows = [yw if r is c else r for r in rows]
         rows.insert([i for i, r in enumerate(rows) if r is a][0] + 1, lgy)
-        # eighth pass (numbers of the 25-swatch video): swap 14 and 15, 17 and 18, 7 and 8
-        for x, y in ((14, 15), (17, 18), (7, 8)):
-            rows[x - 1], rows[y - 1] = rows[y - 1], rows[x - 1]
+        # ninth pass (the 25-swatch numbering, swaps undone): new stripes between 6 and 7,
+        # and between 18 and 19 (light red | light grey stripes: no flicker)
+        f_rb = lambda rp, p: (RD if rp == 0 else 9, 0)              # red | brown stripes
+        f_lg = lambda rp, p: (LR if rp == 0 else LG, 0)             # light red | light grey stripes
+        rb = ("red | brown stripes", _L(f_rb), f_rb)
+        lrg = ("light red | light grey stripes", _L(f_lg), f_lg)
+        p6, p18 = rows[5], rows[17]
+        rows.insert(rows.index(p6) + 1, rb)
+        rows.insert(rows.index(p18) + 1, lrg)
     return rows
 
 def main(path, seconds=6, merged=False):
