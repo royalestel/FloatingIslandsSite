@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-# anim2: anim1 with every string tilting the same number of lines (no perspective),
-# the wave starting at the rear string and travelling towards the camera.
+# anim2: the wave into the distance (tilt_floor_video.py at ef4bb05), frozen.
 """The cosmic strings floor (floor_video, stationary camera) with raster
 splits: each line is 6 $d021 segments (GOLDSHIP's split points, sprite x
 56/120/184/248/312: window x 32/96/160/224/288, so 32 | 64 x4 | 32 px), and
@@ -25,8 +24,8 @@ EDGES = [0, 32, 96, 160, 224, 288, 320]          # segment boundaries in the win
 XC = np.array([(a + b) / 2 for a, b in zip(EDGES, EDGES[1:])])
 TILT_T, STAGGER = 16, 2                          # frames up and down; start delay per string
 RISE = 28                                        # the closest string's right-end rise (lines)
-RISE_EXP = 0.0                                   # every string rises the same RISE lines
-
+RISE_EXP = 0.3                                   # rise ~ thickness^0.3: far strings still
+                                                 # rise visibly, so the wave reads into the distance
 HOLD0, HOLD1 = 60, 60                            # still frames before / after
 
 def strings():
@@ -56,7 +55,7 @@ def frame(strs, t):
     half0 = strs[0][1]
     for i in range(len(strs) - 1, -1, -1):               # far first
         rows, half = strs[i]
-        u = (t - STAGGER * (len(strs) - 1 - i)) / TILT_T     # rear string first
+        u = (t - STAGGER * i) / TILT_T
         a = RISE * (half / half0) ** RISE_EXP * np.sin(np.pi * u) if 0 < u < 1 else 0.0
         offs = -np.round(a * XC / W).astype(int)          # right end up
         for s, o in enumerate(offs):
