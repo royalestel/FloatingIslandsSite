@@ -69,6 +69,12 @@ TOSS3 = [20, 22, 28]                              # red / light red, purple / li
 
 TOSS4 = [19, 23, 25]                              # red / grey, light red / light grey, yellow / light grey (too much flicker)
 
+ROLL = True                       # the idle-byte patterns roll one bit left every frame
+
+def rol(g, k):
+    k %= 8
+    return ((g << k) | (g >> (8 - k))) & 255 if k else g
+
 def _c(fn, rp, p, s):
     """A swatch's colour and idle byte on its line s (0..ROWS-1); entries marked
     .three take the line index too (patterns that differ from line to line)."""
@@ -143,10 +149,11 @@ def build_rows(merged):
         rows[6], rows[7] = rows[7], rows[6]
         # eleventh pass (the 27-swatch numbering): toss 7 and 8; blue | brown stripes (no flicker,
         # alternate lines) between 6 and the new 7
-        def f_rcb(rp, p, s):                                    # red checker, brown, red checker
-            if s == 1:
-                return (9, 0)
-            return (2, 0x55 if (rp + p) % 2 == 0 else 0xAA)     # red checker inverting
+        def f_rcb(rp, p, s):                                    # red checker, brown, red checker;
+            red_line = (s != 1) if p == 0 else (s == 1)         # every other frame the brown moves
+            if red_line:
+                return (2, 0x55 if (rp + p) % 2 == 0 else 0xAA) # red checker inverting
+            return (9, 0)
         f_rcb.three = True
         def _L3(fn):                                            # mean over the 3 lines
             y = 0
@@ -172,17 +179,19 @@ def main(path, seconds=6, merged=False):
     WIDTH = -(-tw // Z // 8) * 8                                # swatches as wide as the text (8 px steps)
     h = PAD * 2 + ROWS * len(rows)
     x = np.arange(WIDTH)
-    looks = []
+    looks = {}
     for p in (0, 1):
-        img = np.zeros((h, WIDTH), int)
-        for i, (_, _, fn) in enumerate(rows):
-            for s in range(ROWS):
-                r = PAD + ROWS * i + s
-                c, g = _c(fn, r & 1, p, s)
-                img[r] = c
-                if g:
-                    img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
-        looks.append(lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z))
+        for k in (range(8) if ROLL else (0,)):              # k: the idle bytes rolled k bits
+            img = np.zeros((h, WIDTH), int)
+            for i, (_, _, fn) in enumerate(rows):
+                for s in range(ROWS):
+                    r = PAD + ROWS * i + s
+                    c, g = _c(fn, r & 1, p, s)
+                    img[r] = c
+                    if g:
+                        g = rol(g, k)
+                        img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
+            looks[p, k] = lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z)
     W, H = WIDTH * Z, h * Z
     v = iv.Video(path, 16 + W + 16 + tw + 16, H + 50)
     for f in range(seconds * 60):
@@ -190,7 +199,7 @@ def main(path, seconds=6, merged=False):
         dr = ImageDraw.Draw(c)
         dr.text((16, 8), ("all swatches, darkest first (measured light)   CRT" if merged else "red ramp 1-25, then purple, then yellow (each by measured light)   CRT"),
                 fill=(170, 176, 210), font=small)
-        c.paste(looks[f & 1], (16, 34))
+        c.paste(looks[f & 1, f % 8 if ROLL else 0], (16, 34))
         for i, (n, ls, _) in enumerate(rows):
             y = 34 + (PAD + ROWS * i) * Z + ROWS * Z // 2 - 8
             dr.text((W + 32, y), txt[i], fill=(190, 195, 225), font=small)
