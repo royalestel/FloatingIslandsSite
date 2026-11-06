@@ -94,7 +94,8 @@ def draw(toks, y, f):
     return row
 
 # ---- the new waves -----------------------------------------------------------------
-W5 = dict(name="W5 right, blue", TILT=32, STAG=4, amp=28, start="front", side="R", modes=("blue", "blue"))
+W5 = dict(name="W5 right, blue", TILT=32, STAG=4, amp=28, start="front", side="R", modes=("blue", "blue"),
+          base="red")                          # starts from the red floor: red, white at the apex, blue at rest
 W6 = dict(name="W6 left/right from the back", TILT=32, STAG=4, amp=28, start="back", side="alt",
           modes=("red", "multi"))              # even bars: left wave (red), odd bars: right wave (multi)
 
@@ -120,7 +121,13 @@ def wave_tokens(A, tw):
                 if not base:
                     continue
                 if uu < 0.5:
-                    tok = base
+                    if A.get("base") == "red":
+                        kr = PROF_R[T][r]
+                        if not kr:
+                            continue
+                        tok = RED + kr
+                    else:
+                        tok = base
                 elif mode == "blue":
                     tok = base + int(round((TOPB - base) * f))
                 elif mode == "red":
@@ -139,21 +146,29 @@ def wave_tokens(A, tw):
     return out
 
 # ---- the start ------------------------------------------------------------------------
-SHAKE = 180
+SHAKE = 580
 
 def shake_offsets(t):
-    """(whole-floor shift, per-column shifts): little shake, long pause, bigger shake,
-    long pause, then the split columns from small, to full, back to still."""
+    """(whole-floor shift, per-column shifts): a little shake (20), a long pause (120),
+    a bigger shake (20), a long pause (120), then the split columns: 1 line for a
+    second, 2 lines for a second, building to 3 and settling back to still slowly."""
     if t < 20:
         return round(1.0 * math.sin(2 * math.pi * t / 10)), [0] * SEGS
-    if t < 60:
+    if t < 140:
         return 0, [0] * SEGS
-    if t < 80:
-        return round(2.0 * math.sin(2 * math.pi * (t - 60) / 10)), [0] * SEGS
-    if t < 120:
+    if t < 160:
+        return round(2.0 * math.sin(2 * math.pi * (t - 140) / 10)), [0] * SEGS
+    if t < 280:
         return 0, [0] * SEGS
-    u = t - 120
-    env = 3.0 * math.sin(math.pi * u / 60)                       # small -> full -> still
+    u = t - 280
+    if u < 60:
+        env = 1.0
+    elif u < 120:
+        env = 2.0
+    elif u < 180:
+        env = 2.0 + (u - 120) / 60.0                     # build to 3
+    else:
+        env = 3.0 * max(0.0, (300 - u) / 120.0)         # settle slowly to still
     return 0, [round(env * math.sin(2 * math.pi * u / 10 + 0.9 * k)) for k in range(SEGS)]
 
 def shift_rows(a, o):
