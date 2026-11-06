@@ -55,6 +55,10 @@ def name(e):
         return f"{n[e[2]]} + {n[e[1]]} every other"
     return n[e[2]] + {29: " 1/4 inverting", 5: " checker inverting"}[e[1]] + "  [ghost]"
 
+# moved by eye (1-based positions in the measured order; each moves this many places darker):
+# 20 yellow 1/4 inverting, 28 yellow checker inverting, 32 light red / yellow
+MOVE_DARKER = [(20, 4), (28, 4), (32, 4)]
+
 def build_rows(merged):
     rows = []                                          # (label, entry or red index)
     for i in range(r25.N):
@@ -67,11 +71,20 @@ def build_rows(merged):
             rows.append((name(e), L(light(e)), lambda rp, p, e=e: (colour(e, rp, p), ghost(e, rp, p))))
     if merged:                                         # one ramp: everything dark to light
         rows.sort(key=lambda r: r[1])
+        moved = sorted(((old - 1 - places, rows[old - 1]) for old, places in MOVE_DARKER),
+                       key=lambda t: t[0])                # (final position, item), by identity
+        rows = [r for r in rows if all(r is not m for _, m in moved)]
+        for pos, item in moved:
+            rows.insert(pos, item)
     return rows
 
 def main(path, seconds=6, merged=False):
     rows = build_rows(merged)
-    ROWS, Z, PAD, WIDTH = 2, 7, 4, 160
+    ROWS, Z, PAD = 2, 7, 4
+    font, small = fl.fonts()
+    txt = [f"{i + 1:2d}   {n}   L* {ls:.0f}" for i, (n, ls, _) in enumerate(rows)]
+    tw = int(max(small.getlength(t) for t in txt)) + 4         # the labels' width in pixels
+    WIDTH = -(-tw // Z // 8) * 8                                # swatches as wide as the text (8 px steps)
     h = PAD * 2 + ROWS * len(rows)
     x = np.arange(WIDTH)
     looks = []
@@ -85,9 +98,8 @@ def main(path, seconds=6, merged=False):
                 if g:
                     img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
         looks.append(lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z))
-    font, small = fl.fonts()
     W, H = WIDTH * Z, h * Z
-    v = iv.Video(path, W + 430, H + 50)
+    v = iv.Video(path, 16 + W + 16 + tw + 16, H + 50)
     for f in range(seconds * 60):
         c = Image.new("RGB", (v.w, v.h), (8, 8, 16))
         dr = ImageDraw.Draw(c)
@@ -96,7 +108,7 @@ def main(path, seconds=6, merged=False):
         c.paste(looks[f & 1], (16, 34))
         for i, (n, ls, _) in enumerate(rows):
             y = 34 + (PAD + ROWS * i) * Z + ROWS * Z // 2 - 8
-            dr.text((W + 32, y), f"{i + 1:2d}   {n}   L* {ls:.0f}", fill=(190, 195, 225), font=small)
+            dr.text((W + 32, y), txt[i], fill=(190, 195, 225), font=small)
         v.add(c)
     v.close()
     print("wrote", path, len(rows), "swatches")
@@ -108,7 +120,11 @@ def still(path, merged=True, scale=2):
     from PIL import ImageFont
     import ramp_extra_video as me
     rows = me.build_rows(merged)
-    ROWS, Z, PAD, WIDTH = 2, 7 * scale, 4, 160
+    ROWS, Z, PAD = 2, 7 * scale, 4
+    font = ImageFont.truetype("DejaVuSans-Bold.ttf", 15 * scale)
+    txt = [f"{i + 1:2d}  {n}  L* {ls:.0f}" for i, (n, ls, _) in enumerate(rows)]
+    tw = int(max(font.getlength(t) for t in txt)) + 4
+    WIDTH = -(-tw // Z // 8) * 8                                # swatches as wide as the labels
     h = PAD * 2 + ROWS * len(rows)
     x = np.arange(WIDTH)
     img = np.zeros((h, WIDTH), int)
@@ -120,14 +136,13 @@ def still(path, merged=True, scale=2):
             if g:
                 img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
     look = lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z)
-    font = ImageFont.truetype("DejaVuSans-Bold.ttf", 15 * scale)
     W, H = WIDTH * Z, h * Z
-    c = Image.new("RGB", (W + 470 * scale, H + 50 * scale), (8, 8, 16))
+    c = Image.new("RGB", (16 + W + 16 + tw + 16, H + 50 * scale), (8, 8, 16))
     dr = ImageDraw.Draw(c)
     c.paste(look, (16, 34 * scale))
     for i, (n, ls, _) in enumerate(rows):
         y = 34 * scale + (PAD + ROWS * i) * Z + ROWS * Z // 2 - 12 * scale
-        dr.text((W + 32, y), f"{i + 1:2d}  {n}  L* {ls:.0f}", fill=(235, 238, 255), font=font)
+        dr.text((W + 32, y), txt[i], fill=(235, 238, 255), font=font)
     c.save(path)
     print("wrote", path, c.size)
 
