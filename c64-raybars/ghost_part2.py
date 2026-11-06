@@ -8,8 +8,8 @@ ghost-byte row the ghost swatches of that line become the nearest flat swatch.
   anim1  first tilt (40-frame tilt, near strings tilt most), near strings first
   anim2  the wave into the distance (16-frame tilt, rise ~ thickness^0.3)
   anim3  every string tilts the same 28 lines, from the rear string, half speed
-  anim4  anim3: blue strings flash white at their apex and settle red (red ramp:
-         flat swatches only; the blue part may use ghost swatches)
+  anim4  anim3: blue strings flash white at their apex and settle red (red_ramp25.py:
+         the red ramp has its own ghost-byte swatches, under the same rule)
 
 Each has a second of stillness before and after.  320 px lines (the idle byte only
 shows in the display window), CRT look, 60 fps.
@@ -22,7 +22,7 @@ import flyby3d as fb
 import ideas_video as iv
 import loop_video as lv
 import preview_v10 as v10
-import red_ramp as rr
+import red_ramp25 as rr
 import ghost_preview as gp
 
 LAD, FLAT, STR, NS = gp.LAD, gp.FLAT, gp.STR, gp.NS
@@ -39,13 +39,13 @@ def _profile_red(T):
         out.append(int(np.argmin(np.abs(rr.Lstar(np.array(lit)) - rr.RAMP_L))))
     return out
 PROF_R = {T: _profile_red(T) for T in range(1, gp.TMAX + 1)}
-TOP_R = len(rr.RAMP) - 1                            # white in the red ramp
+TOP_R = rr.WHITE                                    # white in the red ramp
 
 def colour(tok, y, f):
     return v10.colour(LAD[tok], y & 1, f & 1) if tok < RED else rr.colour(tok - RED, y & 1, f & 1)
 
 def ghost(tok, y, f):
-    return v10.ghost(LAD[tok], y & 1, f & 1) if tok < RED else 0
+    return v10.ghost(LAD[tok], y & 1, f & 1) if tok < RED else rr.ghost(tok - RED, y & 1, f & 1)
 
 def light(tok):
     return gp.RAMP_L[tok] if tok < RED else rr.RAMP_L[tok - RED]
@@ -95,7 +95,10 @@ def fix_line(toks, y, f):
     out = []
     for t in toks:
         if not is_black(t) and ghost(t, y, f):
-            t = min(FLAT, key=lambda j: abs(gp.RAMP_L[j] - light(t)))
+            if t < RED:
+                t = min(FLAT, key=lambda j: abs(gp.RAMP_L[j] - light(t)))
+            else:
+                t = RED + min(rr.FLAT, key=lambda j: abs(rr.RAMP_L[j] - light(t)))
         out.append(t)
     return out, True
 
