@@ -146,12 +146,12 @@ def wave_tokens(A, tw):
     return out
 
 # ---- the start ------------------------------------------------------------------------
-SHAKE = 580
+SHAKE = 700
 
 def shake_offsets(t):
     """(whole-floor shift, per-column shifts): a little shake (20), a long pause (120),
     a bigger shake (20), a long pause (120), then the split columns: 1 line for a
-    second, 2 lines for a second, building to 3 and settling back to still slowly."""
+    second, 2 lines for a second, up to 3, down to 1, a long linger at 1, then still."""
     if t < 20:
         return round(1.0 * math.sin(2 * math.pi * t / 10)), [0] * SEGS
     if t < 140:
@@ -167,8 +167,12 @@ def shake_offsets(t):
         env = 2.0
     elif u < 180:
         env = 2.0 + (u - 120) / 60.0                     # build to 3
+    elif u < 240:
+        env = 3.0 - 2.0 * (u - 180) / 60.0              # settle from 3 lines to 1
+    elif u < 360:
+        env = 1.0                                       # linger at 1 line (2 s)
     else:
-        env = 3.0 * max(0.0, (300 - u) / 120.0)         # settle slowly to still
+        env = max(0.0, (420 - u) / 60.0)                # then to still
     return 0, [round(env * math.sin(2 * math.pi * u / 10 + 0.9 * k)) for k in range(SEGS)]
 
 def shift_rows(a, o):
@@ -198,7 +202,7 @@ def main(path):
         n = pre + wave + post
         for t in range(n):
             tw = t - pre
-            seg = segs(tw) if tw >= 0 else gp2.segments(gp2.ANIMS[0], -1)
+            seg = segs(tw)                                  # tw < 0: this wave's own starting floor
             if n_i == 0 and t < SHAKE:
                 dy, dk = shake_offsets(t)
                 seg = np.stack([shift_rows(seg[k:k + 1], dy + dk[k])[0] for k in range(SEGS)])
