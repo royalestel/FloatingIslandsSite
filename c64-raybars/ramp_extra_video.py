@@ -133,6 +133,8 @@ def build_rows(merged):
         p6, p18 = rows[5], rows[17]
         rows.insert(rows.index(p6) + 1, rb)
         rows.insert(rows.index(p18) + 1, lrg)
+        # tenth pass (the 27-swatch numbering): swap 7 and 8
+        rows[6], rows[7] = rows[7], rows[6]
     return rows
 
 def main(path, seconds=6, merged=False):
