@@ -28,7 +28,7 @@ RED, TOP_R, PROF_R, gp, rr = gp2.RED, gp2.TOP_R, gp2.PROF_R, gp2.gp, gp2.rr
 
 SHAKE = 150
 LIFT_STAG, LIFT_LEN = 3, 32
-ANIM4 = dict(name="anim4", TILT=32, STAG=4, amp=lambda i, T0, T: 28, near_first=True, lift=True)
+ANIM4 = dict(name="anim4", TILT=32, STAG=4, amp=lambda i, T0, T: 28, near_first=True, lift=True, red=False)
 
 def shake_offsets(t):
     """(whole-floor shift, per-column shifts) at shake frame t."""
