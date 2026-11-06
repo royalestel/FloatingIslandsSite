@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Part 2 with a shaken start and a new ending (ghost_part2 + these changes).
 
-  start   the floor shakes (150 frames, before the first wave):
-            1  the whole floor, a line up and down;
-            2  then more (3 lines);
-            3  then each raster-split column on its own: all the bars of a column
-               move together, a few lines up and down, the columns out of step.
+  start   the floor shakes (100 frames, before the first wave): a little shake
+          (1 line), a pause, a slightly bigger one (2 lines), a pause, then each
+          raster-split column on its own (3 lines, the columns out of step), and
+          the wave follows at once.
   waves   anim1, anim2, anim3 as in ghost_part2.
   end     anim4 is rebuilt: the right-end wave runs front to back in blue with no
           colour change; as it reaches the back row, the LEFT edge of the bars
@@ -26,20 +25,23 @@ import ghost_part2 as gp2
 STR, NS, W, H, SEGS, EDGES = gp2.STR, gp2.NS, gp2.W, gp2.H, gp2.SEGS, gp2.EDGES
 RED, TOP_R, PROF_R, gp, rr = gp2.RED, gp2.TOP_R, gp2.PROF_R, gp2.gp, gp2.rr
 
-SHAKE = 150
+SHAKE = 100
 LIFT_STAG, LIFT_LEN = 3, 32
 ANIM4 = dict(name="anim4", TILT=32, STAG=4, amp=lambda i, T0, T: 28, near_first=True, lift=True, red=False)
 
 def shake_offsets(t):
-    """(whole-floor shift, per-column shifts) at shake frame t."""
-    if t < 30:
+    """(whole-floor shift, per-column shifts) at shake frame t:
+    a little shake, a pause, a slightly bigger one, a pause, then the split columns."""
+    if t < 20:                                   # a little shake (1 line)
         return round(1.0 * math.sin(2 * math.pi * t / 10)), [0] * SEGS
-    if t < 80:
-        return round(3.0 * math.sin(2 * math.pi * t / 16)), [0] * SEGS
-    if t < 130:
-        u = t - 80
-        return 0, [round(2.0 * math.sin(2 * math.pi * u / 12 + 0.9 * k)) for k in range(SEGS)]
-    return 0, [0] * SEGS
+    if t < 35:                                   # pause
+        return 0, [0] * SEGS
+    if t < 55:                                   # slightly bigger (2 lines)
+        return round(2.0 * math.sin(2 * math.pi * (t - 35) / 10)), [0] * SEGS
+    if t < 70:                                   # pause
+        return 0, [0] * SEGS
+    u = t - 70                                   # the split columns, each on its own (3 lines)
+    return 0, [round(3.0 * math.sin(2 * math.pi * u / 10 + 0.9 * k)) for k in range(SEGS)]
 
 def shift_rows(a, o):
     out = np.zeros_like(a)
