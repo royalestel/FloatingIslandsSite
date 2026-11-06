@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """anim5: three blue cosmic strings in a black screen.
-  A  the near bar rises from the bottom, two more follow; all three move up
-     and down on a figure eight in depth, passing in front of / behind each other
+  A  three bars rise from the bottom into the spaced-out layout (the same as the last
+     frame), then slide up and down past one another like classic rasterbars: the
+     same size and colour, only the draw order changes as they pass
   B  they blend into a circle in depth (away, down, towards, up), 120 degrees
      apart, so they follow each other round and change colour with distance
   C  they blend back to three bars at one distance, spaced out vertically.
@@ -28,8 +29,9 @@ Z_EQ, DY_EQ = 1.7, 0.32              # final: one distance, bars spaced DY_EQ ap
 OMEGA = 2 * np.pi / 240              # one turn every 4 s
 T_BLACK = 30
 T_ENTER = [30, 100, 170]             # frame each bar starts rising; 90 frames to get there
-T_MOVE = 90                          # the bars start moving (speed ramps up over 60 frames)
-T_B0, T_B1 = 500, 620                # figure eight -> circle
+T_MOVE = 90                          # the phase angle starts to run (as before: fixes the circle's phase)
+T_SLIDE = 300                        # the bars leave their spaced-out layout and start sliding
+T_B0, T_B1 = 500, 620                # sliding at one distance -> circle
 T_C0, T_C1 = 1100, 1230              # circle -> three bars spaced out
 T_END = T_C1 + 120
 
@@ -43,31 +45,29 @@ def theta(t):
     return 1.5 * np.pi + OMEGA * ang
 
 def bars(t):
-    """(z, y_world, rise offset in lines) of the three bars at frame t."""
+    """(z, y_world, rise offset in lines, draw-order key) of the three bars at frame t."""
     th = theta(t)
-    s = smooth((t - T_B0) / (T_B1 - T_B0))              # 0 figure eight .. 1 circle
+    m = smooth((t - T_SLIDE) / 60)                      # 0 spaced out .. 1 sliding
+    s = smooth((t - T_B0) / (T_B1 - T_B0))              # 0 one distance .. 1 circle
     e = smooth((t - T_C0) / (T_C1 - T_C0))              # 0 circle .. 1 spaced out
-    out = []
-    ys_c = []
-    for k in range(3):
-        ph = th + 2 * np.pi * k / 3
-        ys_c.append(AY * np.cos(ph))
     slots = np.argsort(np.argsort([-AY * np.cos(theta(T_C0) + 2 * np.pi * k / 3)
                                    for k in range(3)]))     # highest bar -> top slot
+    y0 = [0.0, DY_EQ, -DY_EQ]                           # the opening layout
+    out = []
     for k in range(3):
         ph = th + 2 * np.pi * k / 3
-        z8 = ZC - AZ * np.cos(2 * (ph - 1.5 * np.pi))       # figure eight
-        zc = ZC + AZ * np.sin(ph)                           # circle: away, down, towards, up
-        z = (1 - s) * z8 + s * zc
-        y = AY * np.cos(ph)
+        zc = ZC + AZ * np.sin(ph)                       # circle: away, down, towards, up
+        z = (1 - s) * Z_EQ + s * zc
+        y = (1 - m) * y0[k] + m * AY * np.cos(ph)       # the circle seen edge-on is the slide
         z = (1 - e) * z + e * Z_EQ
         y = (1 - e) * y + e * (1 - slots[k]) * DY_EQ
-        out.append((z, y, 200 * (1 - smooth((t - T_ENTER[k]) / 90))))
+        key = z + 0.001 * (1 - e) * np.sin(ph)          # far (sin > 0) behind, also when sliding
+        out.append((z, y, 200 * (1 - smooth((t - T_ENTER[k]) / 90)), key))
     return out
 
 def render(t):
     col = np.zeros(H, int)
-    for z, y, rise in sorted(bars(t), key=lambda b: -b[0]):       # far first
+    for z, y, rise, _ in sorted(bars(t), key=lambda b: -b[3]):    # far first
         z = max(z, 0.6)
         yc = H / 2 - F * y / z + rise * (1 + 60 / H)
         half = F * R / z
