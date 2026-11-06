@@ -21,8 +21,10 @@ v7 = fv.v7
 W, H, Z = fv.W, fv.H, fv.Z
 EDGES = [0, 32, 96, 160, 224, 288, 320]          # segment boundaries in the window
 XC = np.array([(a + b) / 2 for a, b in zip(EDGES, EDGES[1:])])
-TILT_T, STAGGER = 40, 2                          # frames up and down; start delay per string
-RISE = 1.6                                       # right end's rise, in the string's half-thicknesses
+TILT_T, STAGGER = 16, 2                          # frames up and down; start delay per string
+RISE = 28                                        # the closest string's right-end rise (lines)
+RISE_EXP = 0.3                                   # rise ~ thickness^0.3: far strings still
+                                                 # rise visibly, so the wave reads into the distance
 HOLD0, HOLD1 = 60, 60                            # still frames before / after
 
 def strings():
@@ -30,7 +32,7 @@ def strings():
     and half-thickness."""
     out = []
     zs = fv.SPACING * np.arange(1, int(fv.ZMAX / fv.SPACING) + 1)
-    for z in zs[zs >= 0.3]:
+    for z in [z for z in zs if z >= 0.3 and fv.screen_y(z) > -4]:   # the ones on screen
         d = np.hypot(z, fv.CAM_H)
         yc, half = fv.screen_y(z), fv.F * fv.R / d
         rows = {}
@@ -49,10 +51,11 @@ def strings():
 def frame(strs, t):
     """Ramp index per (segment, line) at animation frame t."""
     seg = np.zeros((len(XC), H), int)
+    half0 = strs[0][1]
     for i in range(len(strs) - 1, -1, -1):               # far first
         rows, half = strs[i]
         u = (t - STAGGER * i) / TILT_T
-        a = RISE * half * np.sin(np.pi * u) if 0 < u < 1 else 0.0
+        a = RISE * (half / half0) ** RISE_EXP * np.sin(np.pi * u) if 0 < u < 1 else 0.0
         offs = -np.round(a * XC / W).astype(int)          # right end up
         for s, o in enumerate(offs):
             for y, k in rows.items():
