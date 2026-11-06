@@ -33,10 +33,27 @@ HORIZON = 14                    # screen line of the horizon
 Z_NEAR, Z_FAR, Y_NEAR, Y_FAR = 0.45, 18.0, H + 40, HORIZON
 A = (Y_NEAR - Y_FAR) / (np.sqrt(Z_FAR) - np.sqrt(Z_NEAR))
 MIX = 0.5                       # 0: true perspective, 1: the sqrt remap
-def screen_y(z):
+def _y_mix(z):
     true = HORIZON + F * CAM_H / z
     remap = Y_NEAR - A * (np.sqrt(z) - np.sqrt(Z_NEAR))
     return (1 - MIX) * true + MIX * remap
+def _half(z):
+    return F * R / np.hypot(z, CAM_H)
+def _gap(z):
+    return _y_mix(z) - _half(z) - _y_mix(z + SPACING) - _half(z + SPACING)
+# Near the camera the gap between a string and the next one grows fast; from
+# where it reaches GAP lines, each nearer string is held GAP black lines
+# below the next one instead (so the closest string comes up the screen).
+GAP = 5
+_lo, _hi = 0.05, 5.0
+for _ in range(60):
+    _m = (_lo + _hi) / 2
+    _lo, _hi = (_m, _hi) if _gap(_m) > GAP else (_lo, _m)
+Z_HOLD = _hi
+def screen_y(z):
+    if z >= Z_HOLD:
+        return _y_mix(z)
+    return screen_y(z + SPACING) + _half(z) + _half(z + SPACING) + GAP
 SPEED = SPACING / 96            # one spacing every 96 frames: a seamless loop
 ZMAX = 40.0
 SUB = 8
