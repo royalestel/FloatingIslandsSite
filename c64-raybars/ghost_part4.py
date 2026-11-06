@@ -174,43 +174,61 @@ def wave_tokens(A, tw):
     return out
 
 # ---- the start ------------------------------------------------------------------------
-SHAKE = 820
+SHAKE = 1064
+
+# An earthquake: each position is a sum of sines at four unrelated frequencies
+# (periods about 14, 7, 5 and 3 frames), each column with its own phases, under a slow
+# envelope.  Rounded to whole lines it is that frame's offset.
+QFREQ = (0.071, 0.137, 0.213, 0.327)
+QWT = (1.0, 0.7, 0.45, 0.3)
+
+def quake(t, k, env):
+    x = sum(w * math.sin(2 * math.pi * f * t + 1.7 * k * (j + 1) + 0.9 * j + 0.4)
+            for j, (f, w) in enumerate(zip(QFREQ, QWT))) / sum(QWT)
+    return int(round(1.5 * env * x))
+
+def interp(u, keys):
+    """Envelope from (time, level) keys, eased between them."""
+    if u <= keys[0][0]:
+        return keys[0][1]
+    for (t0, a), (t1, b) in zip(keys, keys[1:]):
+        if u < t1:
+            x = (u - t0) / (t1 - t0)
+            x = x * x * (3 - 2 * x)
+            return a + (b - a) * x
+    return keys[-1][1]
+
+SPLIT_KEYS = [(0, 0.5), (60, 1.0), (120, 2.0), (180, 4.0), (225, 6.0), (265, 4.0), (320, 2.0),
+              (380, 1.0), (420, 0.0)]
 
 def shake_offsets(t):
     """(whole-floor shift, per-column shifts):
-       0-20     a little shake (1 line)
-       20-140   pause (2 s)
-       140-200  a bigger shake (2 lines, 1 s)
-       200-320  pause (2 s)
-       320-...  the split columns: 1 line (1 s), 2 lines (1 s), build to 3 (1 s),
-                settle to 1 (1 s), 1 line (1 s), a beat (1/3 s), 1 line again (1 s),
-                then a 2 s pause, and the waves."""
-    if t < 20:
-        return round(1.0 * math.sin(2 * math.pi * t / 10)), [0] * SEGS
-    if t < 140:
+       0-40      a little quake of the whole floor (1-2 lines)
+       40-160    pause (2 s)
+       160-260   a bigger quake (up to 3 lines)
+       260-380   pause (2 s)
+       380-800   the split columns, each shaking on its own, from small, getting bigger
+                 to a peak of about 6 lines, and dying away
+       800-920   a longer pause (2 s)
+       920-944   a short tiny shake (1 line)
+       944-1064  pause (2 s), then the waves."""
+    if t < 40:
+        return quake(t, 0, 1.5 * math.sin(math.pi * t / 40)), [0] * SEGS
+    if t < 160:
         return 0, [0] * SEGS
-    if t < 200:
-        return round(2.0 * math.sin(2 * math.pi * (t - 140) / 10)), [0] * SEGS
-    if t < 320:
+    if t < 260:
+        return quake(t, 0, 3.0 * math.sin(math.pi * (t - 160) / 100)), [0] * SEGS
+    if t < 380:
         return 0, [0] * SEGS
-    u = t - 320
-    if u < 60:
-        env = 1.0
-    elif u < 120:
-        env = 2.0
-    elif u < 180:
-        env = 2.0 + (u - 120) / 60.0                     # build to 3
-    elif u < 240:
-        env = 3.0 - 2.0 * (u - 180) / 60.0              # settle from 3 lines to 1
-    elif u < 300:
-        env = 1.0                                       # 1 line, one second
-    elif u < 320:
-        env = 0.0                                       # a beat
-    elif u < 380:
-        env = 1.0                                       # 1 line again
-    else:
-        env = 0.0                                       # still: the 2 s pause before the waves
-    return 0, [round(env * math.sin(2 * math.pi * u / 10 + 0.9 * k)) for k in range(SEGS)]
+    if t < 800:
+        u = t - 380
+        env = interp(u, SPLIT_KEYS)
+        return 0, [quake(u, k + 1, env) for k in range(SEGS)]
+    if t < 920:
+        return 0, [0] * SEGS
+    if t < 944:
+        return quake(t, 0, 1.2 * math.sin(math.pi * (t - 920) / 24)), [0] * SEGS
+    return 0, [0] * SEGS
 
 def shift_rows(a, o):
     out = np.zeros_like(a)
