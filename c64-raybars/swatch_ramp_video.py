@@ -39,6 +39,10 @@ def reorder(lad):
 
 DROP = {13, 15, 19, 24, 27}           # by eye: dark grey, cyan checker inverting,
                                       # dark grey / grey, grey, light grey
+DROP2 = {7, 10, 25}                   # then: dark grey checker inverting,
+                                      # grey checker inverting, light grey / white
+SHIFT_N = {6}                         # light blue 1/4 inverting: pixels one to the right
+SHIFT = set()
 SWAP_ROWS = {v7.STRIPES}              # cyan | white stripes: its two rows swapped
 
 def main(path, seconds=5):
@@ -57,6 +61,8 @@ def main(path, seconds=5):
     lad = sorted(lums, key=lambda k: lums[k])
     lad = reorder(lad)
     lad = [k for i, k in enumerate(lad) if i + 1 not in DROP]
+    lad = [k for i, k in enumerate(lad) if i + 1 not in DROP2]
+    SHIFT.update(lad[i - 1] for i in SHIFT_N)
     L = lambda y: 116 * y ** (1 / 3) - 16 if y > 0.008856 else y * 903.3
     h = PAD * 2 + ROWS * len(lad)
     WIDTH = h                                # a square of colour
@@ -77,6 +83,8 @@ def main(path, seconds=5):
                 rp = (r + (k in SWAP_ROWS)) & 1
                 img[r] = v7.colour(k, rp, p)
                 g = v7.ghost(k, rp, p)
+                if k in SHIFT:
+                    g = (g >> 1) | ((g & 1) << 7)
                 if g:
                     img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
         looks.append(lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z))
