@@ -146,21 +146,26 @@ def wave_tokens(A, tw):
     return out
 
 # ---- the start ------------------------------------------------------------------------
-SHAKE = 700
+SHAKE = 820
 
 def shake_offsets(t):
-    """(whole-floor shift, per-column shifts): a little shake (20), a long pause (120),
-    a bigger shake (20), a long pause (120), then the split columns: 1 line for a
-    second, 2 lines for a second, up to 3, down to 1, a long linger at 1, then still."""
+    """(whole-floor shift, per-column shifts):
+       0-20     a little shake (1 line)
+       20-140   pause (2 s)
+       140-200  a bigger shake (2 lines, 1 s)
+       200-320  pause (2 s)
+       320-...  the split columns: 1 line (1 s), 2 lines (1 s), build to 3 (1 s),
+                settle to 1 (1 s), 1 line (1 s), a beat (1/3 s), 1 line again (1 s),
+                then a 2 s pause, and the waves."""
     if t < 20:
         return round(1.0 * math.sin(2 * math.pi * t / 10)), [0] * SEGS
     if t < 140:
         return 0, [0] * SEGS
-    if t < 160:
+    if t < 200:
         return round(2.0 * math.sin(2 * math.pi * (t - 140) / 10)), [0] * SEGS
-    if t < 280:
+    if t < 320:
         return 0, [0] * SEGS
-    u = t - 280
+    u = t - 320
     if u < 60:
         env = 1.0
     elif u < 120:
@@ -169,10 +174,14 @@ def shake_offsets(t):
         env = 2.0 + (u - 120) / 60.0                     # build to 3
     elif u < 240:
         env = 3.0 - 2.0 * (u - 180) / 60.0              # settle from 3 lines to 1
-    elif u < 360:
-        env = 1.0                                       # linger at 1 line (2 s)
+    elif u < 300:
+        env = 1.0                                       # 1 line, one second
+    elif u < 320:
+        env = 0.0                                       # a beat
+    elif u < 380:
+        env = 1.0                                       # 1 line again
     else:
-        env = max(0.0, (420 - u) / 60.0)                # then to still
+        env = 0.0                                       # still: the 2 s pause before the waves
     return 0, [round(env * math.sin(2 * math.pi * u / 10 + 0.9 * k)) for k in range(SEGS)]
 
 def shift_rows(a, o):
