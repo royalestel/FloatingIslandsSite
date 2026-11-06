@@ -34,8 +34,15 @@ LAD = v10.LAD                                     # 25 swatches, darkest first
 Lstar = fv.Lstar
 RAMP_L = Lstar(np.array([v10.EYE[k] for k in LAD]))
 FLAT = [i for i, k in enumerate(LAD) if all(v10.ghost(k, r, p) == 0 for r in (0, 1) for p in (0, 1))]
-EDGES = [0, 32, 96, 160, 224, 288, 320]
-SEGS = 6
+import os
+# Split layout in the 320 px window.  6 segments: 32 | 64 x 4 | 32 (an 8-cycle write each:
+# GOLDSHIP's layout).  7 segments (SPLITS=7): 40 | 48 x 5 | 40 -- a write every 6 cycles
+# (lda #imm / sta), which the sprite-free 63-cycle line has room for.
+if os.environ.get("SPLITS", "6") == "7":
+    EDGES = [0, 40, 88, 136, 184, 232, 280, 320]
+else:
+    EDGES = [0, 32, 96, 160, 224, 288, 320]
+SEGS = len(EDGES) - 1
 
 def profile_idx(T):
     d = 2 * F * R / T
