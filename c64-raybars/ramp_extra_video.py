@@ -69,7 +69,7 @@ TOSS3 = [20, 22, 28]                              # red / light red, purple / li
 
 TOSS4 = [19, 23, 25]                              # red / grey, light red / light grey, yellow / light grey (too much flicker)
 
-ROT_NUMS = (6, 7, 8)              # swatches (video numbers) whose idle-byte pattern moves
+ROT_NUMS = (2, 3, 4)              # swatches (video numbers) whose idle-byte pattern moves
                                   # one pixel right every frame: a rotate of the byte
 
 def ror(g, k):
