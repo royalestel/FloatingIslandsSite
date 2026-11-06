@@ -198,6 +198,77 @@ def ramp_v3(h, d, ladder=None):
     upper = lower[::-1] if h % 2 == 0 else lower[:0:-1]
     return upper + lower
 
+# ---- v4 (preview): brightness by LINEAR light -- the two frames' light
+# averaged, as the eye integrates a 50 Hz flicker -- and white brought into
+# the core early as white under the flicker patterns (1/4 on/off, 1/4
+# inverting, checker inverting), sparkling on and off at mid distance
+def _white():
+    import swatches_video as sw
+    pats = {n: f for n, _, f in sw.BLUE_PATTERNS}
+    for pn in ("1/4 on/off", "1/4 inverting", "checker inverting"):
+        name = "white " + pn
+        if any(p[6] == name for p in sv.PAL):
+            continue
+        f = pats[pn]
+        t = sw.patch(1, 1, name, 0, lambda r, p, bp=False, f=f: f(r, p))
+        sv.PAL.append((1, 1, f, sw.blended(t[4]), sw.brightness(t[4]), 0, name))
+    sv.COL = np.array([p[3] for p in sv.PAL])
+    sv.LUM = np.array([p[4] for p in sv.PAL])
+    sv.WIDE = np.array([p[5] for p in sv.PAL])
+_white()
+WHITE_P = [i for i, p in enumerate(sv.PAL) if p[6].startswith("white ") and p[6] != "white"]
+
+def lum_linear(k):
+    import swatches_video as sw
+    a, b, pat, *_ = sv.PAL[k]
+    t = sw.patch(a, b, "", 0, lambda r, p, bp=False: pat(r, p))
+    return float(np.mean([fl.lin(f) @ sv.LW for f in t[4]]))
+
+LUMLIN = np.array([lum_linear(k) for k in range(len(sv.PAL))])
+EDGE_L = sorted(LADDER_P, key=lambda k: LUMLIN[k])           # blue family
+CORE_L = sorted(LADDER_P + WHITE_P, key=lambda k: LUMLIN[k])  # + flickering white
+CORE_R = 0.4                          # rows within this of the centre may sparkle white
+WHITE_BIAS = 0.4                      # how strongly the core prefers white
+V4_ANCHORS = [(28.0, 6.5), (20.0, 22.0), (5.0, 62.0), (0.42, 100.0)]
+
+def row_v4(d, r):
+    global V3_ANCHORS
+    keep, V3_ANCHORS = V3_ANCHORS, V4_ANCHORS
+    try:
+        return row_v3(d, r)
+    finally:
+        V3_ANCHORS = keep
+
+def ramp_v4(h, d):
+    """Rows from the centre out: in the core (|r| < CORE_R) once the light
+    reaches white 1/4 on/off's, white only (1/4 on/off, 1/4 inverting,
+    checker inverting, solid) -- white comes in early, flickering, and
+    stays; elsewhere the blue family, by linear light."""
+    whites = sorted(WHITE_P + [28], key=lambda k: LUMLIN[k])
+    wmin = 0.8 * LUMLIN[whites[0]]
+    half = (h + 1) // 2
+    lower, err, lmax, white_ok = [], 0.0, 9.0, True
+    for i in range(half):
+        j = h - half + i
+        r = 2 * (j + 0.5) / h - 1
+        want = row_v4(d, r) + err
+        if white_ok and abs(r) < CORE_R and want >= wmin:
+            lad = whites
+        else:
+            lad, white_ok = EDGE_L, False
+        lum = LUMLIN[lad]
+        cost = np.where(lum <= lmax + 1e-9, np.abs(lum - want), np.inf)
+        if not np.isfinite(cost).any():
+            lad, lum = EDGE_L, LUMLIN[EDGE_L]
+            cost = np.where(lum <= lmax + 1e-9, np.abs(lum - want), np.inf)
+            white_ok = False
+        k = int(np.argmin(cost))
+        lower.append(lad[k])
+        lmax = lum[k]
+        err = 0.8 * (want - lum[k])
+    upper = lower[::-1] if h % 2 == 0 else lower[:0:-1]
+    return upper + lower
+
 def d_of_h(h):
     """The distance a bar h lines tall stands for (inverse of bar_lines)."""
     k = 2 * R_BAR * F
@@ -258,16 +329,17 @@ def pack_ramps():
         pg[2] += h
     return [(bytes(b), offs) for b, offs, _ in pages]
 
-def swatch_tables():
+def swatch_tables(n=32):
     """Two pages (frame parity p): colour by row parity (E: even mock row,
-    O: odd) at +0 / +32, idle byte at +64 / +96."""
+    O: odd) at +0 / +n, idle byte at +2n / +3n (n = 32 for the program;
+    the previews, with more swatches, use 64).  Only the first n swatches."""
     pages = []
     for p in (0, 1):
         b = bytearray(256)
-        for k, (a, bb, pat, *_r) in enumerate(sv.PAL):
+        for k, (a, bb, pat, *_r) in enumerate(sv.PAL[:n]):
             for r in (0, 1):
-                b[32 * r + k] = a if (r + p) % 2 == 0 else bb
-                b[64 + 32 * r + k] = pat(r, p) & 255
+                b[n * r + k] = a if (r + p) % 2 == 0 else bb
+                b[2 * n + n * r + k] = pat(r, p) & 255
         pages.append(bytes(b))
     return pages
 

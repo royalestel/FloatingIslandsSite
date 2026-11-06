@@ -42,11 +42,12 @@ def blurry(im):
 
 PURPLE = "PURPLE" in os.environ       # left v3, right v3 with purple / light blue 1/4 inverting
 STOP = float(os.environ.get("STOP", 0))
+V4 = "V4" in os.environ               # linear-light ladder, flickering white core (ramp_v4)
 SPEED = 0.045                       # metres a frame (cosmicstrings' base speed)
 DNEAR = 2 * sv.lv.R_BAR * gc.F / (gc.HMAX + 0.45)
 
 def main(out_crt, out_sharp, below=0.3, start=None, split=False):
-    tabs = [np.frombuffer(t, np.uint8) for t in gc.swatch_tables()]
+    tabs = [np.frombuffer(t, np.uint8) for t in gc.swatch_tables(64)]
     ramps = {}
     spr = gc.sprites()
     font, small = fl.fonts()
@@ -61,6 +62,8 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
         if d >= DNEAR:
             h = max(2, min(gc.HMAX, lv.bar_lines(d)))
             key = (h, round(d * 10) / 10)        # by distance (0.1 m) as well
+            if key not in ramps and V4 and not split:
+                ramps[key] = (gc.ramp_v4(h, key[1]),) * 2
             if key not in ramps:
                 alt = gc.ramp_v3 if V3 else gc.ramp_smooth
                 if PURPLE:                           # v3 vs v3 with the extra patterns
@@ -68,7 +71,8 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
                 else:
                   ramps[key] = (gc.ramp_round(h, round(d * 2) / 2),
                                 alt(h, key[1]) if split else
-                                (gc.ramp_v3(h, key[1], gc.LADDER_P if PURPLE else None) if V3
+                                (gc.ramp_v4(h, key[1]) if V4 else
+                                 gc.ramp_v3(h, key[1], gc.LADDER_P if PURPLE else None) if V3
                                  else gc.ramp_round(h, round(d * 2) / 2)))
             top = int(round((2 * gc.CYL - 2 * gc.F * (-below) / d - h) / 2))
             for j in range(h):
@@ -78,8 +82,8 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
                     t = tabs[p]
                     for side, (x0, x1) in enumerate(((0, 160), (160, 320)) if split else ((0, 320),)):
                         k = ramps[key][side][j]
-                        img[r, x0:x1] = t[32 * (r & 1) + k]
-                        g = t[64 + 32 * (r & 1) + k]
+                        img[r, x0:x1] = t[64 * (r & 1) + k]
+                        g = t[128 + 64 * (r & 1) + k]
                         if g:
                             xs = x[x0:x1]
                             row = img[r, x0:x1]
