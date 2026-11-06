@@ -76,6 +76,8 @@ def centre_first(rows):
         p[j] = min(p[j], p[j + 1])
     for j in range(c1 + 1, h):
         p[j] = min(p[j], p[j - 1])
+    # evenly both ways: a row takes a step only when its mirror row does
+    p = [min(p[j], p[h - 1 - j]) for j in range(h)]
     return [LADDER[i] for i in p]
 
 CONTRAST_FULL = 14.0               # full round profile from here in;

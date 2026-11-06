@@ -21,6 +21,24 @@ gc.ROUND = True                     # round bars at all distances (preview)
 
 import os
 V3 = "V3" in os.environ               # the v3 preview ramps (gen_cosmic.ramp_v3)
+BLUR = float(os.environ.get("BLUR", 0))   # extra blur on the CRT look (lines at 1x)
+
+def blurry(im):
+    """A very soft TV: the CRT look blurred again in linear light, mostly
+    vertically (across the lines), BLUR lines."""
+    from PIL import ImageFilter
+    a = (np.asarray(im, float) / 255) ** 2.2
+    def g(x, r):
+        b = Image.fromarray(np.clip(x ** (1 / 2.2) * 255, 0, 255).astype(np.uint8))
+        return (np.asarray(b.filter(ImageFilter.GaussianBlur(r)), float) / 255) ** 2.2
+    # vertical: blur a column-squashed copy, then stretch back
+    h, w, _ = a.shape
+    small = Image.fromarray(np.clip(a ** (1 / 2.2) * 255, 0, 255).astype(np.uint8)).resize((w // 4, h))
+    sv_ = (np.asarray(small.filter(ImageFilter.GaussianBlur(BLUR * 3 / 4)), float) / 255) ** 2.2
+    vert = (np.asarray(Image.fromarray(np.clip(sv_ ** (1 / 2.2) * 255, 0, 255).astype(np.uint8)).resize((w, h), Image.BILINEAR), float) / 255) ** 2.2
+    out = 0.7 * vert + 0.3 * g(a, BLUR * 3 / 2)
+    return Image.fromarray(np.clip(out ** (1 / 2.2) * 255, 0, 255).astype(np.uint8))
+
 SPEED = 0.045                       # metres a frame (cosmicstrings' base speed)
 DNEAR = 2 * sv.lv.R_BAR * gc.F / (gc.HMAX + 0.45)
 
@@ -83,6 +101,8 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
                 dr.text((16, 8), f"one cosmic string, {below:.2f} m below the ship:   {label}   "
                         f"{'CRT' if crt else 'sharp'}", fill=(170, 176, 210), font=small)
             look = lv.crt_look(rgb, Z) if crt else Image.fromarray(rgb).resize((W, H), Image.NEAREST)
+            if crt and BLUR:
+                look = blurry(look)
             canvas.paste(look, (16, 40))
             # the distance, large, in the empty top right of the window
             big = f"{d:5.2f} m" if d >= DNEAR else "clipped"
