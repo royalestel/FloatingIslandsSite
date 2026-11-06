@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""The ramp the bars are drawn from (v9's ladder: v3's swatches plus the
-white centre swatches), darkest at the top, two rows per swatch, each next
-pair one step brighter; both frames alternating, CRT look, 5 seconds.
+"""Every swatch we have (the 29, purple and light blue 1/4 inverting, and
+the white centre's cyan + white every other / cyan | white stripes), in
+order of linear light, darkest at the top, two rows per swatch; both frames
+alternating, CRT look, 5 seconds; a square of colour with the labels beside
+it (number, name, L* by linear light).
 
     python3 swatch_ramp_video.py out.mp4
 """
@@ -15,17 +17,32 @@ import loop_video as lv
 import swatch_loop_video as sv
 import preview_v7 as v7
 
-ROWS, WIDTH, Z, PAD = 2, 160, 6, 3
+ROWS, Z, PAD = 2, 8, 3
 
 def main(path, seconds=5):
-    lad = v7.LADDER7
+    def lin(k):
+        frames = []
+        for p in (0, 1):
+            img = np.zeros((8, 8, 3))
+            for r in range(8):
+                c = fb.C64RGB[v7.colour(k, r & 1, p)]
+                g = v7.ghost(k, r & 1, p)
+                for x_ in range(8):
+                    img[r, x_] = 0 if (g >> (7 - x_)) & 1 else c
+            frames.append(img)
+        return float(np.mean([fl.lin(f) @ sv.LW for f in frames]))
+    lums = {k: lin(k) for k in range(len(sv.PAL))}
+    lad = sorted(lums, key=lambda k: lums[k])
+    L = lambda y: 116 * y ** (1 / 3) - 16 if y > 0.008856 else y * 903.3
     h = PAD * 2 + ROWS * len(lad)
+    WIDTH = h                                # a square of colour
     font, small = fl.fonts()
     names = []
     for k in lad:
         a, b, *_r, name = sv.PAL[k]
-        names.append(name if name != "full" else
-                     (fl.NAMES[a] if a == b else f"{fl.NAMES[a]} / {fl.NAMES[b]}"))
+        names.append((name if name != "full" else
+                      (fl.NAMES[a] if a == b else f"{fl.NAMES[a]} / {fl.NAMES[b]}"))
+                     + f"   L* {L(lums[k]):.0f}")
     looks = []
     x = np.arange(WIDTH)
     for p in (0, 1):
@@ -39,14 +56,15 @@ def main(path, seconds=5):
                     img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
         looks.append(lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z))
     W, H = WIDTH * Z, h * Z
-    v = iv.Video(path, W + 360, H + 50)
+    v = iv.Video(path, W + 330, H + 50)
     for f in range(seconds * 60):
         canvas = Image.new("RGB", (v.w, v.h), (8, 8, 16))
         dr = ImageDraw.Draw(canvas)
-        dr.text((16, 8), "the swatch ramp, two rows each, darkest first   CRT", fill=(170, 176, 210), font=small)
+        dr.text((16, 8), "every swatch by linear light, two rows each, darkest first   CRT",
+                fill=(170, 176, 210), font=small)
         canvas.paste(looks[f & 1], (16, 34))
         for i, n in enumerate(names):
-            y = 34 + (PAD + ROWS * i) * Z + ROWS * Z // 2 - 7
+            y = 34 + (PAD + ROWS * i) * Z + ROWS * Z // 2 - 8
             dr.text((W + 32, y), f"{i + 1:2d}  {n}", fill=(190, 195, 225), font=small)
         v.add(canvas)
     v.close()
