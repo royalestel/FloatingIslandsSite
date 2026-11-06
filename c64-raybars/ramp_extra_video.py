@@ -69,11 +69,14 @@ TOSS3 = [20, 22, 28]                              # red / light red, purple / li
 
 TOSS4 = [19, 23, 25]                              # red / grey, light red / light grey, yellow / light grey (too much flicker)
 
-ROLL = True                       # the idle-byte patterns roll one bit left every frame
+ROT_NUMS = (6, 7, 8)              # swatches (video numbers) whose idle-byte pattern moves
+                                  # one pixel right every frame: a rotate of the byte
 
-def rol(g, k):
+def ror(g, k):
+    """Rotate the idle byte right k bits: the pattern moves k pixels right on screen
+    (bit 7 is the left pixel, so this is the opposite of ROL)."""
     k %= 8
-    return ((g << k) | (g >> (8 - k))) & 255 if k else g
+    return ((g >> k) | (g << (8 - k))) & 255 if k else g
 
 def _c(fn, rp, p, s):
     """A swatch's colour and idle byte on its line s (0..ROWS-1); entries marked
@@ -181,7 +184,7 @@ def main(path, seconds=6, merged=False):
     x = np.arange(WIDTH)
     looks = {}
     for p in (0, 1):
-        for k in (range(8) if ROLL else (0,)):              # k: the idle bytes rolled k bits
+        for k in range(8):                                  # k: the moving patterns' shift
             img = np.zeros((h, WIDTH), int)
             for i, (_, _, fn) in enumerate(rows):
                 for s in range(ROWS):
@@ -189,7 +192,8 @@ def main(path, seconds=6, merged=False):
                     c, g = _c(fn, r & 1, p, s)
                     img[r] = c
                     if g:
-                        g = rol(g, k)
+                        if i + 1 in ROT_NUMS:
+                            g = ror(g, k)
                         img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
             looks[p, k] = lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z)
     W, H = WIDTH * Z, h * Z
@@ -199,7 +203,7 @@ def main(path, seconds=6, merged=False):
         dr = ImageDraw.Draw(c)
         dr.text((16, 8), ("all swatches, darkest first (measured light)   CRT" if merged else "red ramp 1-25, then purple, then yellow (each by measured light)   CRT"),
                 fill=(170, 176, 210), font=small)
-        c.paste(looks[f & 1, f % 8 if ROLL else 0], (16, 34))
+        c.paste(looks[f & 1, f % 8], (16, 34))
         for i, (n, ls, _) in enumerate(rows):
             y = 34 + (PAD + ROWS * i) * Z + ROWS * Z // 2 - 8
             dr.text((W + 32, y), txt[i], fill=(190, 195, 225), font=small)
