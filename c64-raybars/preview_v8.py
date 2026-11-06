@@ -59,7 +59,9 @@ def ramp_v8(h, d):
     upper = out[::-1] if h % 2 == 0 else out[:0:-1]
     return upper + out
 
-def main(path):
+def main(path, left=None, right=None, names=("v3", "v8"), title="v3 + white centre"):
+    left = left or gc.ramp_v3
+    right = right or ramp_v8
     spr = gc.sprites()
     font, small = fl.fonts()
     Z = 3
@@ -73,7 +75,7 @@ def main(path):
         h = max(2, min(gc.HMAX, lv.bar_lines(d)))
         key = (h, round(d * 10) / 10)
         if key not in cache:
-            cache[key] = (gc.ramp_v3(h, key[1]), ramp_v8(h, key[1]))
+            cache[key] = (left(h, key[1]), right(h, key[1]))
         top = int(round((2 * gc.CYL + 2 * gc.F * BELOW / d - h) / 2))
         img = np.zeros((fb.H, fb.W), int)
         for j in range(h):
@@ -100,11 +102,11 @@ def main(path):
                         rgb[gc.SPRY + 1 + sy - 51, 136 + s * 24 + 2 * cx:][:2] = fb.C64RGB[cols[val]]
         canvas = Image.new("RGB", (v.w, v.h), (8, 8, 16))
         dr = ImageDraw.Draw(canvas)
-        dr.text((16, 8), f"left: v3   right: v8 (v3 + white centre)   {d:5.2f} m   {h} lines   CRT",
+        dr.text((16, 8), f"left: {names[0]}   right: {names[1]} ({title})   {d:5.2f} m   {h} lines   CRT",
                 fill=(170, 176, 210), font=small)
         canvas.paste(lv.crt_look(rgb, Z), (16, 40))
-        dr.text((16 + 40, 56), "v3", fill=(200, 200, 220), font=font)
-        dr.text((16 + W // 2 + 40, 56), "v8", fill=(200, 200, 220), font=font)
+        dr.text((16 + 40, 56), names[0], fill=(200, 200, 220), font=font)
+        dr.text((16 + W // 2 + 40, 56), names[1], fill=(200, 200, 220), font=font)
         dr.text((v.w - 200, 56), f"{d:5.2f} m", fill=(235, 235, 120), font=font)
         v.add(canvas)
         last = canvas
