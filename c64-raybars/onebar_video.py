@@ -68,7 +68,8 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
                 else:
                   ramps[key] = (gc.ramp_round(h, round(d * 2) / 2),
                                 alt(h, key[1]) if split else
-                                (gc.ramp_v3(h, key[1]) if V3 else gc.ramp_round(h, round(d * 2) / 2)))
+                                (gc.ramp_v3(h, key[1], gc.LADDER_P if PURPLE else None) if V3
+                                 else gc.ramp_round(h, round(d * 2) / 2)))
             top = int(round((2 * gc.CYL - 2 * gc.F * (-below) / d - h) / 2))
             for j in range(h):
                 ln = top + j
