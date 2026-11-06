@@ -38,8 +38,9 @@ def frames(variant):
     """Per frame: distance, and the bar rows' linear RGB (16 bit), cols 0..119."""
     tabs = [np.frombuffer(t, np.uint8) for t in gc.swatch_tables()]
     rampf = {"now": gc.ramp_round, "all 29": gc.ramp_smooth, "v3": gc.ramp_v3,
-             "v3 + patterns": lambda h, d: gc.ramp_v3(h, d, gc.LADDER_P)}[variant]
-    step = 10 if variant.startswith("v3") else 2   # ramps by distance: 0.1 m / 0.5 m
+             "v3 + patterns": lambda h, d: gc.ramp_v3(h, d, gc.LADDER_P),
+             "v5 (white on/off)": gc.ramp_v5}[variant]
+    step = 10 if variant.startswith("v") else 2   # ramps by distance: 0.1 m / 0.5 m
     cache = {}
     x = np.arange(120)
     d, f, out = sv.lv.FAR, 0, []
@@ -94,7 +95,7 @@ def main():
     import os
     variants = os.environ.get("VARIANTS", "now,v3").split(",")
     res = {v: profile(v) for v in variants}
-    colours = {"now": "#2a78d6", "all 29": "#eb6834", "v3": "#1baf7a", "v3 + patterns": "#eb6834"}
+    colours = {"now": "#2a78d6", "all 29": "#eb6834", "v3": "#1baf7a", "v3 + patterns": "#eb6834", "v5 (white on/off)": "#2a78d6"}
     fig, axes = plt.subplots(2, 1, figsize=(10, 7.5), sharex=True)
     fig.patch.set_facecolor("#fcfcfb")
     for ax, (title, col) in zip(axes, (("Core of the bar (middle fifth of its rows)", 1),

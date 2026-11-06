@@ -198,6 +198,56 @@ def ramp_v3(h, d, ladder=None):
     upper = lower[::-1] if h % 2 == 0 else lower[:0:-1]
     return upper + lower
 
+# ---- v5 (preview): v3 with the extra far patterns, and white brought into
+# the core early as WHITE ON/OFF: solid white on one frame, black the next
+# (no dither pattern).  From the centre out, once the core's light reaches
+# it, the core rows go white on/off, then cyan/white, then white.
+def _white_onoff():
+    import swatches_video as sw
+    name = "white on/off"
+    if not any(p[6] == name for p in sv.PAL):
+        pat = lambda r, p: 0x00 if p == 0 else 0xff
+        t = sw.patch(1, 1, name, 0, lambda r, p, bp=False: pat(r, p))
+        sv.PAL.append((1, 1, pat, sw.blended(t[4]), sw.brightness(t[4]), 0, name))
+        sv.COL = np.array([p[3] for p in sv.PAL])
+        sv.LUM = np.array([p[4] for p in sv.PAL])
+        sv.WIDE = np.array([p[5] for p in sv.PAL])
+    return [i for i, p in enumerate(sv.PAL) if p[6] == name][0]
+WONOFF = _white_onoff()
+assert len(sv.PAL) <= 32
+WHITES = [WONOFF, 27, 28]                # white on/off, cyan/white, white
+CORE_R = 0.4                             # rows within this of the centre may go white
+WHITE_IN = [(6.5, 0.0), (5.5, 0.09), (1.5, 0.4)]   # white core half-width (of the bar) by distance
+
+def white_width(d):
+    ds, ws = zip(*WHITE_IN[::-1])
+    return float(np.interp(np.log(d), np.log(ds), ws))
+
+def ramp_v5(h, d):
+    lad_e = LADDER_P
+    lum_e = np.array([sv.LUM[k] for k in lad_e])
+    lum_w = np.array([sv.LUM[k] for k in WHITES])
+    half = (h + 1) // 2
+    lower, err, lmax, white_ok = [], 0.0, 9.0, True
+    for i in range(half):
+        j = h - half + i
+        r = 2 * (j + 0.5) / h - 1
+        want = row_v3(d, r) + err
+        if white_ok and (abs(r) < white_width(d) or i == 0 and white_width(d) > 0):
+            lad, lum = WHITES, lum_w
+        else:
+            lad, lum, white_ok = lad_e, lum_e, False
+        cost = np.where(lum <= lmax + 1e-9, np.abs(lum - want), np.inf)
+        if not np.isfinite(cost).any():
+            lad, lum, white_ok = lad_e, lum_e, False
+            cost = np.where(lum <= lmax + 1e-9, np.abs(lum - want), np.inf)
+        k = int(np.argmin(cost))
+        lower.append(lad[k])
+        lmax = lum[k]
+        err = 0.8 * (want - lum[k])
+    upper = lower[::-1] if h % 2 == 0 else lower[:0:-1]
+    return upper + lower
+
 def d_of_h(h):
     """The distance a bar h lines tall stands for (inverse of bar_lines)."""
     k = 2 * R_BAR * F
