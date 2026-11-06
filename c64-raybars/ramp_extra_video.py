@@ -55,7 +55,7 @@ def name(e):
         return f"{n[e[2]]} + {n[e[1]]} every other"
     return n[e[2]] + {29: " 1/4 inverting", 5: " checker inverting"}[e[1]] + "  [ghost]"
 
-def main(path, seconds=6, merged=False):
+def build_rows(merged):
     rows = []                                          # (label, entry or red index)
     for i in range(r25.N):
         e = r25.ENTRIES[i]
@@ -67,6 +67,10 @@ def main(path, seconds=6, merged=False):
             rows.append((name(e), L(light(e)), lambda rp, p, e=e: (colour(e, rp, p), ghost(e, rp, p))))
     if merged:                                         # one ramp: everything dark to light
         rows.sort(key=lambda r: r[1])
+    return rows
+
+def main(path, seconds=6, merged=False):
+    rows = build_rows(merged)
     ROWS, Z, PAD, WIDTH = 2, 7, 4, 160
     h = PAD * 2 + ROWS * len(rows)
     x = np.arange(WIDTH)
@@ -99,5 +103,36 @@ def main(path, seconds=6, merged=False):
     for i, (n, ls, _) in enumerate(rows if merged else rows[r25.N:], 1 if merged else r25.N + 1):
         print(i, n, round(ls))
 
+def still(path, merged=True, scale=2):
+    """One big PNG (frame parity 0) for zooming: numbers 2 x larger."""
+    from PIL import ImageFont
+    import ramp_extra_video as me
+    rows = me.build_rows(merged)
+    ROWS, Z, PAD, WIDTH = 2, 7 * scale, 4, 160
+    h = PAD * 2 + ROWS * len(rows)
+    x = np.arange(WIDTH)
+    img = np.zeros((h, WIDTH), int)
+    for i, (_, _, fn) in enumerate(rows):
+        for s_ in range(ROWS):
+            r = PAD + ROWS * i + s_
+            c, g = fn(r & 1, 0)
+            img[r] = c
+            if g:
+                img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
+    look = lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z)
+    font = ImageFont.truetype("DejaVuSans-Bold.ttf", 15 * scale)
+    W, H = WIDTH * Z, h * Z
+    c = Image.new("RGB", (W + 470 * scale, H + 50 * scale), (8, 8, 16))
+    dr = ImageDraw.Draw(c)
+    c.paste(look, (16, 34 * scale))
+    for i, (n, ls, _) in enumerate(rows):
+        y = 34 * scale + (PAD + ROWS * i) * Z + ROWS * Z // 2 - 12 * scale
+        dr.text((W + 32, y), f"{i + 1:2d}  {n}  L* {ls:.0f}", fill=(235, 238, 255), font=font)
+    c.save(path)
+    print("wrote", path, c.size)
+
 if __name__ == "__main__":
-    main(sys.argv[1], merged="--merged" in sys.argv)
+    if sys.argv[1].endswith(".png"):
+        still(sys.argv[1], "--merged" in sys.argv)
+    else:
+        main(sys.argv[1], merged="--merged" in sys.argv)
