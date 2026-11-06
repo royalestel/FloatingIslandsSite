@@ -21,7 +21,8 @@ gc.ROUND = True                     # round bars at all distances (preview)
 
 import os
 V3 = "V3" in os.environ               # the v3 preview ramps (gen_cosmic.ramp_v3)
-BLUR = float(os.environ.get("BLUR", 0))   # extra blur on the CRT look (lines at 1x)
+BLUR = float(os.environ.get("BLUR", 2))   # the extra-blurry look's blur (lines)
+MODES = os.environ.get("MODES", "CRT,sharp").split(",")   # the two outputs: CRT, sharp, blurry
 
 def blurry(im):
     """A very soft TV: the CRT look blurred again in linear light, mostly
@@ -90,18 +91,19 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
                         xx = 136 + side * 24 + 2 * cx
                         rgb[yy, xx:xx + 2] = fb.C64RGB[cols[v]]
         last = []
-        for v, crt in zip(vids, (True, False)):
+        for v, mode in zip(vids, MODES):
+            crt = mode != "sharp"
             canvas = Image.new("RGB", (v.w, v.h), (8, 8, 16))
             dr = ImageDraw.Draw(canvas)
             label = f"{d:5.2f} m   {h} lines" if d >= DNEAR else "clipped"
             if split:
                 dr.text((16, 8), f"left: now   right: {'v3 (L* by log distance, centre-out)' if V3 else 'all 29, centre-out'}   "
-                        f"{label}   {'CRT' if crt else 'sharp'}", fill=(170, 176, 210), font=small)
+                        f"{label}   {mode}", fill=(170, 176, 210), font=small)
             else:
                 dr.text((16, 8), f"one cosmic string, {below:.2f} m below the ship:   {label}   "
-                        f"{'CRT' if crt else 'sharp'}", fill=(170, 176, 210), font=small)
+                        f"{mode}", fill=(170, 176, 210), font=small)
             look = lv.crt_look(rgb, Z) if crt else Image.fromarray(rgb).resize((W, H), Image.NEAREST)
-            if crt and BLUR:
+            if mode == "blurry":
                 look = blurry(look)
             canvas.paste(look, (16, 40))
             # the distance, large, in the empty top right of the window
