@@ -52,6 +52,12 @@ def light(fn):
             y += lin(c) * ((8 - bin(g).count("1")) / 8 if g else 1.0) / 4
     return Ls(y)
 
+# swatches the eye rejected (too much flicker): never used
+EXTRA_OK = {(7, 10)}                                 # light red with yellow (a warm hue step) may fill a gap
+ROUGH_PAIRS = {(3, 10), (3, 7)}                      # cyan with light red / yellow: only stripes
+BANNED = {"purple / light red", "light red + purple every other", "light red / cyan",
+          "cyan + light red every other", "cyan / yellow"}
+
 def pool():
     """Every candidate: (name, fn, colours used) over the seven bases (black included for ghosts)."""
     out = []
@@ -64,32 +70,40 @@ def pool():
                     (f"{N[a]} | {N[b]} stripes", f_stripes(a, b), {a, b}),
                     (f"{N[a]} + {N[b]} every other", f_every(b, a), {a, b}),
                     (f"{N[b]} + {N[a]} every other", f_every(a, b), {a, b})]
-    return [(n, fn, cols, light(fn)) for n, fn, cols in out]
+    def rough(cols):                                  # pairs that flickered too much: stripes only
+        return tuple(sorted(cols)) in ROUGH_PAIRS
+    return [(n, fn, cols, light(fn)) for n, fn, cols in out
+            if n not in BANNED and not (len(cols) == 2 and rough(cols) and "stripes" not in n)]
+
+def penalty(c):
+    """Flicker shows most where the two colours differ a lot: prefer low-contrast mixes,
+    stripes and ghost patterns over big-contrast flicker."""
+    n, cols = c[0], c[2]
+    if len(cols) < 2:
+        return 0.0
+    a, b = sorted(cols)
+    contrast = abs(Ls(lin(a)) - Ls(lin(b)))
+    return (0.03 if "stripes" in n else 0.12) * contrast
+
+# the curated 25 (after the five that flickered too much were removed and the greedy
+# fill was tidied by hand): names as pool() makes them
+FINAL = ["black", "blue 1/4 on/off [ghost]", "blue 1/4 inverting [ghost]",
+         "dark grey 1/4 inverting [ghost]", "blue checker inverting [ghost]",
+         "dark grey checker inverting [ghost]", "blue", "blue + dark grey every other",
+         "blue | dark grey stripes", "dark grey + blue every other", "dark grey",
+         "dark grey | purple stripes", "purple", "purple + light red every other",
+         "purple | light red stripes", "light red", "yellow checker inverting [ghost]",
+         "light red | cyan stripes", "cyan", "cyan | yellow stripes", "yellow",
+         "yellow + white every other", "yellow | white stripes", "white + yellow every other", "white"]
 
 def build(total=25):
-    sw = [("black", f_solid(0), {0}, 0.0)]
-    sw += [(N[c], f_solid(c), {c}, light(f_solid(c))) for c in BASES]
+    allc = {"black": ("black", f_solid(0), {0}, 0.0)}
+    for c in BASES:
+        allc[N[c]] = (N[c], f_solid(c), {c}, light(f_solid(c)))
+    for n, fn, cols, l in pool():
+        allc[n] = (n, fn, cols, l)
+    sw = [allc[n] for n in FINAL]
     sw.sort(key=lambda t: t[3])
-    cand = pool()
-    used = set()
-    while len(sw) < total:
-        gaps = sorted(((sw[i + 1][3] - sw[i][3], i) for i in range(len(sw) - 1)), reverse=True)
-        pick = None
-        for gap, i in gaps:
-            lo, hi = sw[i], sw[i + 1]
-            mid = (lo[3] + hi[3]) / 2
-            inside = [c for c in cand if c[0] not in used and lo[3] + 0.5 < c[3] < hi[3] - 0.5]
-            if not inside:
-                continue
-            near = lo[2] | hi[2]
-            # nearest to the middle; mixes of the two end colours (or ghosts of either) first
-            pick = min(inside, key=lambda c: abs(c[3] - mid) + (0 if c[2] <= near else 3))
-            break
-        if pick is None:
-            break
-        used.add(pick[0])
-        sw.append((pick[0], pick[1], pick[2], pick[3]))
-        sw.sort(key=lambda t: t[3])
     return [(n, fn, l) for n, fn, _, l in sw]
 
 def main(path):
