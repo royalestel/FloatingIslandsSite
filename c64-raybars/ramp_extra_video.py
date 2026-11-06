@@ -113,8 +113,9 @@ def build_rows(merged):
             y = 0
             for rp in (0, 1):
                 for p in (0, 1):
-                    c, _g = fn(rp, p)
-                    y += ((fb.C64RGB[c] / 255) ** 2.2) @ np.array([0.2126, 0.7152, 0.0722]) / 4
+                    c, g = fn(rp, p)
+                    lit = (8 - bin(g).count("1")) / 8 if g else 1.0
+                    y += lit * ((fb.C64RGB[c] / 255) ** 2.2) @ np.array([0.2126, 0.7152, 0.0722]) / 4
             return float(116 * y ** (1 / 3) - 16) if y > 0.008856 else y * 903.3
         f_yw = lambda rp, p: (YE if rp == 0 else WH, 0)
         f_lgy = lambda rp, p: (LG if rp == 0 else YE, 0)
@@ -135,6 +136,13 @@ def build_rows(merged):
         rows.insert(rows.index(p18) + 1, lrg)
         # tenth pass (the 27-swatch numbering): swap 7 and 8
         rows[6], rows[7] = rows[7], rows[6]
+        # eleventh pass (the 27-swatch numbering): toss 7 and 8; brown 1/8 inverting [ghost]
+        # (a 1-in-8 idle-byte dot pattern, brown, inverting frame to frame) between 6 and the new 7
+        f_b8 = lambda rp, p: (9, 0x11 if (rp + p) % 2 == 0 else 0x88)
+        b8 = ("brown 1/8 inverting  [ghost]", _L(f_b8), f_b8)
+        p6 = rows[5]
+        rows = [r for i, r in enumerate(rows, 1) if i not in (7, 8)]
+        rows.insert(rows.index(p6) + 1, b8)
     return rows
 
 def main(path, seconds=6, merged=False):
