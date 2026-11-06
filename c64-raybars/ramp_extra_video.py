@@ -136,10 +136,10 @@ def build_rows(merged):
         rows.insert(rows.index(p18) + 1, lrg)
         # tenth pass (the 27-swatch numbering): swap 7 and 8
         rows[6], rows[7] = rows[7], rows[6]
-        # eleventh pass (the 27-swatch numbering): toss 7 and 8; brown 1/8 inverting [ghost]
-        # (a 1-in-8 idle-byte dot pattern, brown, inverting frame to frame) between 6 and the new 7
-        f_b8 = lambda rp, p: (9, 0x11 if (rp + p) % 2 == 0 else 0x88)
-        b8 = ("brown 1/8 inverting  [ghost]", _L(f_b8), f_b8)
+        # eleventh pass (the 27-swatch numbering): toss 7 and 8; blue | brown stripes (no flicker,
+        # alternate lines) between 6 and the new 7
+        f_b8 = lambda rp, p: (6 if rp == 0 else 9, 0)
+        b8 = ("blue | brown stripes", _L(f_b8), f_b8)
         p6 = rows[5]
         rows = [r for i, r in enumerate(rows, 1) if i not in (7, 8)]
         rows.insert(rows.index(p6) + 1, b8)
