@@ -201,21 +201,25 @@ def ramp_v3(h, d, ladder=None):
 # ---- v5 (preview): v3 with the extra far patterns, and white brought into
 # the core early as WHITE ON/OFF: solid white on one frame, black the next
 # (no dither pattern).  From the centre out, once the core's light reaches
-# it, the core rows go white on/off, then cyan/white, then white.
-def _white_onoff():
+# it, the core rows go white over cyan, then white.
+def _white_over_cyan():
+    """White flickering over cyan: every line white on one frame and cyan on
+    the next (the whole bar in step, unlike the cyan / white pair, whose
+    phase swaps line by line).  Halfway between cyan and white."""
     import swatches_video as sw
-    name = "white on/off"
+    name = "cyan / white, whole lines"
     if not any(p[6] == name for p in sv.PAL):
-        pat = lambda r, p: 0x00 if p == 0 else 0xff
-        t = sw.patch(1, 1, name, 0, lambda r, p, bp=False: pat(r, p))
-        sv.PAL.append((1, 1, pat, sw.blended(t[4]), sw.brightness(t[4]), 0, name))
+        frames = []
+        for p in (0, 1):
+            frames.append(np.tile(sv.fb.C64RGB[1 if p == 0 else 3], (sw.P, sw.P, 1)))
+        sv.PAL.append((1, 3, lambda r, p: 0, sw.blended(frames), sw.brightness(frames), 0, name))
         sv.COL = np.array([p[3] for p in sv.PAL])
         sv.LUM = np.array([p[4] for p in sv.PAL])
         sv.WIDE = np.array([p[5] for p in sv.PAL])
     return [i for i, p in enumerate(sv.PAL) if p[6] == name][0]
-WONOFF = _white_onoff()
+WONOFF = _white_over_cyan()             # (was white on/off: too much contrast)
 assert len(sv.PAL) <= 32
-WHITES = [WONOFF, 27, 28]                # white on/off, cyan/white, white
+WHITES = [WONOFF, 28]                    # white over cyan, white
 CORE_R = 0.4                             # rows within this of the centre may go white
 WHITE_IN = [(6.5, 0.0), (5.5, 0.09), (1.5, 0.4)]   # white core half-width (of the bar) by distance
 
@@ -316,7 +320,8 @@ def swatch_tables():
         b = bytearray(256)
         for k, (a, bb, pat, *_r) in enumerate(sv.PAL):
             for r in (0, 1):
-                b[32 * r + k] = a if (r + p) % 2 == 0 else bb
+                whole = "whole lines" in sv.PAL[k][6]       # the same on every line
+                b[32 * r + k] = (a if p == 0 else bb) if whole else (a if (r + p) % 2 == 0 else bb)
                 b[64 + 32 * r + k] = pat(r, p) & 255
         pages.append(bytes(b))
     return pages
