@@ -24,7 +24,7 @@ v7 = fv.v7
 W, H, Z = fv.W, fv.H, fv.Z
 EDGES = [0, 32, 96, 160, 224, 288, 320]          # segment boundaries in the window
 XC = np.array([(a + b) / 2 for a, b in zip(EDGES, EDGES[1:])])
-TILT_T, STAGGER = 16, 2                          # frames up and down; start delay per string
+TILT_T, STAGGER = 32, 4                          # frames up and down; start delay per string
 RISE = 28                                        # the closest string's right-end rise (lines)
 RISE_EXP = 0.0                                   # every string rises the same RISE lines
 
