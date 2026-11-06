@@ -19,6 +19,26 @@ import preview_v7 as v7
 
 ROWS, Z, PAD = 2, 8, 3
 
+def reorder(lad):
+    """By eye (the CRT ramp): 6 <-> 7, 8 <-> 9; the light blue, grey and cyan
+    checker inverting (13, 15, 24) darker than they measure: moved up --
+    13 and 15 to just above blue, 24 to just above purple / dark grey."""
+    lad = list(lad)
+    lad[5], lad[6] = lad[6], lad[5]
+    lad[7], lad[8] = lad[8], lad[7]
+    m13, m15, m24 = lad[12], lad[14], lad[23]
+    for k in (m13, m15, m24):
+        lad.remove(k)
+    blue = [k for k in lad if sv.PAL[k][6] == "full" and sv.PAL[k][0] == sv.PAL[k][1] == 6][0]
+    pdg = [k for k in lad if sv.PAL[k][6] == "full" and {sv.PAL[k][0], sv.PAL[k][1]} == {4, 11}][0]
+    i = lad.index(blue)
+    lad[i:i] = [m13, m15]
+    i = lad.index(pdg)
+    lad[i:i] = [m24]
+    return lad
+
+SWAP_ROWS = {v7.STRIPES}              # cyan | white stripes: its two rows swapped
+
 def main(path, seconds=5):
     def lin(k):
         frames = []
@@ -33,6 +53,7 @@ def main(path, seconds=5):
         return float(np.mean([fl.lin(f) @ sv.LW for f in frames]))
     lums = {k: lin(k) for k in range(len(sv.PAL))}
     lad = sorted(lums, key=lambda k: lums[k])
+    lad = reorder(lad)
     L = lambda y: 116 * y ** (1 / 3) - 16 if y > 0.008856 else y * 903.3
     h = PAD * 2 + ROWS * len(lad)
     WIDTH = h                                # a square of colour
@@ -50,8 +71,9 @@ def main(path, seconds=5):
         for i, k in enumerate(lad):
             for s in range(ROWS):
                 r = PAD + ROWS * i + s
-                img[r] = v7.colour(k, r & 1, p)
-                g = v7.ghost(k, r & 1, p)
+                rp = (r + (k in SWAP_ROWS)) & 1
+                img[r] = v7.colour(k, rp, p)
+                g = v7.ghost(k, rp, p)
                 if g:
                     img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
         looks.append(lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z))
