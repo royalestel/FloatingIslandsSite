@@ -5,7 +5,7 @@ measured light.  Types: solid, a / b flicker pair (phase swapped line to line),
 "x + white every other", and [ghost] ones (an idle byte darkens part of the line:
 the blue ramp's 1/4 and checker patterns).  Two lines a swatch, CRT look.
 
-    python3 ramp_extra_video.py out.mp4
+    python3 ramp_extra_video.py out.mp4 [--merged]     (--merged: one ramp, dark to light)
 """
 import sys
 import numpy as np
@@ -55,7 +55,7 @@ def name(e):
         return f"{n[e[2]]} + {n[e[1]]} every other"
     return n[e[2]] + {29: " 1/4 inverting", 5: " checker inverting"}[e[1]] + "  [ghost]"
 
-def main(path, seconds=6):
+def main(path, seconds=6, merged=False):
     rows = []                                          # (label, entry or red index)
     for i in range(r25.N):
         e = r25.ENTRIES[i]
@@ -65,6 +65,8 @@ def main(path, seconds=6):
     for fam in (PURPLE, YELLOW):
         for e in sorted(fam, key=light):
             rows.append((name(e), L(light(e)), lambda rp, p, e=e: (colour(e, rp, p), ghost(e, rp, p))))
+    if merged:                                         # one ramp: everything dark to light
+        rows.sort(key=lambda r: r[1])
     ROWS, Z, PAD, WIDTH = 2, 7, 4, 160
     h = PAD * 2 + ROWS * len(rows)
     x = np.arange(WIDTH)
@@ -85,7 +87,7 @@ def main(path, seconds=6):
     for f in range(seconds * 60):
         c = Image.new("RGB", (v.w, v.h), (8, 8, 16))
         dr = ImageDraw.Draw(c)
-        dr.text((16, 8), "red ramp 1-25, then purple, then yellow (each by measured light)   CRT",
+        dr.text((16, 8), ("all swatches, darkest first (measured light)   CRT" if merged else "red ramp 1-25, then purple, then yellow (each by measured light)   CRT"),
                 fill=(170, 176, 210), font=small)
         c.paste(looks[f & 1], (16, 34))
         for i, (n, ls, _) in enumerate(rows):
@@ -94,8 +96,8 @@ def main(path, seconds=6):
         v.add(c)
     v.close()
     print("wrote", path, len(rows), "swatches")
-    for i, (n, ls, _) in enumerate(rows[r25.N:], r25.N + 1):
+    for i, (n, ls, _) in enumerate(rows if merged else rows[r25.N:], 1 if merged else r25.N + 1):
         print(i, n, round(ls))
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(sys.argv[1], merged="--merged" in sys.argv)
