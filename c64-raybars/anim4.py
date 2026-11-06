@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# anim4: anim3 in the red ramp (red_ramp.py); each string flashes white on the frame
-# of its apex tilt and fades back down the ramp to its own swatches as it comes to rest.
+# anim4: anim3 starting in the blue ramp; each string flashes white on the frame of its
+# apex tilt and fades down the red ramp (red_ramp.py) to its own red swatches as it comes to rest.
 # Black rows are not drawn (black is just $d021 background), so they never hide a string behind.
 """The cosmic strings floor (floor_video, stationary camera) with raster
 splits: each line is 6 $d021 segments (GOLDSHIP's split points, sprite x
@@ -39,34 +39,40 @@ def strings():
     for z in [z for z in zs if z >= 0.3 and fv.screen_y(z) > -4]:   # the ones on screen
         d = np.hypot(z, fv.CAM_H)
         yc, half = fv.screen_y(z), fv.F * fv.R / d
-        rows = {}
-        for y in range(int(np.floor(yc - half)), int(np.ceil(yc + half))):
+        both = []
+        for ramp_l in (fv.RAMP_L, rr.RAMP_L):           # blue, red
+          rows = {}
+          for y in range(int(np.floor(yc - half)), int(np.ceil(yc + half))):
             r = (y + (np.arange(fv.SUB) + 0.5) / fv.SUB - yc) / half
             r = r[np.abs(r) < 1]
             if len(r) < fv.SUB / 2:
                 continue
             lit = sum(fv.gc.row_v3(d, v) for v in r) / fv.SUB
-            k = int(np.argmin(np.abs(rr.Lstar(np.array(lit)) - rr.RAMP_L)))
+            k = int(np.argmin(np.abs(rr.Lstar(np.array(lit)) - ramp_l)))
             if k:                                    # black is the background: never painted
                 rows[y] = k
-        out.append((rows, half))
+          both.append(rows)
+        out.append((both[0], both[1], half))
     return out
+
+RED = 100                                        # seg values >= RED: red ramp index + RED
 
 def frame(strs, t):
     """Ramp index per (segment, line) at animation frame t."""
     seg = np.zeros((len(XC), H), int)
-    half0 = strs[0][1]
+    half0 = strs[0][2]
     for i in range(len(strs) - 1, -1, -1):               # far first
-        rows, half = strs[i]
+        blue, red, half = strs[i]
         u = (t - STAGGER * (len(strs) - 1 - i)) / TILT_T     # rear string first
         a = RISE * (half / half0) ** RISE_EXP * np.sin(np.pi * u) if 0 < u < 1 else 0.0
         offs = -np.round(a * XC / W).astype(int)          # right end up
         top = len(rr.RAMP) - 1
-        if 0.5 <= u < 1:                                  # white at the apex, then fade
-            f_ = 1 - (u - 0.5) / 0.5                      # 1 at the apex .. 0 at rest
-            shade = lambda k: k + int(round((top - k) * f_))
-        else:
-            shade = lambda k: k
+        if u < 0.5:                                       # blue until the apex
+            rows, shade = blue, (lambda k: k)
+        else:                                             # white at the apex, then down
+            f_ = max(0.0, 1 - (u - 0.5) / 0.5)            # the red ramp: 1 at the apex .. 0 at rest
+            rows = red
+            shade = lambda k: RED + k + int(round((top - k) * f_))
         for s, o in enumerate(offs):
             for y, k in rows.items():
                 k = shade(k)
@@ -84,7 +90,9 @@ def main(path):
         img = np.zeros((H, W), int)
         for s, (a, b) in enumerate(zip(EDGES, EDGES[1:])):
             for y in range(H):
-                img[y, a:b] = rr.colour(seg[s, y], y & 1, f & 1)
+                k = seg[s, y]
+                img[y, a:b] = (rr.colour(k - RED, y & 1, f & 1) if k >= RED
+                               else v7.colour(fv.RAMP[k], y & 1, f & 1))
         v.add(lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z))
     v.close()
     print("wrote", path, len(strs), "strings", HOLD0 + n_anim + HOLD1, "frames")
