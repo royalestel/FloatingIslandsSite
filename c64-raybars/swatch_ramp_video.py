@@ -37,6 +37,8 @@ def reorder(lad):
     lad[i:i] = [m24]
     return lad
 
+DROP = {13, 15, 19, 24, 27}           # by eye: dark grey, cyan checker inverting,
+                                      # dark grey / grey, grey, light grey
 SWAP_ROWS = {v7.STRIPES}              # cyan | white stripes: its two rows swapped
 
 def main(path, seconds=5):
@@ -54,6 +56,7 @@ def main(path, seconds=5):
     lums = {k: lin(k) for k in range(len(sv.PAL))}
     lad = sorted(lums, key=lambda k: lums[k])
     lad = reorder(lad)
+    lad = [k for i, k in enumerate(lad) if i + 1 not in DROP]
     L = lambda y: 116 * y ** (1 / 3) - 16 if y > 0.008856 else y * 903.3
     h = PAD * 2 + ROWS * len(lad)
     WIDTH = h                                # a square of colour
