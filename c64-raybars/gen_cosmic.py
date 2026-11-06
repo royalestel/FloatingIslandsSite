@@ -63,6 +63,21 @@ def dim_r(d):
 # the blue patterns, blue, purple, light blue, cyan, white)
 LADDER = [0, 1, 2, 3, 5, 6, 8, 10, 14, 18, 19, 22, 25, 27, 28]
 
+def centre_first(rows):
+    """Rows never brighter than the row nearer the centre: a new, brighter
+    step appears in the middle of the bar first and spreads outward."""
+    pos = {k: i for i, k in enumerate(LADDER)}
+    p = [pos.get(k, 0) for k in rows]
+    h = len(p)
+    c0, c1 = (h - 1) // 2, h // 2          # the middle row(s)
+    m = max(p[c0], p[c1])
+    p[c0] = p[c1] = m
+    for j in range(c0 - 1, -1, -1):
+        p[j] = min(p[j], p[j + 1])
+    for j in range(c1 + 1, h):
+        p[j] = min(p[j], p[j - 1])
+    return [LADDER[i] for i in p]
+
 CONTRAST_FULL = 14.0               # full round profile from here in;
                                    # flat at FAR (low contrast far away)
 
@@ -91,7 +106,7 @@ def ramp_round(h, d):
         i = max(i, 0)
         f = (lt - lum[i]) / (lum[i + 1] - lum[i])
         out.append(LADDER[i + 1] if f > lv.BAYER4[j % 4] else LADDER[i])
-    return out
+    return centre_first(out)
 
 def ramp_smooth(h, d):
     """ramp_round, smoother up close: all 29 swatches by brightness (the
@@ -145,11 +160,12 @@ def row_v3(d, r):
 def ramp_v3(h, d):
     lum = np.array([sv.LUM[k] for k in LADDER])
     half = (h + 1) // 2
-    lower, err = [], 0.0
+    lower, err, kmax = [], 0.0, len(LADDER) - 1
     for i in range(half):
         j = h - half + i
         want = row_v3(d, 2 * (j + 0.5) / h - 1) + err
-        k = int(np.argmin(np.abs(lum - want)))
+        k = min(int(np.argmin(np.abs(lum - want))), kmax)   # never above the row inside
+        kmax = k
         lower.append(LADDER[k])
         err = 0.8 * (want - lum[k])
     upper = lower[::-1] if h % 2 == 0 else lower[:0:-1]
