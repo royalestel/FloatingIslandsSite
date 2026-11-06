@@ -45,10 +45,8 @@ SHIFT_N = {6}                         # light blue 1/4 inverting: pixels one to 
 SHIFT = set()
 SWAP_ROWS = {v7.STRIPES}              # cyan | white stripes: its two rows swapped
 
-SWAPS3 = [(19, 20), (17, 18), (16, 15), (14, 13), (12, 11), (8, 9)]   # by eye, after the drops
-
-def main(path, seconds=5):
-    """Split screen: left the last ramp, right with SWAPS3 applied."""
+def ladder():
+    """The chosen swatches, darkest first (by eye), and each one's linear light."""
     def lin(k):
         frames = []
         for p in (0, 1):
@@ -66,57 +64,46 @@ def main(path, seconds=5):
     lad = [k for i, k in enumerate(lad) if i + 1 not in DROP]
     lad = [k for i, k in enumerate(lad) if i + 1 not in DROP2]
     SHIFT.update(lad[i - 1] for i in SHIFT_N)
-    new = list(lad)
-    for a, b in SWAPS3:
-        new[a - 1], new[b - 1] = new[b - 1], new[a - 1]
+    return lad, lums
+
+def main(path, seconds=5):
+    lad, lums = ladder()
     L = lambda y: 116 * y ** (1 / 3) - 16 if y > 0.008856 else y * 903.3
     h = PAD * 2 + ROWS * len(lad)
     WIDTH = h                                # a square of colour
     font, small = fl.fonts()
-    def names(order):
-        out = []
-        for k in order:
-            a, b, *_r, name = sv.PAL[k]
-            out.append((name if name != "full" else
-                        (fl.NAMES[a] if a == b else f"{fl.NAMES[a]} / {fl.NAMES[b]}"))
-                       + f"   L* {L(lums[k]):.0f}")
-        return out
+    names = []
+    for k in lad:
+        a, b, *_r, name = sv.PAL[k]
+        names.append((name if name != "full" else
+                      (fl.NAMES[a] if a == b else f"{fl.NAMES[a]} / {fl.NAMES[b]}"))
+                     + f"   L* {L(lums[k]):.0f}")
+    looks = []
     x = np.arange(WIDTH)
-    def looks(order):
-        out = []
-        for p in (0, 1):
-            img = np.zeros((h, WIDTH), int)
-            for i, k in enumerate(order):
-                for s_ in range(ROWS):
-                    r = PAD + ROWS * i + s_
-                    rp = (r + (k in SWAP_ROWS)) & 1
-                    img[r] = v7.colour(k, rp, p)
-                    g = v7.ghost(k, rp, p)
-                    if k in SHIFT:
-                        g = (g >> 1) | ((g & 1) << 7)
-                    if g:
-                        img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
-            out.append(lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z))
-        return out
-    lo, ln = looks(lad), looks(new)
-    no, nn = names(lad), names(new)
+    for p in (0, 1):
+        img = np.zeros((h, WIDTH), int)
+        for i, k in enumerate(lad):
+            for s in range(ROWS):
+                r = PAD + ROWS * i + s
+                rp = (r + (k in SWAP_ROWS)) & 1
+                img[r] = v7.colour(k, rp, p)
+                g = v7.ghost(k, rp, p)
+                if k in SHIFT:
+                    g = (g >> 1) | ((g & 1) << 7)
+                if g:
+                    img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
+        looks.append(lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z))
     W, H = WIDTH * Z, h * Z
-    LBL = 300
-    v = iv.Video(path, 2 * W + 2 * LBL + 48, H + 50)
-    xo, xn = 16 + LBL, 16 + LBL + W + 16
+    v = iv.Video(path, W + 330, H + 50)
     for f in range(seconds * 60):
         canvas = Image.new("RGB", (v.w, v.h), (8, 8, 16))
         dr = ImageDraw.Draw(canvas)
-        dr.text((16, 8), "left: last ramp      right: new (19-20, 17-18, 15-16, 13-14, 11-12, 8-9 swapped)   CRT",
+        dr.text((16, 8), "every swatch by linear light, two rows each, darkest first   CRT",
                 fill=(170, 176, 210), font=small)
-        canvas.paste(lo[f & 1], (xo, 34))
-        canvas.paste(ln[f & 1], (xn, 34))
-        for i, (a, b) in enumerate(zip(no, nn)):
+        canvas.paste(looks[f & 1], (16, 34))
+        for i, n in enumerate(names):
             y = 34 + (PAD + ROWS * i) * Z + ROWS * Z // 2 - 8
-            t = f"{a}  {i + 1:2d}"
-            tw = dr.textlength(t, font=small)
-            dr.text((xo - 12 - tw, y), t, fill=(190, 195, 225), font=small)
-            dr.text((xn + W + 12, y), f"{i + 1:2d}  {b}", fill=(190, 195, 225), font=small)
+            dr.text((W + 32, y), f"{i + 1:2d}  {n}", fill=(190, 195, 225), font=small)
         v.add(canvas)
     v.close()
     print("wrote", path, len(lad), "swatches")
