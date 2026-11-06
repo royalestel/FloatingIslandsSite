@@ -10,9 +10,10 @@
               fade to blue as they come down.
           W6  from the back, every other bar tilts on its left end and the rest on
               its right, both waves at once.  At each bar's peak it turns white.
-              The left bars come down as the red palette; the right bars settle
-              into a multicolour gradient made from all 16 C64 colours, ordered
-              by lightness (dark to light, one colour per step).
+              The red bars come down in the red palette; the multicolour bars settle
+              into palette25 (7 base colours and in-betweens). The bars alternate
+              along the floor: the nearest is multicolour (right tilt), the next red
+              (left tilt), and so on.
 
     python3 ghost_part4.py out.mp4
 """
@@ -25,6 +26,7 @@ import flicker as fl
 import ghost_part2 as gp2
 import ghost_part3 as gp3
 import anim1_floor as fv
+import palette25 as p25
 
 STR, NS, W, H, SEGS, EDGES = gp2.STR, gp2.NS, gp2.W, gp2.H, gp2.SEGS, gp2.EDGES
 RED, TOP_R, PROF_R, gp, rr = gp2.RED, gp2.TOP_R, gp2.PROF_R, gp2.gp, gp2.rr
@@ -55,16 +57,40 @@ def prof16(T):
     return out
 PROF16 = {T: prof16(T) for T in range(1, gp.TMAX + 1)}
 
+P25 = 500                                            # tokens P25 + index of palette25's swatch (the multicolour ramp)
+ENT25 = p25.build()
+N25 = len(ENT25)
+L25 = np.array([l for _, _, l in ENT25])
+TOP25 = N25 - 1                                      # white
+GHOST25 = [any(fn(rp, p, 0)[1] for rp in (0, 1) for p in (0, 1)) for _, fn, _ in ENT25]
+FLAT25 = [i for i in range(N25) if not GHOST25[i]]
+
+def prof25(T):
+    d = 2 * fv.F * fv.R / T
+    out = []
+    for i in range(T):
+        r = (i + (np.arange(8) + 0.5) / 8) * 2 / T - 1
+        lit = sum(gp.gc.row_v3(d, v) for v in r) / 8
+        Lr = float(fv.Lstar(np.array(lit)))
+        j = int(np.argmin(np.abs(L25 - Lr)))
+        out.append(0 if j == 0 else P25 + j)
+    return out
+PROF25 = {T: prof25(T) for T in range(1, gp.TMAX + 1)}
+
 def colour(tok, y, f):
+    if tok >= P25:
+        return ENT25[tok - P25][1](y & 1, f & 1, y % 3)[0]
     if tok >= P16:
         return ORDER16[tok - P16]
     return gp2.colour(tok, y, f)
 
 def ghost(tok, y, f):
+    if tok >= P25:
+        return ENT25[tok - P25][1](y & 1, f & 1, y % 3)[1]
     return 0 if tok >= P16 else gp2.ghost(tok, y, f)
 
 def is_black(tok):
-    return tok == 0 or tok == RED
+    return tok == 0 or tok == RED or tok == P25
 
 def fix_line(toks, y, f):
     """The ghost rule of ghost_part2 (ghost swatches stay only where a line's segments agree)."""
@@ -74,7 +100,9 @@ def fix_line(toks, y, f):
     out = []
     for t in toks:
         if not is_black(t) and ghost(t, y, f):
-            if t < RED:
+            if t >= P25:
+                t = P25 + min(FLAT25, key=lambda j: abs(L25[j] - L25[t - P25]))
+            elif t < RED:
                 t = min(gp2.FLAT, key=lambda j: abs(gp.RAMP_L[j] - gp2.light(t)))
             else:
                 t = RED + min(rr.FLAT, key=lambda j: abs(rr.RAMP_L[j] - gp2.light(t)))
@@ -108,7 +136,7 @@ def wave_tokens(A, tw):
         u = tw - us
         a = A["amp"] * math.sin(math.pi * u / A["TILT"]) if 0 < u < A["TILT"] else 0.0
         if A["side"] == "alt":
-            side, mode = ("L", A["modes"][0]) if i % 2 == 0 else ("R", A["modes"][1])
+            side, mode = ("R", A["modes"][1]) if i % 2 == 0 else ("L", A["modes"][0])   # nearest: multicolour
         else:
             side, mode = A["side"], A["modes"][0]
         uu = u / A["TILT"]
@@ -136,11 +164,11 @@ def wave_tokens(A, tw):
                         continue
                     tok = RED + kr + int(round((TOP_R - kr) * f))
                 else:                                            # multicolour
-                    target = PROF16[T][r]
+                    target = PROF25[T][r]
                     if not target:
                         continue
-                    pr = target - P16
-                    tok = P16 + pr + int(round((WPOS - pr) * f))
+                    pr = target - P25
+                    tok = P25 + pr + int(round((TOP25 - pr) * f))
                 if 0 <= y0 + s + r < H:
                     out[k, y0 + s + r] = tok
     return out

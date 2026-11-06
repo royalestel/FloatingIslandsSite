@@ -92,7 +92,7 @@ FINAL = ["black", "blue 1/4 on/off [ghost]", "blue 1/4 inverting [ghost]",
          "dark grey checker inverting [ghost]", "blue", "blue + dark grey every other",
          "blue | dark grey stripes", "dark grey + blue every other", "dark grey",
          "dark grey | purple stripes", "purple", "purple + light red every other",
-         "purple | light red stripes", "light red", "yellow checker inverting [ghost]",
+         "purple | light red stripes", "light red", "purple | cyan stripes",
          "light red | cyan stripes", "cyan", "cyan | yellow stripes", "yellow",
          "yellow + white every other", "yellow | white stripes", "white + yellow every other", "white"]
 
