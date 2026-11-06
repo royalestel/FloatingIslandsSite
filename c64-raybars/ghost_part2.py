@@ -22,7 +22,7 @@ import flyby3d as fb
 import ideas_video as iv
 import loop_video as lv
 import preview_v10 as v10
-import red_ramp25 as rr
+import red_ramp_saved as rr          # the saved red ramp (ramp_extra_sorted)
 import ghost_preview as gp
 
 LAD, FLAT, STR, NS = gp.LAD, gp.FLAT, gp.STR, gp.NS
@@ -42,10 +42,10 @@ PROF_R = {T: _profile_red(T) for T in range(1, gp.TMAX + 1)}
 TOP_R = rr.WHITE                                    # white in the red ramp
 
 def colour(tok, y, f):
-    return v10.colour(LAD[tok], y & 1, f & 1) if tok < RED else rr.colour(tok - RED, y & 1, f & 1)
+    return v10.colour(LAD[tok], y & 1, f & 1) if tok < RED else rr.colour(tok - RED, y, f)
 
 def ghost(tok, y, f):
-    return v10.ghost(LAD[tok], y & 1, f & 1) if tok < RED else rr.ghost(tok - RED, y & 1, f & 1)
+    return v10.ghost(LAD[tok], y & 1, f & 1) if tok < RED else rr.ghost(tok - RED, y, f)
 
 def light(tok):
     return gp.RAMP_L[tok] if tok < RED else rr.RAMP_L[tok - RED]
