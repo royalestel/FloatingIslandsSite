@@ -69,6 +69,11 @@ TOSS3 = [20, 22, 28]                              # red / light red, purple / li
 
 TOSS4 = [19, 23, 25]                              # red / grey, light red / light grey, yellow / light grey (too much flicker)
 
+def _c(fn, rp, p, s):
+    """A swatch's colour and idle byte on its line s (0..ROWS-1); entries marked
+    .three take the line index too (patterns that differ from line to line)."""
+    return fn(rp, p, s) if getattr(fn, "three", False) else fn(rp, p)
+
 def build_rows(merged):
     rows = []                                          # (label, entry or red index)
     for i in range(r25.N):
@@ -138,8 +143,21 @@ def build_rows(merged):
         rows[6], rows[7] = rows[7], rows[6]
         # eleventh pass (the 27-swatch numbering): toss 7 and 8; blue | brown stripes (no flicker,
         # alternate lines) between 6 and the new 7
-        f_b8 = lambda rp, p: (6 if rp == 0 else 9, 0)
-        b8 = ("blue | brown stripes", _L(f_b8), f_b8)
+        def f_rcb(rp, p, s):                                    # red checker, brown, red checker
+            if s == 1:
+                return (9, 0)
+            return (2, 0x55 if (rp + p) % 2 == 0 else 0xAA)     # red checker inverting
+        f_rcb.three = True
+        def _L3(fn):                                            # mean over the 3 lines
+            y = 0
+            for s_ in range(3):
+                for rp in (0, 1):
+                    for p in (0, 1):
+                        c, g = fn(rp, p, s_)
+                        lit = (8 - bin(g).count("1")) / 8 if g else 1.0
+                        y += lit * ((fb.C64RGB[c] / 255) ** 2.2) @ np.array([0.2126, 0.7152, 0.0722]) / 12
+            return float(116 * y ** (1 / 3) - 16) if y > 0.008856 else y * 903.3
+        b8 = ("red checker / brown / red checker", _L3(f_rcb), f_rcb)
         p6 = rows[5]
         rows = [r for i, r in enumerate(rows, 1) if i not in (7, 8)]
         rows.insert(rows.index(p6) + 1, b8)
@@ -160,7 +178,7 @@ def main(path, seconds=6, merged=False):
         for i, (_, _, fn) in enumerate(rows):
             for s in range(ROWS):
                 r = PAD + ROWS * i + s
-                c, g = fn(r & 1, p)
+                c, g = _c(fn, r & 1, p, s)
                 img[r] = c
                 if g:
                     img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
@@ -198,7 +216,7 @@ def still(path, merged=True, scale=2):
     for i, (_, _, fn) in enumerate(rows):
         for s_ in range(ROWS):
             r = PAD + ROWS * i + s_
-            c, g = fn(r & 1, 0)
+            c, g = _c(fn, r & 1, 0, s_)
             img[r] = c
             if g:
                 img[r, ((g >> (7 - x % 8)) & 1) == 1] = 0
