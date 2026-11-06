@@ -107,6 +107,23 @@ def build_rows(merged):
         moved12 = rows[11]
         rows = [r for i, r in enumerate(rows, 1) if i not in (12, 18)]
         rows.insert(12 - 1 - 3, moved12)
+        # seventh pass (numbers of the 26-swatch video): toss 5 and 8; 23 becomes
+        # yellow | white stripes; an in-between (light grey | yellow stripes) for 21 and 22
+        def _L(fn):
+            y = 0
+            for rp in (0, 1):
+                for p in (0, 1):
+                    c, _g = fn(rp, p)
+                    y += ((fb.C64RGB[c] / 255) ** 2.2) @ np.array([0.2126, 0.7152, 0.0722]) / 4
+            return float(116 * y ** (1 / 3) - 16) if y > 0.008856 else y * 903.3
+        f_yw = lambda rp, p: (YE if rp == 0 else WH, 0)
+        f_lgy = lambda rp, p: (LG if rp == 0 else YE, 0)
+        yw = ("yellow | white stripes", _L(f_yw), f_yw)
+        lgy = ("light grey | yellow stripes", _L(f_lgy), f_lgy)
+        a, c = rows[20], rows[22]
+        rows = [r for i, r in enumerate(rows, 1) if i not in (5, 8)]
+        rows = [yw if r is c else r for r in rows]
+        rows.insert([i for i, r in enumerate(rows) if r is a][0] + 1, lgy)
     return rows
 
 def main(path, seconds=6, merged=False):
