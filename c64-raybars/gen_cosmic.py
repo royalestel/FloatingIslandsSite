@@ -63,6 +63,26 @@ def dim_r(d):
 # the blue patterns, blue, purple, light blue, cyan, white)
 LADDER = [0, 1, 2, 3, 5, 6, 8, 10, 14, 18, 19, 22, 25, 27, 28]
 
+# extra swatches for the far, dim end (preview): single colours under the
+# 1/4 inverting pattern -- purple (L* 12) and light blue (L* 17) fill the
+# gaps between blue checker inverting (10.5) and purple checker inverting
+# (19.1).  Appended, so the 29 keep their numbers (the tables have 32 slots).
+def _extra():
+    import swatches_video as sw
+    pat = [f for n, _, f in sw.BLUE_PATTERNS if n == "1/4 inverting"][0]
+    for c, name in ((4, "purple 1/4 inverting"), (14, "light blue 1/4 inverting")):
+        if any(p[6] == name for p in sv.PAL):
+            continue
+        t = sw.patch(c, c, name, 0, lambda r, p, bp=False: pat(r, p))
+        sv.PAL.append((c, c, pat, sw.blended(t[4]), sw.brightness(t[4]), 0, name))
+    sv.COL = np.array([p[3] for p in sv.PAL])
+    sv.LUM = np.array([p[4] for p in sv.PAL])
+    sv.WIDE = np.array([p[5] for p in sv.PAL])
+_extra()
+P14, LB14 = [i for i, p in enumerate(sv.PAL) if p[6] in ("purple 1/4 inverting",
+                                                         "light blue 1/4 inverting")]
+LADDER_P = [0, 1, 2, 3, P14, LB14, 5, 6, 8, 10, 14, 18, 19, 22, 25, 27, 28]
+
 def centre_first(rows):
     """Rows never brighter than the row nearer the centre: a new, brighter
     step appears in the middle of the bar first and spreads outward."""
@@ -147,10 +167,14 @@ V3_CURVE = 0.6                        # < 1: brighter sooner, still rising to th
 def _lin(lstar):
     return ((lstar + 16) / 116) ** 3 if lstar > 8 else lstar * 27 / 24389
 
+# the core's lightness at a few distances, straight lines between them
+# against log distance: a gentle climb through the dim patterns far out,
+# brighter by mid distance, white at the near clip
+V3_ANCHORS = [(28.0, 3.0), (20.0, 19.0), (5.0, 60.0), (0.42, 100.0)]
+
 def core_v3(d):
-    dn = 2 * R_BAR * F / (HMAX + 0.45)
-    t = min(1.0, max(0.0, np.log(sv.lv.FAR / d) / np.log(sv.lv.FAR / dn)))
-    return _lin(LSTAR_FAR + (100 - LSTAR_FAR) * t ** V3_CURVE)
+    ds, ls = zip(*V3_ANCHORS[::-1])
+    return _lin(float(np.interp(np.log(d), np.log(ds), ls)))
 
 def row_v3(d, r):
     """Target light of the row at r (-1 top .. 1 bottom) of a bar at d."""
@@ -159,16 +183,17 @@ def row_v3(d, r):
     shape = max(0.0, 1 - r * r) ** 1.2
     return core * ((1 - c) + c * shape) + c * min(core, EDGE) * (1 - shape)
 
-def ramp_v3(h, d):
-    lum = np.array([sv.LUM[k] for k in LADDER])
+def ramp_v3(h, d, ladder=None):
+    LADDER_ = ladder or LADDER
+    lum = np.array([sv.LUM[k] for k in LADDER_])
     half = (h + 1) // 2
-    lower, err, kmax = [], 0.0, len(LADDER) - 1
+    lower, err, kmax = [], 0.0, len(LADDER_) - 1
     for i in range(half):
         j = h - half + i
         want = row_v3(d, 2 * (j + 0.5) / h - 1) + err
         k = min(int(np.argmin(np.abs(lum - want))), kmax)   # never above the row inside
         kmax = k
-        lower.append(LADDER[k])
+        lower.append(LADDER_[k])
         err = 0.8 * (want - lum[k])
     upper = lower[::-1] if h % 2 == 0 else lower[:0:-1]
     return upper + lower

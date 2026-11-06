@@ -40,6 +40,8 @@ def blurry(im):
     out = 0.7 * vert + 0.3 * g(a, BLUR * 3 / 2)
     return Image.fromarray(np.clip(out ** (1 / 2.2) * 255, 0, 255).astype(np.uint8))
 
+PURPLE = "PURPLE" in os.environ       # left v3, right v3 with purple / light blue 1/4 inverting
+STOP = float(os.environ.get("STOP", 0))
 SPEED = 0.045                       # metres a frame (cosmicstrings' base speed)
 DNEAR = 2 * sv.lv.R_BAR * gc.F / (gc.HMAX + 0.45)
 
@@ -53,7 +55,7 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
     vids = [iv.Video(out_crt, W + 32, H + 60), iv.Video(out_sharp, W + 32, H + 60)]
     d, f = (start or sv.lv.FAR), 0
     x = np.arange(fb.W)
-    while d > DNEAR - 2 * SPEED:
+    while d > max(DNEAR - 2 * SPEED, STOP):
         p = f & 1
         img = np.zeros((fb.H, fb.W), int)
         if d >= DNEAR:
@@ -61,9 +63,12 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
             key = (h, round(d * 10) / 10)        # by distance (0.1 m) as well
             if key not in ramps:
                 alt = gc.ramp_v3 if V3 else gc.ramp_smooth
-                ramps[key] = (gc.ramp_round(h, round(d * 2) / 2),
-                              alt(h, key[1]) if split else
-                              (gc.ramp_v3(h, key[1]) if V3 else gc.ramp_round(h, round(d * 2) / 2)))
+                if PURPLE:                           # v3 vs v3 with the extra patterns
+                    ramps[key] = (gc.ramp_v3(h, key[1]), gc.ramp_v3(h, key[1], gc.LADDER_P))
+                else:
+                  ramps[key] = (gc.ramp_round(h, round(d * 2) / 2),
+                                alt(h, key[1]) if split else
+                                (gc.ramp_v3(h, key[1]) if V3 else gc.ramp_round(h, round(d * 2) / 2)))
             top = int(round((2 * gc.CYL - 2 * gc.F * (-below) / d - h) / 2))
             for j in range(h):
                 ln = top + j
@@ -97,7 +102,8 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
             dr = ImageDraw.Draw(canvas)
             label = f"{d:5.2f} m   {h} lines" if d >= DNEAR else "clipped"
             if split:
-                dr.text((16, 8), f"left: now   right: {'v3 (L* by log distance, centre-out)' if V3 else 'all 29, centre-out'}   "
+                dr.text((16, 8), ("left: v3   right: v3 + purple, light blue 1/4 inverting   " if PURPLE else
+                         f"left: now   right: {'v3 (L* by log distance, centre-out)' if V3 else 'all 29, centre-out'}   ") +
                         f"{label}   {mode}", fill=(170, 176, 210), font=small)
             else:
                 dr.text((16, 8), f"one cosmic string, {below:.2f} m below the ship:   {label}   "
@@ -110,8 +116,9 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
             big = f"{d:5.2f} m" if d >= DNEAR else "clipped"
             dr.text((v.w - 200, 56), big, fill=(235, 235, 120), font=font)
             if split:
-                dr.text((16 + 40, 56), "now", fill=(200, 200, 220), font=font)
-                dr.text((16 + W // 2 + 40, 56), "v3" if V3 else "all 29", fill=(200, 200, 220), font=font)
+                dr.text((16 + 40, 56), "v3" if PURPLE else "now", fill=(200, 200, 220), font=font)
+                dr.text((16 + W // 2 + 40, 56), "+ patterns" if PURPLE else ("v3" if V3 else "all 29"),
+                        fill=(200, 200, 220), font=font)
             v.add(canvas)
             last.append(canvas)
         d -= SPEED
