@@ -19,6 +19,8 @@ import swatch_loop_video as sv
 import gen_cosmic as gc
 gc.ROUND = True                     # round bars at all distances (preview)
 
+import os
+V3 = "V3" in os.environ               # the v3 preview ramps (gen_cosmic.ramp_v3)
 SPEED = 0.045                       # metres a frame (cosmicstrings' base speed)
 DNEAR = 2 * sv.lv.R_BAR * gc.F / (gc.HMAX + 0.45)
 
@@ -37,10 +39,12 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
         img = np.zeros((fb.H, fb.W), int)
         if d >= DNEAR:
             h = max(2, min(gc.HMAX, lv.bar_lines(d)))
-            key = (h, round(d * 2) / 2)          # by distance (0.5 m) as well
+            key = (h, round(d * 10) / 10)        # by distance (0.1 m) as well
             if key not in ramps:
-                ramps[key] = (gc.ramp_round(h, key[1]),
-                              gc.ramp_smooth(h, key[1]) if split else gc.ramp_round(h, key[1]))
+                alt = gc.ramp_v3 if V3 else gc.ramp_smooth
+                ramps[key] = (gc.ramp_round(h, round(d * 2) / 2),
+                              alt(h, key[1]) if split else
+                              (gc.ramp_v3(h, key[1]) if V3 else gc.ramp_round(h, round(d * 2) / 2)))
             top = int(round((2 * gc.CYL - 2 * gc.F * (-below) / d - h) / 2))
             for j in range(h):
                 ln = top + j
@@ -73,7 +77,7 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
             dr = ImageDraw.Draw(canvas)
             label = f"{d:5.2f} m   {h} lines" if d >= DNEAR else "clipped"
             if split:
-                dr.text((16, 8), f"left: now (15-step ladder)   right: all 29, centre-out   "
+                dr.text((16, 8), f"left: now   right: {'v3 (L* by log distance, centre-out)' if V3 else 'all 29, centre-out'}   "
                         f"{label}   {'CRT' if crt else 'sharp'}", fill=(170, 176, 210), font=small)
             else:
                 dr.text((16, 8), f"one cosmic string, {below:.2f} m below the ship:   {label}   "
@@ -85,7 +89,7 @@ def main(out_crt, out_sharp, below=0.3, start=None, split=False):
             dr.text((v.w - 200, 56), big, fill=(235, 235, 120), font=font)
             if split:
                 dr.text((16 + 40, 56), "now", fill=(200, 200, 220), font=font)
-                dr.text((16 + W // 2 + 40, 56), "all 29", fill=(200, 200, 220), font=font)
+                dr.text((16 + W // 2 + 40, 56), "v3" if V3 else "all 29", fill=(200, 200, 220), font=font)
             v.add(canvas)
             last.append(canvas)
         d -= SPEED

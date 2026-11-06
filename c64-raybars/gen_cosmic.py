@@ -117,6 +117,44 @@ def ramp_smooth(h, d):
     upper = lower[::-1] if h % 2 == 0 else lower[:0:-1]
     return upper + lower
 
+# v3 (preview): brightness planned in perceptual terms.  The core's
+# lightness (L*) rises in a straight line against log distance, from the
+# dimmest pattern at FAR to white at the near clip -- so it keeps rising
+# all the way in; contrast across the bar fades in from flat at FAR to the
+# full round profile at CONTRAST_FULL; rows take the nearest ladder step
+# with the error carried from the centre outward, mirrored (no Bayer, and
+# the pattern stays put as the bar grows)
+LSTAR_FAR, EDGE = 3.0, 0.012          # core L* at FAR; deep blue edge light
+V3_CURVE = 0.6                        # < 1: brighter sooner, still rising to the end
+
+def _lin(lstar):
+    return ((lstar + 16) / 116) ** 3 if lstar > 8 else lstar * 27 / 24389
+
+def core_v3(d):
+    dn = 2 * R_BAR * F / (HMAX + 0.45)
+    t = min(1.0, max(0.0, np.log(sv.lv.FAR / d) / np.log(sv.lv.FAR / dn)))
+    return _lin(LSTAR_FAR + (100 - LSTAR_FAR) * t ** V3_CURVE)
+
+def row_v3(d, r):
+    """Target light of the row at r (-1 top .. 1 bottom) of a bar at d."""
+    c = contrast(d)
+    core = core_v3(d)
+    shape = max(0.0, 1 - r * r) ** 1.2
+    return core * ((1 - c) + c * shape) + c * min(core, EDGE) * (1 - shape)
+
+def ramp_v3(h, d):
+    lum = np.array([sv.LUM[k] for k in LADDER])
+    half = (h + 1) // 2
+    lower, err = [], 0.0
+    for i in range(half):
+        j = h - half + i
+        want = row_v3(d, 2 * (j + 0.5) / h - 1) + err
+        k = int(np.argmin(np.abs(lum - want)))
+        lower.append(LADDER[k])
+        err = 0.8 * (want - lum[k])
+    upper = lower[::-1] if h % 2 == 0 else lower[:0:-1]
+    return upper + lower
+
 def d_of_h(h):
     """The distance a bar h lines tall stands for (inverse of bar_lines)."""
     k = 2 * R_BAR * F

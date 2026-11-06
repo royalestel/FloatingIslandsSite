@@ -37,14 +37,15 @@ def lstar(y):
 def frames(variant):
     """Per frame: distance, and the bar rows' linear RGB (16 bit), cols 0..119."""
     tabs = [np.frombuffer(t, np.uint8) for t in gc.swatch_tables()]
-    rampf = gc.ramp_round if variant == "now" else gc.ramp_smooth
+    rampf = {"now": gc.ramp_round, "all 29": gc.ramp_smooth, "v3": gc.ramp_v3}[variant]
+    step = 10 if variant == "v3" else 2         # ramps by distance: 0.1 m / 0.5 m
     cache = {}
     x = np.arange(120)
     d, f, out = sv.lv.FAR, 0, []
     while d >= DNEAR:
         p = f & 1
         h = max(2, min(gc.HMAX, lv.bar_lines(d)))
-        key = (h, round(d * 2) / 2)
+        key = (h, round(d * step) / step)
         if key not in cache:
             cache[key] = rampf(h, key[1])
         top = int(round((2 * gc.CYL - 2 * gc.F * BELOW / d - h) / 2))
@@ -89,8 +90,10 @@ def drops(ds, y, name, what):
     return idx
 
 def main():
-    res = {v: profile(v) for v in ("now", "all 29")}
-    colours = {"now": "#2a78d6", "all 29": "#eb6834"}
+    import os
+    variants = os.environ.get("VARIANTS", "now,v3").split(",")
+    res = {v: profile(v) for v in variants}
+    colours = {"now": "#2a78d6", "all 29": "#eb6834", "v3": "#1baf7a"}
     fig, axes = plt.subplots(2, 1, figsize=(10, 7.5), sharex=True)
     fig.patch.set_facecolor("#fcfcfb")
     for ax, (title, col) in zip(axes, (("Core of the bar (middle fifth of its rows)", 1),
@@ -119,8 +122,8 @@ def main():
     fig.suptitle("One bar flying in: brightness every two frames (circles: a drop of more "
                  "than 0.5 L*)", x=0.01, ha="left", fontsize=12, color="#0b0b0b")
     fig.tight_layout()
-    fig.savefig("analysis_onebar.png", dpi=110)
-    print("wrote analysis_onebar.png")
+    fig.savefig(os.environ.get("OUT", "analysis_onebar.png"), dpi=110)
+    print("wrote", os.environ.get("OUT", "analysis_onebar.png"))
 
 if __name__ == "__main__":
     main()
