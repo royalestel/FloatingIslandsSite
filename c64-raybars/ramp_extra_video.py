@@ -63,6 +63,8 @@ MOVE_DARKER = [(20, 4), (28, 4), (32, 4)]
 TOSS = [21, 32, 36]                                # light red / dark grey, yellow / grey, light grey / white
 MOVES = [(24, -4), (16, -4), (18, -4), (28, 4)]    # yellow checker, yellow 1/4, light red checker up; light red / yellow down
 
+TOSS2 = [8, 12, 27, 31]                           # light red 1/4 [ghost], yellow 1/4 [ghost], light grey / grey, light red / yellow
+
 def build_rows(merged):
     rows = []                                          # (label, entry or red index)
     for i in range(r25.N):
@@ -94,6 +96,7 @@ def build_rows(merged):
         for pos, item in sorted(shifts, key=lambda t: t[0]):
             keep.insert(max(0, pos), item)
         rows = keep
+        rows = [r for i, r in enumerate(rows, 1) if i not in TOSS2]    # third pass: toss by the numbers of the video before it
     return rows
 
 def main(path, seconds=6, merged=False):
