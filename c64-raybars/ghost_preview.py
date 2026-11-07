@@ -55,8 +55,8 @@ def profile_idx(T):
 class BT(int):
     """A bar thickness that also carries the ramp level of the bar's top/bottom edge: the floor bars
     each get a different edge swatch (index 0 = nearest bar)."""
-    def __new__(cls, T, e, i=0):
-        o = int.__new__(cls, T); o.e = e; o.i = i; return o
+    def __new__(cls, T, e, i=0, blend=1.0):
+        o = int.__new__(cls, T); o.e = e; o.i = i; o.blend = blend; return o
 
 NBARS = 20
 def edge_level(i):                                # distinct edge swatches 1..21 for bars 0 (nearest) .. 19
@@ -80,16 +80,16 @@ def standard_profile(T, hi, e=1):
         out.append(std[min(12, int(rr * 26 / T))])
     return out
 
-def bar_profile(T, i, hi, physical):
+def bar_profile(T, i, hi, physical, blend=1.0):
     """Floor bar i (0 = nearest).  Bars 0 and 1: the standard, with distinct edge swatches.  Further bars
     shade physically when thin; the thicker they are the more they follow the standard, scaled so the bar's
     brightest row is a different swatch for every bar (hi - i), dimmer into the distance."""
     if i < 2:
-        return standard_profile(T, hi, edge_level(i))
-    k = float(hi - i) / hi
+        return standard_profile(T, hi, 1 + int(round((edge_level(i) - 1) * blend)))
+    k = 1.0 - (i / float(hi)) * blend                 # blend 0: every bar identical; 1: bar i peaks at hi - i
     std = [max(1, int(round(v * k))) for v in standard_profile(T, hi, 1)]
     base = physical(T)
-    phys = [max(1, int(round(v * float(hi - i) / max(1, max(base))))) for v in base]
+    phys = [max(1, int(round(v * (hi - i * blend) / max(1, max(base))))) for v in base]
     w = min(1.0, max(0.0, (T - 10) / 6.0))
     return [int(round(w * a_ + (1 - w) * b_)) for a_, b_ in zip(std, phys)]
 
@@ -99,15 +99,15 @@ class ProfDict(dict):
         super().__init__(base); self.fn = fn; self.cache = {}
     def __getitem__(self, k):
         if isinstance(k, BT):
-            key = (int(k), k.i)
+            key = (int(k), k.i, int(round(k.blend * 16)))
             if key not in self.cache:
-                self.cache[key] = self.fn(int(k), k.i)
+                self.cache[key] = self.fn(int(k), k.i, k.blend)
             return self.cache[key]
         return dict.__getitem__(self, k)
 
 SPREAD_MIN = 20                                   # plain-int bars at least this thick: the spread profile
 PROF = ProfDict({T: standard_profile(T, 23) for T in range(1, TMAX + 1)},
-                lambda T, i: bar_profile(T, i, 23, profile_idx))
+                lambda T, i, b=1.0: bar_profile(T, i, 23, profile_idx, b))
 
 def frame_list(t):
     out = []
