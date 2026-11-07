@@ -38,7 +38,7 @@ def _profile_red(T):
         lit = sum(gp.gc.row_v3(d, v) for v in r) / 8
         out.append(int(np.argmin(np.abs(rr.Lstar(np.array(lit)) - rr.RAMP_L))))
     return out
-PROF_R = gp.ProfDict({T: (gp.spread_profile(T, 24) if T >= gp.SPREAD_MIN else _profile_red(T)) for T in range(1, gp.TMAX + 1)},
+PROF_R = gp.ProfDict({T: gp.standard_profile(T, 24) for T in range(1, gp.TMAX + 1)},
                      lambda T, i: gp.bar_profile(T, i, 24, _profile_red))
 TOP_R = rr.WHITE                                    # white in the red ramp
 

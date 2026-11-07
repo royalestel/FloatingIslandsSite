@@ -62,21 +62,36 @@ NBARS = 20
 def edge_level(i):                                # distinct edge swatches 1..21 for bars 0 (nearest) .. 19
     return 1 + int(round(i * 20.0 / (NBARS - 1)))
 
-def bar_profile(T, i, hi, physical):
-    """Floor bar i (0 = nearest).  Bars 0 and 1: symmetric, a different swatch on every row pair, edge
-    swatch distinct.  Further bars: the physical shading, scaled so the bar's brightest row is a
-    different swatch for every bar (23 - i), dimmer into the distance."""
-    if i < 2:
-        return spread_profile(T, hi, edge_level(i))
-    base = physical(T)
-    sc_ = float(hi - i) / max(1, max(base))
-    return [max(1, int(round(v * sc_))) for v in base]
-
 def spread_profile(T, hi, e=1):
     """Symmetric bar: ceil(T/2) levels spread from the edge swatch e up to hi, mirrored."""
     n = (T + 1) // 2
     half = [int(v) for v in np.round(np.linspace(e, max(hi, e), n))] if n > 1 else [e]
     return half + half[::-1][T % 2:]
+
+def standard_profile(T, hi, e=1):
+    """The standard bar (the nearest floor bar, 26 lines): symmetric, ceil(T/2) levels spread from edge swatch
+    e to hi.  Thicker bars double up rows (the standard stretched); thinner bars get fewer, still all different."""
+    if T <= 26:
+        return spread_profile(T, hi, e)
+    std = spread_profile(26, hi, e)[:13]
+    out = []
+    for r in range(T):
+        rr = min(r, T - 1 - r)
+        out.append(std[min(12, int(rr * 26 / T))])
+    return out
+
+def bar_profile(T, i, hi, physical):
+    """Floor bar i (0 = nearest).  Bars 0 and 1: the standard, with distinct edge swatches.  Further bars
+    shade physically when thin; the thicker they are the more they follow the standard, scaled so the bar's
+    brightest row is a different swatch for every bar (hi - i), dimmer into the distance."""
+    if i < 2:
+        return standard_profile(T, hi, edge_level(i))
+    k = float(hi - i) / hi
+    std = [max(1, int(round(v * k))) for v in standard_profile(T, hi, 1)]
+    base = physical(T)
+    phys = [max(1, int(round(v * float(hi - i) / max(1, max(base))))) for v in base]
+    w = min(1.0, max(0.0, (T - 10) / 6.0))
+    return [int(round(w * a_ + (1 - w) * b_)) for a_, b_ in zip(std, phys)]
 
 class ProfDict(dict):
     """PROF[T] as usual; PROF[BT] builds that bar's own profile (edge level e) with fn(T, e)."""
@@ -91,7 +106,7 @@ class ProfDict(dict):
         return dict.__getitem__(self, k)
 
 SPREAD_MIN = 20                                   # plain-int bars at least this thick: the spread profile
-PROF = ProfDict({T: (spread_profile(T, 23) if T >= SPREAD_MIN else profile_idx(T)) for T in range(1, TMAX + 1)},
+PROF = ProfDict({T: standard_profile(T, 23) for T in range(1, TMAX + 1)},
                 lambda T, i: bar_profile(T, i, 23, profile_idx))
 
 def frame_list(t):

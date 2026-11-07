@@ -75,7 +75,7 @@ def prof25(T):
         j = int(np.argmin(np.abs(L25 - Lr)))
         out.append(0 if j == 0 else P25 + j)
     return out
-PROF25 = gp.ProfDict({T: ([P25 + j for j in gp.spread_profile(T, 23)] if T >= gp.SPREAD_MIN else prof25(T))
+PROF25 = gp.ProfDict({T: [P25 + j for j in gp.standard_profile(T, 23)]
                      for T in range(1, gp.TMAX + 1)},
                     lambda T, i: [P25 + j for j in gp.bar_profile(T, i, 23, lambda t: [max(0, x - P25) if x else 0 for x in prof25(t)])])
 
