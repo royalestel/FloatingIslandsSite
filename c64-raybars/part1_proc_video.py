@@ -6,11 +6,11 @@ import part1_proc as q
 
 def main(path, a=0, b=None):
     v = p1.iv.Video(path, p1.W * 3, p1.H * 3)
-    for f in range(a, q.T_STACK if b is None else b):
-        col, par = q.frame_buf(f, with_par=True)           # swatch parity = the row's parity in its bar
+    for f in range(a, q.p1.T_END if b is None else b):
+        col, par = q.film_buf(f)           # swatch parity = the row's parity in its bar
         img = np.array([p1.gp.draw([c] * p1.gp.SEGS, (y & ~1) | par[y], f) for y, c in enumerate(col)])
         v.add(p1.lv.crt_look(p1.fb.C64RGB[img].astype(np.uint8), 3))
-    v.close(); print("wrote", path, (q.T_STACK if b is None else b) - a, "frames")
+    v.close(); print("wrote", path, (q.p1.T_END if b is None else b) - a, "frames")
 
 if __name__ == "__main__":
     a = sys.argv[2:]

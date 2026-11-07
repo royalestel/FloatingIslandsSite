@@ -54,8 +54,8 @@ def dim(f):
 
 smooth = sc.smooth
 T_STACK = P["T_C1"]                            # 1230: the circle bars are in the stack
-T_NEWB = [T_STACK, T_STACK + 15, T_STACK + 30]  # the three from the bottom (m = 2, 1, 0)
-T_TOPB = T_STACK + 45                           # the upper stack (m >= 6) comes down from above
+T_NEWB = [T_STACK, T_STACK + 20, T_STACK + 40]  # the three from the bottom (m = 2, 1, 0): each starts when the one before is halfway
+T_TOPB = T_STACK                                # the upper stack (m >= 6) comes down from above with the first bottom bar
 NEW_LEN = 40
 T_ROT0, T_ROT1 = T_STACK + 110, T_STACK + 310   # the unified rotation of the whole stack (3.3 s)
 T_END = T_ROT1 + 120

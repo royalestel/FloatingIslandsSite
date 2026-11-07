@@ -56,6 +56,10 @@ PH0 = 192                                                                       
 PHK = [0, 85, 171]                                                                   # the bars' phase offsets
 INC = 65536 // TURN                                                                  # phase step per frame (16-bit)
 
+def lerp8(a, b, w):
+    """a + (b - a) * w / 255, exact at w = 0 and w = 255 (w + w // 128 maps 255 to 256)."""
+    return a + (((b - a) * (w + (w >> 7))) >> 8)
+
 def smooth8(t, t0, n):
     """smoothstep 0..255 of (t - t0) / n, via the 128-entry table."""
     if t <= t0: return 0
@@ -66,16 +70,16 @@ def bars(t):
     """[(thickness, first line, order key)] of the three bars at frame t (far first)."""
     ph = (PH0 * 256 + t * INC) >> 8
     s = smooth8(t, T_B0, T_B1 - T_B0)
-    e = smooth8(t, T_C0, T_C1 - T_C0)
+    e = smooth8(t, T_C0, T_C1 - 1 - T_C0)               # fully settled on the LAST frame: all three bars identical
     zb = zbase(t)
     out = []
     for k in range(3):
         pk = (ph + PHK[k]) & 255
         zc = zb + ((AZQ * sin8(pk)) >> 7)
-        z = Z_EQ + (((zc - Z_EQ) * s) >> 8)
+        z = lerp8(Z_EQ, zc, s)
         yc = 100 - ((cos8(pk) * KY[z]) >> 7)
-        z = z + (((Z_EQ - z) * e) >> 8)
-        yc = yc + (((SLOT[k] - yc) * e) >> 8)
+        z = lerp8(z, Z_EQ, e)
+        yc = lerp8(yc, SLOT[k], e)
         rise = (260 * (255 - smooth8(t, T_ENTER[k], ENTER_LEN))) >> 8
         yc += rise
         z = max(1, min(255, z))
@@ -140,3 +144,16 @@ if __name__ == "__main__":
     print("max centre-line diff", round(worst["dy"], 1), "lines; max thickness diff", worst["dT"],
           " mean thickness diff", round(float(np.mean(rows)), 2))
     print("table bytes: SIN 256, SM 128, KY 255, TT 255, ZB", len(ZB), "slots", SLOT)
+
+
+def stack_buf(t):
+    """Line buffer and in-bar parity for the data-driven part (frames >= T_STACK), from part1.frame_list."""
+    buf, par = [0] * H, [0] * H
+    for y0, T in p1.frame_list(t):
+        for i, k in enumerate(p1.gp.PROF[T]):
+            if k and 0 <= y0 + i < H:
+                buf[y0 + i] = k; par[y0 + i] = i & 1
+    return buf, par
+
+def film_buf(t):
+    return frame_buf(t, with_par=True) if t < T_STACK else stack_buf(t)
