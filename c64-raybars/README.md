@@ -860,3 +860,15 @@ Decided with the user: 6 raster-split columns (32 | 64 x 4 | 32 pixels), movemen
   frame are too many to compose live; the C64 version will move fewer pieces at once.
 * **Order of work:** (1) engine + still floor + shakes (part 2 beginning), VICE-checked pixel by pixel against a Python
   spec like part 1; (2) waves and palette fades (rest of parts 2 and 3); (3) part 4's motion.
+
+### Shakes: what the simulator measured (parts 2-4 design, continued)
+
+* Moving all 6 columns of the 156-line floor each frame with the 6-store loop (one `lda` of the image row, six
+  `sta abs,y` into the column buffers, whose operands are patched with the shifts) costs **6,019 cycles** with two
+  rows per pass, 6,253 with one: nearly the whole 6.5 k blank.
+* Whole-floor shakes cost nothing in the plain rows: the rows just start `dy` lines earlier or later (the irq line).
+* A table lookup cannot replace the copy: the rows read their colour bytes from fixed addresses, so something must
+  put the right bytes there.  Pre-built patterns in cartridge ROM banks would work (a bank switch is one write), but
+  every pattern needs its own bank (the rows' addresses are fixed) and an EasyFlash has 64 banks.  So the plan is:
+  the offsets come from tables (sines, envelopes), and the data movement is split: 3 of the 6 columns are
+  redrawn each frame (each column at 30 Hz, about 3 k cycles), which also leaves time for the rest.
