@@ -10,9 +10,10 @@ Wave shorthand:  [<hand>] <direction> pk <white|black> pal <palette>
                vanishes against the background), then fades to the palette as it comes
                back down; before the peak it keeps the palette it had.
 
-  3a  every other split column (1st, 3rd, 5th, 7th):  f2b pk white pal blue
-  3b  at once:  the columns that just changed:  b2f pk white pal red
-                the other columns:               f2b pk black pal multicolor
+  (3a, 3b: the first two column waves -- every other split column f2b pk white pal blue, then
+   b2f pk white pal red / f2b pk black pal multicolor -- are no longer in part 3; they are
+   still here: python3 part3.py out.mp4 ab)
+  Part 3 now begins on part 2's last frame (same floor, same flicker phase) and runs:
   3c  every other bar (the nearest first):        rh f2b pk white pal blue
   3d  the other bars:                             lh b2f pk white pal blue
   3e  at once, per column: even columns f2b pk white pal multicolor,
@@ -20,7 +21,7 @@ Wave shorthand:  [<hand>] <direction> pk <white|black> pal <palette>
 
     python3 part3.py out.mp4          # 3a, 3b
     python3 part3.py out.mp4 cde      # 3c, 3d, 3e (from the state 3b ends in)
-    python3 part3.py out.mp4 all      # 3a-3e as one film (this is part3.mp4)
+    python3 part3.py out.mp4 all      # part 3: 3c, 3d, 3e (this is part3.mp4)
 """
 import os, sys, math
 os.environ.setdefault("SPLITS", "7")
@@ -34,6 +35,7 @@ STR, NS, W, H, SEGS = g4.STR, g4.NS, g4.W, g4.H, g4.SEGS
 RED, P25, TOPB, TOP_R, TOP25 = g4.RED, g4.P25, g4.TOPB, g4.TOP_R, g4.TOP25
 PROF_R, PROF25, gp = g4.PROF_R, g4.PROF25, g4.gp
 TILT, STAG, AMP = 32, 4, 28
+F0 = 2087                                    # part 2's last frame number (2088 frames): same flicker phase
 
 def base_tok(pal, T, r):
     """The palette's token for row r of a bar T thick (0 = black / not drawn)."""
@@ -118,7 +120,7 @@ STATE_3B = [["red" if k % 2 == 0 else "multi" for k in range(SEGS)] for i in ran
 # 3c  every other bar (the nearest first):  rh f2b pk white pal blue
 def SPEC_3C(i, k):
     return dict(kind="tilt", side="R", dir="f2b", end="blue", peak="white") if i % 2 == 0 else None
-STATE_3C = [["blue" if i % 2 == 0 else STATE_3B[i][k] for k in range(SEGS)] for i in range(NS)]
+STATE_3C = [["blue" if i % 2 == 0 else START[i][k] for k in range(SEGS)] for i in range(NS)]   # 3c now starts from part 2's end
 # 3d  the other bars:  lh b2f pk white pal blue
 def SPEC_3D(i, k):
     return dict(kind="tilt", side="L", dir="b2f", end="blue", peak="white") if i % 2 == 1 else None
@@ -130,15 +132,15 @@ COLS_3E = [dict(dir="f2b", end="multi", peak="white") if k % 2 == 0 else
 def main(path, which="ab"):
     Z = 3
     v = iv.Video(path, W * Z, H * Z)
-    f = 0
+    f = F0 if which == "all" else 0               # part 3 goes on from part 2's last frame
     wave = (NS - 1) * STAG + TILT
     # (name, plans, static state of unmoved bars, lead-in, wave length, tail)
     seq_ab = [("3a", COLS_3A, START, 30, wave, 20),
               ("3b", COLS_3B, STATE_3A, 0, wave, 90)]
-    seq_cde = [("3c", SPEC_3C, STATE_3B, 30, wave, 20),
+    seq_cde = [("3c", SPEC_3C, START, 30, wave, 20),
                ("3d", SPEC_3D, STATE_3C, 0, wave, 20),
                ("3e", COLS_3E, STATE_3D, 0, wave, 90)]
-    seq_all = seq_ab + [("3c", SPEC_3C, STATE_3B, 0, wave, 20)] + seq_cde[1:]   # one film: 3a-3e
+    seq_all = seq_cde                                          # part 3: 3c, 3d, 3e from part 2's end
     seq = {"ab": seq_ab, "cde": seq_cde, "all": seq_all}[which]
     for name, cols, static, pre, length, post in seq:
         n = pre + length + post
