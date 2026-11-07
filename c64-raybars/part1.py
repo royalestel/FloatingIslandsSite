@@ -5,12 +5,11 @@ Three bars slide in, circle in depth (the whole circle goes off into the distanc
 under 8 lines -- then closer than it started, then back to neutral), and settle into a
 vertical stack.  At the end of the part:
   * the stack is built faster: three more bars slide up from the bottom (15 frames apart,
-    40 each) and two more come in at the top (a bar and a half of the stack is off the top
-    of the screen at first);
-  * then all 8 bars start stacked vertically in one plane and rotate down together, about
-    the nearest bar, into the floor (the plane opens as it goes: bar spacing 0.27 m -> 0.8 m,
-    the pivot comes to the floor, the horizon drops) -- in one unified rotation rather than
-    each bar sliding to its own place; the rest of the floor comes in from the top behind.
+    40 each) and the rest of the stack comes down from above: all 28 floor bars are one
+    tall vertical stack, most of it above the top of the screen;
+  * then the whole stack of 28 bars rotates down together as one plane, about the nearest
+    bar, into the floor (the plane opens as it goes: bar spacing 0.27 m -> 0.8 m, the pivot
+    comes to the floor, the horizon drops); the upper bars swing into view as it turns.
     It ends on exactly the floor that part 2 starts with.
 
     python3 part1.py part1.mp4 [first_frame last_frame]
@@ -36,12 +35,11 @@ sc.configure(P)
 smooth = sc.smooth
 T_STACK = P["T_C1"]                            # 1230: the circle bars are in the stack
 T_NEWB = [T_STACK, T_STACK + 15, T_STACK + 30]  # the three from the bottom (m = 2, 1, 0)
-T_TOPB = [T_STACK + 45, T_STACK + 60]           # the two at the top (m = 6, 7)
+T_TOPB = T_STACK + 45                           # the upper stack (m >= 6) comes down from above
 NEW_LEN = 40
-T_ROT0, T_ROT1 = 1340, 1500                     # the unified rotation
-T_X0, T_XSTAG, T_XLEN = T_ROT0 + 20, 3, 60      # the rest of the floor comes in from the top
+T_ROT0, T_ROT1 = 1340, 1540                     # the unified rotation of the whole stack (3.3 s)
 T_END = T_ROT1 + 120
-NSTACK = 8
+NSTACK = 6 + len(sc.EXTRA_D)                                       # all the floor's bars: 28
 PITCH = sc.PITCH_PX
 Z0 = P["Z_EQ"]
 YCW = [H / 2 + (5 - m - 2.5) * PITCH for m in range(NSTACK)]     # stack slot m (0 = bottom), screen line
@@ -51,7 +49,7 @@ YP0 = -(YCW[0] - H / 2) * Z0 / F                                 # the bottom ba
 YP1, ZP1, HORIZON = -fv.CAM_H, fv.SPACING, fv.HORIZON
 
 def stack(t):
-    """[(size distance, centre line, key)] of the 8 stacked / rotating bars at frame t >= T_STACK."""
+    """[(size distance, centre line, key)] of the 28 stacked / rotating bars at frame t >= T_STACK."""
     p = smooth((t - T_ROT0) / float(T_ROT1 - T_ROT0))
     alpha = math.pi / 2 * p
     s = S0 + (S1 - S0) * p
@@ -69,19 +67,14 @@ def stack(t):
         if m < 3:
             yc += 260 * (1 - smooth((t - T_NEWB[2 - m]) / NEW_LEN))   # up from the bottom
         elif m > 5:
-            yc -= 90 * (1 - smooth((t - T_TOPB[m - 6]) / NEW_LEN))    # down from the top
+            yc -= 600 * (1 - smooth((t - T_TOPB) / (NEW_LEN + 10)))   # the upper stack comes down
         out.append((d, yc, d))
     return out
 
 def bars_all(t):
     if t < T_STACK:
         return [b for b in sc.bars(t)[:3]]                        # the three circling bars
-    out = stack(t)
-    for i in range(NSTACK - 6, len(sc.EXTRA_D)):                  # the floor beyond the stack
-        d, y = sc.EXTRA_D[i], sc.EXTRA_YC[i]
-        u = smooth((t - T_X0 - T_XSTAG * (i - (NSTACK - 6))) / T_XLEN)
-        out.append((d, y - 300 * (1 - u), d))
-    return out
+    return stack(t)
 
 def frame_list(t):
     out = []
