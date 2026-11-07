@@ -53,12 +53,10 @@ def profile_idx(T):
         out.append(int(np.argmin(np.abs(Lstar(np.array(lit)) - RAMP_L))))
     return out
 def spread_profile(T, hi):
-    """Every row of a thick bar a different swatch: T levels spread over 1..hi, dealt alternately to the
-    rising (top) and falling (bottom) side, so the two sides never repeat a colour and the highlight
-    sits just below the middle."""
-    lev = [int(v) for v in np.round(np.linspace(1, hi, T))]
-    up, down = lev[0:T - 1:2], lev[1:T - 1:2]
-    return up + [lev[-1]] + down[::-1]
+    """Symmetric bar, every row pair a different swatch: ceil(T/2) levels spread over 1..hi, mirrored."""
+    n = (T + 1) // 2
+    half = [int(v) for v in np.round(np.linspace(1, hi, n))]
+    return half + half[::-1][T % 2:]
 SPREAD_MIN = 20                                   # bars at least this thick get the spread profile
 PROF = {T: (spread_profile(T, 23) if T >= SPREAD_MIN else profile_idx(T)) for T in range(1, TMAX + 1)}
 
