@@ -367,6 +367,7 @@ clampz: lda la+1
         lda p_azs,x             ; zc = zb + azs[pk], sign-extended
         sta t1
         ldy #0
+        lda t1
         bpl @pos
         dey
 @pos:   clc
