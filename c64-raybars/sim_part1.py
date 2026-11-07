@@ -25,8 +25,8 @@ mem = mpu.memory
 for i in range(2, 0x80):
     mem[i] = 0
 mem[labels["rp"]], mem[labels["rp"] + 1] = labels["scene"] & 255, labels["scene"] >> 8
-TRAMP = 0xF000
-upd, buf = labels["update"], 0xC000
+TRAMP = 0x0334
+upd, buf = labels["update"], 0x0400
 mem[TRAMP:TRAMP + 4] = [0x20, upd & 255, upd >> 8, 0x00]
 COL, GH = gen.tables()
 
@@ -58,14 +58,14 @@ def run_rows(fp):
     return per, writes
 
 def main():
-    lists, rec, prof = gen.build()
+    lists, rec0, rec1, prof = gen.build()
     n = gen.p1.T_END
     run_update()                                          # frame 0
     ok, worst = True, 0
     budget = (312 - (51 + ROWS) + 46) * 63 - 200
     for f in range(n):
         got = [mem[buf + i] for i in range(ROWS)]
-        want = gen.compose_ref(lists[f])
+        want = gen.compose_ref(lists[f], f)
         if got != want:
             print(f"frame {f}: line buffer differs at lines {[i for i in range(ROWS) if got[i] != want[i]][:6]}")
             ok = False

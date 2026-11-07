@@ -30,7 +30,6 @@ FIRST_LINE = 51
 IRQ0LINE  = 46                  ; DEN low across line $30 (48)
 IRQLINE   = FIRST_LINE - 2      ; the stable double IRQ
 HTUNE     = 0
-PROFBASE  = $2000
 
 VIC_CTRL1  = $d011
 VIC_RASTER = $d012
@@ -42,7 +41,7 @@ VIC_BG     = $d021
 CIA1_ICR   = $dc0d
 CIA2_ICR   = $dd0d
 IDLE       = $3fff
-LINEBUF    = $c000
+LINEBUF    = $0400                ; the screen is never shown
 
 ; =============================================================================
 .segment "ZEROPAGE"
@@ -128,7 +127,14 @@ dly:    .repeat 14
         .endrep
         ldy #0
         lda (rp),y
-        cmp #$ff
+        cmp #$fe
+        bne @nj
+        lda #<scene1            ; the stream jumps over the I/O hole at $d000
+        sta rp
+        lda #>scene1
+        sta rp+1
+        lda (rp),y
+@nj:    cmp #$ff
         bne @new
         lda lastp               ; same list as the last frame
         sta cur
@@ -308,7 +314,7 @@ ght:    GHT
 prof:   .incbin "part1_prof.bin"
 
 .segment "SCENE"
-scene:  .incbin "part1_rec.bin"
+scene:  .incbin "part1_rec0.bin"
 
-.segment "BSS"
-.res 1
+.segment "SCENE1"
+scene1: .incbin "part1_rec1.bin"

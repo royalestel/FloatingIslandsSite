@@ -800,9 +800,10 @@ also runs the 6502 simulators, which check every frame against the Python model.
 
 ## PART 1 on the C64: part1.prg, routine.d64
 
-`part1.prg` is the intro film (ghost-byte swatches, no splits: the three bars, the circle in depth
-that goes off into the distance and back, the stack and its rotation into the floor) as a program.
-`python3 part1_gen.py` precalculates the scene (25 KB of bar lists) and the swatch tables;
+`part1.prg` is the intro film (ghost-byte swatches, no splits: the three bars, the circle in depth that
+goes off into the distance and back, the dimming of the circle down the ramp and back, the stack and its
+rotation into the 20-bar floor) as a program, with the every-row-different bar profiles.
+`python3 part1_gen.py` precalculates the scene and the swatch tables and writes `part1.cfg`;
 `cl65 -g -t none -C part1.cfg -Ln part1.lbl -o part1.prg part1.s` builds it; `python3 sim_part1.py`
 checks it on a simulated 6502; `python3 mk_d64.py routine.d64 ROUTINE part1.prg=PART1` makes the disk.
 
@@ -811,15 +812,22 @@ checks it on a simulated 6502; `python3 mk_d64.py routine.d64 ROUTINE part1.prg=
   where the idle byte (`$3fff`) has 0 bits and black where it has 1 bits.  Each of the 200 rows
   (63 cycles) loads the line's swatch index and writes the swatch's idle byte and `$d021`
   (tables by swatch, line parity and frame parity); two copies of the rows, one per frame parity.
-* **Update (in the blank):** clears the 200-byte index buffer, copies each bar's swatch indices in,
+* **Data:** every distinct bar array (a bar's swatch indices, top row first, with the dimming already
+  applied) is stored once -- 448 of them, 13,580 bytes at $4000.  The scene is 4 bytes per bar per
+  frame (address of the first visible row, first line, rows - 1), 25 KB in two pieces: the stream
+  jumps over the I/O hole at $d000 to $e000 (`$fe` marks the jump; a record never straddles it).
+  The 200-byte line buffer is at $0400.
+* **Update (in the blank):** clears the 200-byte index buffer, copies each bar's indices in,
   far to near.
-* **Simulated:** all 1660 frames' buffers equal the Python model; the sampled frames' 200 rows are
-  63 cycles each and write the right idle byte and colour; update() worst case 6,019 cycles of about
-  6,541 (92 %) -- the frames of the rotation with 28 bars.
+* **Simulated:** all 1830 frames' buffers equal the Python model (part1_gen.compose_ref); the sampled
+  frames' 200 rows are 63 cycles each and write the right idle byte and colour; update() worst case
+  4,013 cycles of about 6,541 (61 %).
+* **Differs slightly from the MP4:** the dimming is applied per bar here and per composed run in the
+  video, so 39 of the 1830 frames (where bars overlap) can differ in a few rows' swatch.
 * **Not seen yet:** VICE or hardware.  Where in the line the two writes land (HTUNE) and the DEN trick
   are reasoned, not observed.  Parts 2-4 are not built: they need the 7-split rows, new compose code
   and their scene data.
-* **Running while the rest loads:** not with this build.  The rows use all the CPU and update() 92 % of the
-  blank, so there is almost nothing left for a loader (a disk loader would need the IEC bus at its own
+* **Running while the rest loads:** not with this build.  The rows use all the CPU and update() 61 % of the
+  blank, so there is little left for a loader (a disk loader would need the IEC bus at its own
   timing).  A cartridge would avoid that: the data sit in ROM banks and part 1's rows, whose 43 padding
   cycles could copy about 4 bytes each, would move the rest into RAM in the background.
