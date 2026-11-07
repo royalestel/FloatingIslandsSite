@@ -20,6 +20,7 @@ Wave shorthand:  [<hand>] <direction> pk <white|black> pal <palette>
 
     python3 part3.py out.mp4          # 3a, 3b
     python3 part3.py out.mp4 cde      # 3c, 3d, 3e (from the state 3b ends in)
+    python3 part3.py out.mp4 all      # 3a-3e as one film (this is part3.mp4)
 """
 import os, sys, math
 os.environ.setdefault("SPLITS", "7")
@@ -137,7 +138,8 @@ def main(path, which="ab"):
     seq_cde = [("3c", SPEC_3C, STATE_3B, 30, wave, 20),
                ("3d", SPEC_3D, STATE_3C, 0, wave, 20),
                ("3e", COLS_3E, STATE_3D, 0, wave, 90)]
-    seq = seq_ab if which == "ab" else seq_cde
+    seq_all = seq_ab + [("3c", SPEC_3C, STATE_3B, 0, wave, 20)] + seq_cde[1:]   # one film: 3a-3e
+    seq = {"ab": seq_ab, "cde": seq_cde, "all": seq_all}[which]
     for name, cols, static, pre, length, post in seq:
         n = pre + length + post
         for t in range(n):
