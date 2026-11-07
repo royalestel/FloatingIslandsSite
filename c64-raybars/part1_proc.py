@@ -97,8 +97,13 @@ def levels(T):
         half[-1] = 23
     return half + half[::-1][T % 2:]
 
-def frame_buf(t, dimmed=True):
+def frame_buf(t, dimmed=True, with_par=False):
+    """The line buffer (swatch index per line); with_par also gives each line's PARITY IN ITS BAR (row - bar
+    top) & 1.  The swatches' colour pairs and ghost bytes are chosen by that, not by the absolute line, so a
+    bar shows exactly two looks (frame parity) however it moves.  On the C64 this costs nothing: the bar's
+    indices get +32 when its first line is odd, and the tables hold both parities."""
     buf = [0] * H
+    par = [0] * H
     g = p1.dim(t) if dimmed else 1.0
     u = (1.0 - g) / (1.0 - p1.DIM[1][1]) if g < 1 else 0.0
     for T, y0 in bars(t):
@@ -113,8 +118,9 @@ def frame_buf(t, dimmed=True):
                 arr2.append(max(1, int(round(v))))
             arr = arr2
         for i, k in enumerate(arr):
-            if 0 <= y0 + i < H: buf[y0 + i] = k
-    return buf
+            if 0 <= y0 + i < H:
+                buf[y0 + i] = k; par[y0 + i] = i & 1
+    return (buf, par) if with_par else buf
 
 if __name__ == "__main__":
     import part1_gen as gen
