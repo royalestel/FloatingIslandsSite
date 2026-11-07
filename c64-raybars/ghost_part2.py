@@ -39,7 +39,7 @@ def _profile_red(T):
         out.append(int(np.argmin(np.abs(rr.Lstar(np.array(lit)) - rr.RAMP_L))))
     return out
 PROF_R = gp.ProfDict({T: (gp.spread_profile(T, 24) if T >= gp.SPREAD_MIN else _profile_red(T)) for T in range(1, gp.TMAX + 1)},
-                     lambda T, e: gp.spread_profile(T, 24, e))
+                     lambda T, i: gp.bar_profile(T, i, 24, _profile_red))
 TOP_R = rr.WHITE                                    # white in the red ramp
 
 def colour(tok, y, f):

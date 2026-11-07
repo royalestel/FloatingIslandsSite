@@ -77,7 +77,7 @@ def prof25(T):
     return out
 PROF25 = gp.ProfDict({T: ([P25 + j for j in gp.spread_profile(T, 23)] if T >= gp.SPREAD_MIN else prof25(T))
                      for T in range(1, gp.TMAX + 1)},
-                    lambda T, e: [P25 + j for j in gp.spread_profile(T, 23, e)])
+                    lambda T, i: [P25 + j for j in gp.bar_profile(T, i, 23, lambda t: [max(0, x - P25) if x else 0 for x in prof25(t)])])
 
 def colour(tok, y, f):
     if tok >= P25:

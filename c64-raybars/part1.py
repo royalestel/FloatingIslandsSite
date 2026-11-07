@@ -117,7 +117,7 @@ def frame_list(t):
         z, yc = max(b[0], 0.6), b[1]
         T = max(1, min(TMAX, int(round(2 * F * R / z))))
         if len(b) > 3:
-            T = gp.BT(T, gp.edge_level(b[3]))                       # this bar's own edge swatch
+            T = gp.BT(T, gp.edge_level(b[3]), b[3])                       # this bar's own edge swatch
         y0 = int(round(yc - T / 2))
         if y0 >= H or y0 + T <= 0 or not any(gp.PROF[T][max(0, -y0):H - y0]):
             continue
