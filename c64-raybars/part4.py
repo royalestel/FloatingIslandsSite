@@ -110,10 +110,21 @@ for k in range(SEGS):
 
 # random pieces that travel all the way up and down the screen: more and more of them
 excursions = {(i, k): [] for i in range(NS) for k in range(SEGS)}      # (start, duration)
+# The trips ramp up (slowly at first), then about 50 pieces are on a trip at once for 2.5 s
+# (3 trips a frame start at 37 a second, each lasts 50-110 frames), then it tapers as the
+# columns start to line up.
+P0, P1, RATE = 690, 840, 37.5                                           # plateau 690-840 (2.5 s)
+def trips_per_second(t_):
+    if t_ < P0:
+        return 0.5 + (RATE - 0.5) * ((t_ - T_CIRC) / float(P0 - T_CIRC)) ** 2
+    if t_ <= P1:
+        return RATE
+    return 0.5 + (RATE - 0.5) * (1.0 - smooth((t_ - P1) / float(T_LAST - P1)))
+acc = 0.0
 for t_ in range(T_CIRC, int(T_LAST) + 1):
-    lam = (0.5 + 40.0 * chaos(t_) ** 2) / 60.0                          # expected events this frame
-    n = int(lam) + (1 if rng.random() < lam - int(lam) else 0)
-    for _ in range(n):
+    acc += trips_per_second(t_) / 60.0                                   # steady, not random, spacing
+    while acc >= 1.0:
+        acc -= 1.0
         excursions[rng.randrange(NS), rng.randrange(SEGS)].append((t_, rng.randint(50, 110)))
 
 def excursion(k, i, t):
