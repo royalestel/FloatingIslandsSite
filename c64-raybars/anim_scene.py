@@ -33,6 +33,16 @@ def theta(t):
     """Angle of bar 0 (starts at 270 deg: centre height, nearest on the circle)."""
     return 1.5 * np.pi + OMEGA * t
 
+# Optional: the whole circle moves off into the distance until its rearmost bar is just visible,
+# then back (set FAR_ZC, the circle centre's distance at the far point, in the params).
+FAR_ZC, FAR_T0, FAR_LEN, FAR_HOLD = None, 640, 160, 40
+
+def _dz(t):
+    if FAR_ZC is None:
+        return 0.0
+    b = smooth((t - FAR_T0) / FAR_LEN) * (1.0 - smooth((t - FAR_T0 - FAR_LEN - FAR_HOLD) / FAR_LEN))
+    return ZC * ((FAR_ZC / ZC) ** b - 1.0)                     # a steady shrink: geometric in distance
+
 def bars(t):
     """(distance, centre line, draw-order key) of the six bars at frame t
     (bars not on screen yet are far below it)."""
@@ -46,7 +56,7 @@ def bars(t):
     for k in range(6):
         if k < 3:
             ph = th + 2 * np.pi * k / 3
-            zc = ZC + AZ * np.sin(ph)                   # circle: away, down, towards, up
+            zc = ZC + _dz(t) + AZ * np.sin(ph)          # circle: away, down, towards, up (and, if set, off into the distance and back)
             z = (1 - s) * Z_EQ + s * zc                 # sliding = the circle edge-on
             yc = H / 2 - F * AY * np.cos(ph) / z
             z = (1 - e) * z + e * Z_EQ
