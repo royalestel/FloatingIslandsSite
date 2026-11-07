@@ -5,7 +5,9 @@
      second one bar element (the piece of a bar inside a column) flashes white and fades to
      one of the 3 palettes (blue / red / multicolour).
   B  after a few seconds the bars of each column, independently, start moving in circles in
-     depth (the bars follow each other round); the colour changes go on.
+     depth (the bars follow each other round); the colour changes go on.  From here the
+     movement slowly gets crazy: everything speeds up, the slides and circles grow, and more
+     and more random bar pieces travel all the way up and down the screen.
   C  3 s later every flash ends in blue.
   D  then the columns start to line up: at 3 matches a second a bar element in one column
      joins the element of the same bar in the next column over (they flash and turn blue);
@@ -81,17 +83,59 @@ for key in events:
     events[key].sort()
 
 # ---- positions ------------------------------------------------------------------------------
+def settle_at(t):
+    return 1.0 - smooth((t - T_SETTLE0) / SETTLE)
+
+def chaos(t):
+    """0 until the circles start, 1 at the last match: how crazy the middle section is."""
+    return smooth((t - T_CIRC) / float(T_LAST - T_CIRC))
+
 def amps(t):
-    settle = 1.0 - smooth((t - T_SETTLE0) / SETTLE)
-    return min(1.0, t / 60.0) * settle, smooth((t - T_CIRC) / 120.0) * settle
+    st = settle_at(t)
+    return min(1.0, t / 60.0) * st, smooth((t - T_CIRC) / 120.0) * st
+
+# phases that speed up with the chaos: slide phase and circle phase of each column
+PH_SLIDE, PH_CIRC = [], []
+for k in range(SEGS):
+    a_, b_, ps, pc = 0.0, 0.0, [], []
+    for t_ in range(T_END + 1):
+        ps.append(a_)
+        pc.append(b_)
+        a_ += 2 * math.pi / PERIOD[k] * (1 + 1.2 * chaos(t_))
+        b_ += OMEGA[k] * (1 + 1.5 * chaos(t_))
+    PH_SLIDE.append(ps)
+    PH_CIRC.append(pc)
+
+# random pieces that travel all the way up and down the screen: more and more of them
+excursions = {(i, k): [] for i in range(NS) for k in range(SEGS)}      # (start, duration)
+for t_ in range(T_CIRC, int(T_LAST) + 1):
+    lam = (0.5 + 40.0 * chaos(t_) ** 2) / 60.0                          # expected events this frame
+    n = int(lam) + (1 if rng.random() < lam - int(lam) else 0)
+    for _ in range(n):
+        excursions[rng.randrange(NS), rng.randrange(SEGS)].append((t_, rng.randint(50, 110)))
+
+def excursion(k, i, t):
+    """Vertical offset of the piece from its random trip: up to the top, then to the bottom, home."""
+    dy = 0.0
+    for t0, d in excursions[i, k]:
+        if t0 <= t < t0 + d:
+            u = (t - t0) / d
+            if u < 0.5:
+                dy += -(YC[i] + 12.0) * math.sin(2 * math.pi * u)             # up, off the top, back
+            else:
+                dy += (H - YC[i] + 12.0) * -math.sin(2 * math.pi * u)         # down, off the bottom, back
+    return dy
 
 def traj(k, i, t):
     """(centre line, thickness) of bar i in column k's own motion."""
     sa, ca = amps(t)
-    slide = SLIDE_AMP * sa * math.sin(2 * math.pi * t / PERIOD[k] + 0.8 * k)
-    th = OMEGA[k] * t + 0.22 * i + 1.3 * k
-    rho = 1.0 + CIRC_Z * ca * math.sin(th)
-    return YC[i] + slide - CIRC_Y * ca * math.cos(th), STR[i][1] / rho
+    ch = chaos(t)
+    slide = SLIDE_AMP * (1 + 1.7 * ch) * sa * math.sin(PH_SLIDE[k][t] + 0.8 * k)
+    th = PH_CIRC[k][t] + 0.22 * i + 1.3 * k
+    rho = 1.0 + CIRC_Z * (1 + 0.8 * ch) * ca * math.sin(th)
+    exc = excursion(k, i, t) * settle_at(t) if t >= T_CIRC else 0.0
+    return (YC[i] + slide - CIRC_Y * (1 + 1.5 * ch) * ca * math.cos(th) + exc,
+            STR[i][1] / max(rho, 0.35))
 
 def pos(i, k, t):
     y, T = traj(k, i, t)
