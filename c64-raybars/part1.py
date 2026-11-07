@@ -4,8 +4,10 @@
 Three bars slide in, circle in depth (the whole circle goes off into the distance -- no bar
 under 8 lines -- then closer than it started, then back to neutral), keep circling while they
 dim down the ramp to the ghost-byte colours and back up to full brightness, and settle into a
-vertical stack.  The floor they end in is pushed back a little (its nearest bar at 1.0 m instead
-of 0.8) and has 24 bars instead of 28 (the back 4 removed), so the rear bars' tilt can be seen.
+vertical stack.  The floor they end in has 20 bars (the back 8 of the old 28 removed), spaced out
+(1.5 m apart, the nearest at 1.5 m) and seen from a steeper angle: at least 2 black lines between
+bars, and the far end stops at line ~31 leaving a gap at the top of the screen, so the rear bars'
+tilt can be seen.  The dimming fades down slowly, stays dark for 80 frames, and comes back.
 At the end of the part:
   * the stack is built faster: three more bars slide up from the bottom (15 frames apart,
     40 each) and the rest of the stack comes down from above: all 28 floor bars are one
@@ -30,7 +32,7 @@ import anim1_floor as fv
 F, R, H, W = sc.F, sc.R, sc.H, gp.W
 TMAX = gp.TMAX
 REAR_8_LINES = 2 * 200 * 0.12 / 8.0            # 6 m: a bar this far is 8 lines thick
-EXTRA = 60                                     # frames added for the dimming while circling
+EXTRA = 170                                    # frames added for the dimming while circling
 P = dict(ap.P)
 P.update(FAR_KEYS=[(640, P["ZC"]), (760, REAR_8_LINES - P["AZ"]), (790, REAR_8_LINES - P["AZ"]),
                    (890, 1.6), (910, 1.6), (1000, P["ZC"])],
@@ -39,7 +41,7 @@ sc.configure(P)
 
 # dimming: after the circle is back at neutral (frame 1000) the bars fade down the ramp to the
 # ghost-byte colours and back to full brightness, still circling
-DIM = [(1000, 1.0), (1050, 0.28), (1070, 0.28), (1130, 1.0)]
+DIM = [(1000, 1.0), (1100, 0.28), (1180, 0.28), (1240, 1.0)]   # slow fade down, dark for 80 frames, back up
 
 def dim(f):
     if f <= DIM[0][0] or f >= DIM[-1][0]:
@@ -57,14 +59,29 @@ T_TOPB = T_STACK + 45                           # the upper stack (m >= 6) comes
 NEW_LEN = 40
 T_ROT0, T_ROT1 = T_STACK + 110, T_STACK + 310   # the unified rotation of the whole stack (3.3 s)
 T_END = T_ROT1 + 120
-FLOOR_Z0, NSTACK = 1.0, 24                                       # the floor: nearest bar 1.0 m, 24 bars
+# The floor: 20 bars, nearest at 1.5 m, 1.5 m apart; the horizon (screen line of the far end) at
+# line 30 so there is a gap above the farthest bar; the camera height CAM (a steeper view) makes
+# the nearest bar land on line 172 and the bars thinner, so there are 2 or more lines between all of them.
+FLOOR_Z0, FLOOR_S, NSTACK = 1.5, 1.5, 20
+FLOOR_Y_NEAR, FLOOR_Y_FAR = 172.0, 30.0
+FLOOR_MIX = 0.85                                  # how much of the square-root remap (separates the far bars)
+CAM = (FLOOR_Y_NEAR - FLOOR_Y_FAR) * FLOOR_Z0 / F
+FLOOR_ZF = FLOOR_Z0 + FLOOR_S * (NSTACK - 1)
+
+def floor_yc(z):
+    """Screen line of a floor bar at distance z: half true perspective, half a square-root remap
+    (so the far bars stay apart), both from line 172 at the nearest to line ~38 far away."""
+    true = FLOOR_Y_FAR + F * CAM / z
+    remap = FLOOR_Y_NEAR + (FLOOR_Y_FAR - FLOOR_Y_NEAR) * ((math.sqrt(z) - math.sqrt(FLOOR_Z0))
+                                                           / (math.sqrt(FLOOR_ZF) - math.sqrt(FLOOR_Z0)))
+    return (1 - FLOOR_MIX) * true + FLOOR_MIX * remap
 PITCH = sc.PITCH_PX
 Z0 = P["Z_EQ"]
 YCW = [H / 2 + (5 - m - 2.5) * PITCH for m in range(NSTACK)]     # stack slot m (0 = bottom), screen line
 S0 = PITCH * Z0 / F                                              # wall spacing (m)
-S1 = fv.SPACING                                                  # floor spacing (m)
+S1 = FLOOR_S                                                     # floor spacing (m)
 YP0 = -(YCW[0] - H / 2) * Z0 / F                                 # the bottom bar's height (m)
-YP1, ZP1, HORIZON = -fv.CAM_H, FLOOR_Z0, fv.HORIZON
+YP1, ZP1, HORIZON = -CAM, FLOOR_Z0, FLOOR_Y_FAR
 
 def stack(t):
     """[(size distance, centre line, key)] of the 28 stacked / rotating bars at frame t >= T_STACK."""
@@ -80,7 +97,7 @@ def stack(t):
         z = zp + m * s * math.sin(alpha)
         yc = y0 - F * y / z
         w = smooth((p - 0.6) / 0.4)                               # land exactly on part 2's floor
-        yc = (1 - w) * yc + w * float(fv.screen_y(z))
+        yc = (1 - w) * yc + w * floor_yc(z)
         d = math.hypot(z, y * p)                                  # the bar's thickness distance
         if m < 3:
             yc += 260 * (1 - smooth((t - T_NEWB[2 - m]) / NEW_LEN))   # up from the bottom
