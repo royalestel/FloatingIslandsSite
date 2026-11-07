@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """PART 4 (7 splits).  Starts where part 3 ends: even split columns multicolour, odd red.
 
-  A  every split column slides up and down on the screen (each at its own pace); 3 times a
-     second one bar element (the piece of a bar inside a column) flashes white and fades to
+  A  every split column slides up and down on the screen (each at its own pace); 6 times a
+     second at first (easing to 3), one bar element (the piece of a bar inside a column) flashes white and fades to
      one of the 3 palettes (blue / red / multicolour).
   B  after a few seconds the bars of each column, independently, start moving in circles in
      depth (the bars follow each other round); the colour changes go on.  From here the
@@ -63,11 +63,13 @@ PAL0 = ["multi" if k % 2 == 0 else "red" for k in range(SEGS)]     # where part 
 events = {(i, k): [] for i in range(NS) for k in range(SEGS)}      # (t0, palette)
 hist = {(i, k): [] for i in range(NS) for k in range(SEGS)}        # (t_change, rep column)
 
-t = FLASH_EVERY
+t = FLASH_EVERY // 2
 while t < T_ALIGN:                                                  # the random flashes
     i, k = rng.randrange(NS), rng.randrange(SEGS)
     events[i, k].append((t, "blue" if t >= T_BLUE else rng.choice(["blue", "red", "multi"])))
-    t += FLASH_EVERY
+    # twice as fast at the beginning (6 a second), easing to 3 a second by the time the circles start
+    t += FLASH_EVERY / 2.0 * (1.0 + smooth(t / float(T_CIRC)))
+    t = int(round(t))
 group = {i: list(range(SEGS)) for i in range(NS)}                   # rep column of each column
 for n, (i, k) in enumerate(pairs):                                  # the matches
     tm = match_t[n]
