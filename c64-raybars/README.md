@@ -891,3 +891,13 @@ The user's idea: every column is ONE byte pattern, and the shake is a table look
   shows the 8565's 1-pixel light-grey dot (5 dots a line): a property of that chip, which VICE emulates.
 * `python3 vice_check_2c.py` (with `VICEXTRA="-VICIImodel 6569"`); `FREEZE=n python3 mk_cart_p.py part2c part2c.crt`
   builds a test cartridge that stays on frame n.
+
+### Waves on the C64: cost estimate (parts 2-3, before the engine is written)
+
+Each column keeps its own page (the still floor's colour bytes); a moving (bar, column) piece is first RESTORED from a
+pristine copy of the still floor and then drawn at its tilted position, far to near.  Counting the pieces of the video's
+waves (part 3: 324 wave frames, 6 columns): on average 23 pieces move (max 48), 124 piece rows (max 285) and 350
+restore rows (max 777) per frame, i.e. about 4.3 k cycles on average and 9.6 k at the worst frame at 9 cycles a row;
+with the 6-store trick (one load of a profile row, six stores, the six columns' shifts patched per bar) about 28 %
+less (3 k average, 6.9 k worst).  So the peak frames are a little over the 6.5 k budget: those frames update 3 of the
+6 columns (each column at 30 Hz), as for the shakes.
