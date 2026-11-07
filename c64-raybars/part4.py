@@ -110,22 +110,19 @@ for k in range(SEGS):
 
 # random pieces that travel all the way up and down the screen: more and more of them
 excursions = {(i, k): [] for i in range(NS) for k in range(SEGS)}      # (start, duration)
-# The trips ramp up (slowly at first), then about 50 pieces are on a trip at once for 2.5 s
-# (3 trips a frame start at 37 a second, each lasts 50-110 frames), then it tapers as the
-# columns start to line up.
-P0, P1, RATE = 690, 840, 37.5                                           # plateau 690-840 (2.5 s)
-def trips_per_second(t_):
-    if t_ < P0:
-        return 0.5 + (RATE - 0.5) * ((t_ - T_CIRC) / float(P0 - T_CIRC)) ** 2
-    if t_ <= P1:
-        return RATE
-    return 0.5 + (RATE - 0.5) * (1.0 - smooth((t_ - P1) / float(T_LAST - P1)))
-acc = 0.0
-for t_ in range(T_CIRC, int(T_LAST) + 1):
-    acc += trips_per_second(t_) / 60.0                                   # steady, not random, spacing
-    while acc >= 1.0:
-        acc -= 1.0
-        excursions[rng.randrange(NS), rng.randrange(SEGS)].append((t_, rng.randint(50, 110)))
+# The trips: every piece joins in, a few at first, more and more, until during a 2.5 s plateau
+# ALL 28 pieces of every split column (196 in all) are on trips at once; then they drop out as
+# the columns start to line up.  A piece's trips run back to back (each up off the top, down
+# off the bottom, home), 50-110 frames each.
+P0, P1 = 690, 840                                                       # the plateau: 2.5 s
+for key in excursions:
+    t_ = T_CIRC + (P0 - T_CIRC) * math.sqrt(rng.random())               # when this piece joins in
+    while t_ <= T_LAST:
+        d = rng.randint(50, 110)
+        excursions[key].append((int(t_), d))
+        t_ += d
+        if t_ > P1 and rng.random() > 1.0 - smooth((t_ - P1) / float(T_LAST - P1)):
+            break                                                       # dropping out after the plateau
 
 def excursion(k, i, t):
     """Vertical offset of the piece from its random trip: up to the top, then to the bottom, home."""
