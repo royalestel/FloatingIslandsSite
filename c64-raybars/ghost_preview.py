@@ -107,6 +107,9 @@ def film_lines(lst):
 
 # ---- part 2: the wave -----------------------------------------------------------
 STR = [(y0, T) for y0, T in reversed(frame_list(sc.T_END - 1))]          # nearest first
+if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "floor20.json")):
+    import json                                    # the 20-bar floor that part 1 ends on
+    STR = [tuple(b) for b in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "floor20.json")))]
 NS = len(STR)
 TILT, STAG = WV["TILT_T"], WV["STAG"]
 USTART = [i * STAG if WV["NEAR_FIRST"] else (NS - 1 - i) * STAG for i in range(NS)]

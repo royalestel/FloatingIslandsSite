@@ -243,12 +243,8 @@ def shift_rows(a, o):
         out[:, :H + o] = a[:, -o:]
     return out
 
-def main(path):
-    Z = 3
-    v = iv.Video(path, W * Z, H * Z)
-    f = 0
-    # (name, segments(tw), wave length, pre, post)
-    seq = [
+def make_seq():
+    return [
         (gp2.ANIMS[0], lambda tw: gp2.segments(gp2.ANIMS[0], tw), (NS - 1) * 3 + 40),
         (gp2.ANIMS[1], lambda tw: gp2.segments(gp2.ANIMS[1], tw), (NS - 1) * 2 + 16),
         (gp2.ANIMS[2], lambda tw: gp2.segments(gp2.ANIMS[2], tw), (NS - 1) * 4 + 32),
@@ -256,6 +252,16 @@ def main(path):
         (W5, lambda tw: wave_tokens(W5, tw), (NS - 1) * 4 + 32),
         (W6, lambda tw: wave_tokens(W6, tw), (NS - 1) * 4 + 32),
     ]
+
+def total_frames():
+    seq = make_seq()
+    return sum((SHAKE if i == 0 else 10) + w + (10 if i < len(seq) - 1 else 60) for i, (_, _, w) in enumerate(seq))
+
+def main(path):
+    Z = 3
+    v = iv.Video(path, W * Z, H * Z)
+    f = 0
+    seq = make_seq()
     for n_i, (A, segs, wave) in enumerate(seq):
         pre = SHAKE if n_i == 0 else 10
         post = 10 if n_i < len(seq) - 1 else 60

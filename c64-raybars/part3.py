@@ -35,7 +35,7 @@ STR, NS, W, H, SEGS = g4.STR, g4.NS, g4.W, g4.H, g4.SEGS
 RED, P25, TOPB, TOP_R, TOP25 = g4.RED, g4.P25, g4.TOPB, g4.TOP_R, g4.TOP25
 PROF_R, PROF25, gp = g4.PROF_R, g4.PROF25, g4.gp
 TILT, STAG, AMP = 32, 4, 28
-F0 = 2087                                    # part 2's last frame number (2088 frames): same flicker phase
+F0 = 1895                                    # part 2's last frame number (1896 frames, 20-bar floor): same flicker phase
 
 def base_tok(pal, T, r):
     """The palette's token for row r of a bar T thick (0 = black / not drawn)."""
