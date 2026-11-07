@@ -130,7 +130,13 @@ def main(path, a=0, b=None):
         col = gp.film_lines(frame_list(f))
         g = dim(f)
         if g < 1.0:                                   # fade down the ramp (black stays black)
-            col = np.array([max(1, int(round(k * g))) if k else 0 for k in col])
+            u = (1.0 - g) / (1.0 - DIM[1][1])             # 0 = full bright, 1 = darkest
+            def dimk(k):                                  # centre rows (top 6 swatches) keep a brighter ramp
+                if not k: return 0
+                v = k * g
+                if k >= 16: v = max(v, k * (1 - u) + (11 + k - 16) * u)
+                return max(1, int(round(v)))
+            col = np.array([dimk(k) for k in col])
         img = np.array([gp.draw([c] * gp.SEGS, y, f) for y, c in enumerate(col)])
         v.add(lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z))
     v.close()
