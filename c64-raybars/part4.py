@@ -194,7 +194,7 @@ def tokens(t):
             items.append((T, y, i))
         for T, y, i in sorted(items, key=lambda a: a[0]):       # far (thin) first
             Tn = max(1, min(TMAX, int(round(T))))
-            Tn = gp.BT(Tn, gp.edge_level(i), i)                    # this floor bar's own profile
+            Tn = p3.gp.BT(Tn, p3.gp.edge_level(i), i)                    # this floor bar's own profile
             y0 = int(round(y - Tn / 2.0))
             base, flash = palette(i, k, t)
             for r in range(Tn):
