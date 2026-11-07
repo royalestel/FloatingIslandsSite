@@ -2,16 +2,17 @@
 """PART 3: starts where part 2 ends (7 splits): the finished floor, the nearest bar
 multicolour, the next red, alternating.
 
-Wave shorthand:  <hand> <direction> pk <white|black> pal <palette>
-  rh / lh      the bar tilts on its right / left end
-  f2b / b2f    the wave runs front to back / back to front
-  pk white     the bar turns white at the peak of its tilt (pk black: black, i.e. it
-               vanishes against the background), then fades to the palette as it
-               comes back down; before the peak it keeps the palette it had.
+Wave shorthand:  [<hand>] <direction> pk <white|black> pal <palette>
+  rh / lh      the bar tilts on its right / left end;  with no hand: the part of every
+               bar inside the named raster-split column lifts straight up, as one piece
+  f2b / b2f    the wave runs front to back / back to front (bar by bar)
+  pk white     the piece turns white at the peak of its lift (pk black: black, so it
+               vanishes against the background), then fades to the palette as it comes
+               back down; before the peak it keeps the palette it had.
 
-  3a  every other bar (the nearest, the third, ...):  rh f2b pk white pal blue
-  3b  at once:  the bars that just changed:  lh b2f pk white pal red
-                the other bars:              rh f2b pk black pal multicolor
+  3a  every other split column (1st, 3rd, 5th, 7th):  f2b pk white pal blue
+  3b  at once:  the columns that just changed:  b2f pk white pal red
+                the other columns:               f2b pk black pal multicolor
 
     python3 part3.py out.mp4
 """
@@ -58,51 +59,43 @@ def fade_tok(pal, T, r, f, peak):
     return (P25 + pr + int(round((TOP25 - pr) * f)) if peak == "white"
             else P25 + int(round(pr * (1 - f))))
 
-def tokens(plans, static, tw):
-    """SEGS x H tokens at frame tw.  plans[i]: None (the bar stays as static[i]) or a dict
-    side, start, base, end, peak."""
+LIFT = 16                                     # lines a column's piece rises at its peak
+
+def tokens(cols, static, tw):
+    """SEGS x H tokens at frame tw.  cols[k]: None (column k stays as static[i][k]) or a dict
+    dir ('f2b' / 'b2f'), end (palette), peak ('white' / 'black').  static[i][k]: the palette
+    of bar i's piece in column k."""
     out = np.zeros((SEGS, H), int)
     for i in range(NS - 1, -1, -1):                              # far first
         y0, T = STR[i]
-        pl = plans[i]
-        if pl is None:
-            for k in range(SEGS):
+        for k in range(SEGS):
+            sp = cols[k]
+            pal = static[i][k]
+            if sp is None:
                 for r in range(T):
-                    tok = base_tok(static[i], T, r)
+                    tok = base_tok(pal, T, r)
                     if tok and 0 <= y0 + r < H:
                         out[k, y0 + r] = tok
-            continue
-        u = tw - pl["start"]
-        a = AMP * math.sin(math.pi * u / TILT) if 0 < u < TILT else 0.0
-        uu = u / TILT
-        f = 1.0 - (min(uu, 1.0) - 0.5) / 0.5 if uu >= 0.5 else 0.0
-        for k in range(SEGS):
-            c = (k + 0.5) / SEGS
-            s = -int(round(a * c)) if pl["side"] == "R" else -int(round(a * (1 - c)))
+                continue
+            start = i * STAG if sp["dir"] == "f2b" else (NS - 1 - i) * STAG
+            u = tw - start
+            a = LIFT * math.sin(math.pi * u / TILT) if 0 < u < TILT else 0.0
+            uu = u / TILT
+            f = 1.0 - (min(uu, 1.0) - 0.5) / 0.5 if uu >= 0.5 else 0.0
+            s = -int(round(a))
             for r in range(T):
-                tok = (base_tok(pl["base"], T, r) if uu < 0.5
-                       else fade_tok(pl["end"], T, r, f, pl["peak"]))
+                tok = base_tok(pal, T, r) if uu < 0.5 else fade_tok(sp["end"], T, r, f, sp["peak"])
                 if tok and 0 <= y0 + s + r < H:
                     out[k, y0 + s + r] = tok
     return out
 
 # the state part 2 ends in: even bars (the nearest first) multicolour, odd bars red
-START = ["multi" if i % 2 == 0 else "red" for i in range(NS)]
+START = [["multi" if i % 2 == 0 else "red"] * SEGS for i in range(NS)]
 
-def plans_3a():
-    return [dict(side="R", start=i * STAG, base="multi", end="blue", peak="white") if i % 2 == 0 else None
-            for i in range(NS)]
-
-STATE_3A = ["blue" if i % 2 == 0 else "red" for i in range(NS)]
-
-def plans_3b():
-    out = []
-    for i in range(NS):
-        if i % 2 == 0:       # the bars that just changed: lh b2f pk white pal red
-            out.append(dict(side="L", start=(NS - 1 - i) * STAG, base="blue", end="red", peak="white"))
-        else:                # the others: rh f2b pk black pal multicolor
-            out.append(dict(side="R", start=i * STAG, base="red", end="multi", peak="black"))
-    return out
+COLS_3A = [dict(dir="f2b", end="blue", peak="white") if k % 2 == 0 else None for k in range(SEGS)]
+STATE_3A = [["blue" if k % 2 == 0 else START[i][k] for k in range(SEGS)] for i in range(NS)]
+COLS_3B = [dict(dir="b2f", end="red", peak="white") if k % 2 == 0 else
+           dict(dir="f2b", end="multi", peak="black") for k in range(SEGS)]
 
 def main(path):
     Z = 3
@@ -110,12 +103,12 @@ def main(path):
     f = 0
     wave = (NS - 1) * STAG + TILT
     # (name, plans, static state of unmoved bars, lead-in, wave length, tail)
-    seq = [("3a", plans_3a(), START, 30, wave, 20),
-           ("3b", plans_3b(), STATE_3A, 0, wave, 90)]
-    for name, plans, static, pre, length, post in seq:
+    seq = [("3a", COLS_3A, START, 30, wave, 20),
+           ("3b", COLS_3B, STATE_3A, 0, wave, 90)]
+    for name, cols, static, pre, length, post in seq:
         n = pre + length + post
         for t in range(n):
-            seg = tokens(plans, static, t - pre)
+            seg = tokens(cols, static, t - pre)
             img = []
             for y in range(H):
                 toks = [int(seg[k, y]) for k in range(SEGS)]
