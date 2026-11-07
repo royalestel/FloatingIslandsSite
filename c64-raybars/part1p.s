@@ -47,7 +47,7 @@ IDLE       = $3fff
 LINEBUF    = $0400              ; the screen is never shown; 64 bytes of padding either side
 
         .import p_sin, p_sk, p_azs, p_sb, p_se, p_sc, p_risel, p_riseh, p_zbfl, p_zbfh
-        .import p_kyl, p_kyh, p_tt, p_dx, p_dimt, p_full, p_foffl, p_foffh
+        .import p_kyl, p_kyh, p_tt, p_dx, p_dimt, p_full, p_foffl, p_foffh, p_sqlo, p_sqhi
 
 ; =============================================================================
 .segment "ZEROPAGE"
@@ -66,7 +66,6 @@ save_y:  .res 1
 ; --- procedural beginning
 pa:      .res 2                 ; phase accumulator (16 bits), the phase is its high byte
 sv:      .res 1                 ; s: the slide becomes the circle (0..255)
-ev:      .res 1                 ; e: the circle settles into the stack
 zbl:     .res 1                 ; the circle's centre distance (1/64 m)
 zbh:     .res 1
 dl:      .res 1
@@ -174,18 +173,34 @@ dly:    .repeat 14
         rts
 
 ; -----------------------------------------------------------------------------
-;  8 x 8 multiply: mda * mrr -> A (high) : mrr (low)
+;  8 x 8 multiply by quarter squares: mda * mrr -> A (high) : mrr (low)
 ; -----------------------------------------------------------------------------
-mul8:   lda #0
-        ldx #8
-        lsr mrr
-@l:     bcc @n
+mul8:   lda mda
+        sec
+        sbc mrr
+        bcs @d
+        eor #$ff
+        adc #1
+@d:     tay                     ; |a - b|
+        lda mda
         clc
-        adc mda
-@n:     ror
-        ror mrr
-        dex
-        bne @l
+        adc mrr
+        bcs @big
+        tax                     ; a + b < 256
+        lda p_sqlo,x
+        sec
+        sbc p_sqlo,y
+        sta mrr
+        lda p_sqhi,x
+        sbc p_sqhi,y
+        rts
+@big:   tax                     ; a + b = 256 + x
+        lda p_sqlo+256,x
+        sec
+        sbc p_sqlo,y
+        sta mrr
+        lda p_sqhi+256,x
+        sbc p_sqhi,y
         rts
 
 ; -----------------------------------------------------------------------------
@@ -200,7 +215,8 @@ lerp:   lda lw
         lda lb+1
         sta la+1
 @ret:   rts
-@m:     bpl @w1                 ; w' = w + (w >> 7)
+@m:     lda lw                  ; w' = w + (w >> 7)
+        bpl @w1
         clc
         adc #1
 @w1:    sta l2                 ; the multiplier
@@ -307,27 +323,6 @@ clampz: lda la+1
         beq @ss
 @s255:  lda #255
 @ss:    sta sv
-        ; --- e: smoothstep of (t - T_C0) over NC frames
-        sec
-        lda fcl
-        sbc #<T_C0
-        sta dl
-        lda fch
-        sbc #>T_C0
-        sta dh
-        bmi @e0
-        lda dh
-        bne @e255
-        lda dl
-        cmp #NC
-        bcs @e255
-        tax
-        lda p_sc,x
-        jmp @es
-@e0:    lda #0
-        beq @es
-@e255:  lda #255
-@es:    sta ev
         ; --- zb: the circle's centre distance (1/64 m)
         sec
         lda fcl
@@ -467,38 +462,11 @@ clampz: lda la+1
         lda yh
         adc oh
         sta yh
-@yc:    ; z = lerp(z, Z_EQ, e); yc = lerp(yc, SLOT[k], e)
-        lda zl
-        sta la
-        lda zh
-        sta la+1
-        lda #<Z_EQ
-        sta lb
-        lda #>Z_EQ
-        sta lb+1
-        lda ev
-        sta lw
-        jsr lerp
-        lda la
+@yc:    ldx kk
+        lda la                  ; z
         sta zl
         lda la+1
         sta zh
-        lda yl
-        sta la
-        lda yh
-        sta la+1
-        ldx kk
-        lda slotl,x
-        sta lb
-        lda sloth,x
-        sta lb+1
-        lda ev
-        sta lw
-        jsr lerp
-        lda la
-        sta yl
-        lda la+1
-        sta yh
         ; rise: d = t - T_ENTER[k]; <= 0: 260, >= NE: 0, else RISE[d]
         sec
         lda fcl
@@ -714,15 +682,15 @@ enth:   .byte >T_ENTER0, >T_ENTER1, >T_ENTER2
         beq @ev
         lda #$20
 @ev:    sta @or + 1
-        ldx #0
+        ldx t3                  ; the rows, from the last to the first
+        dex
 @ld:    lda $ffff,x
         tay
 @mp:    lda $ffff,y
 @or:    ora #0
 @st:    sta $ffff,x
-        inx
-        cpx t3
-        bne @ld
+        dex
+        bpl @ld
 @skip:  ldx kk
         inx
         cpx #3
@@ -739,11 +707,11 @@ enth:   .byte >T_ENTER0, >T_ENTER1, >T_ENTER2
         sta LINEBUF + N         ; clear: 4 cycles a line
         .endrep
         lda fch
-        cmp #>T_STACK
+        cmp #>T_PROC
         bcc @proc
         bne @stream
         lda fcl
-        cmp #<T_STACK
+        cmp #<T_PROC
         bcs @stream
 @proc:  jsr pbars
         jsr pdraw
