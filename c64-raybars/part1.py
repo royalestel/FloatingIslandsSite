@@ -131,12 +131,21 @@ def main(path, a=0, b=None):
         g = dim(f)
         if g < 1.0:                                   # fade down the ramp (black stays black)
             u = (1.0 - g) / (1.0 - DIM[1][1])             # 0 = full bright, 1 = darkest
-            def dimk(k):                                  # centre rows (top 6 swatches) keep a brighter ramp
+            cen = np.zeros(len(col), bool)                # middle 4 rows of every bar get one swatch lighter
+            y = 0
+            while y < len(col):
+                if col[y]:
+                    y1 = y
+                    while y1 < len(col) and col[y1]: y1 += 1
+                    if y1 - y >= 8: m = (y + y1) // 2; cen[m - 2:m + 2] = True
+                    y = y1
+                else: y += 1
+            def dimk(k, c):                               # centre rows (top 6 swatches) keep a brighter ramp
                 if not k: return 0
                 v = k * g
-                if k >= 16: v = max(v, k * (1 - u) + (11 + k - 16) * u)
+                if k >= 16: v = max(v, k * (1 - u) + (11 + k - 16 + (1 if c else 0)) * u)
                 return max(1, int(round(v)))
-            col = np.array([dimk(k) for k in col])
+            col = np.array([dimk(k, c) for k, c in zip(col, cen)])
         img = np.array([gp.draw([c] * gp.SEGS, y, f) for y, c in enumerate(col)])
         v.add(lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z))
     v.close()
