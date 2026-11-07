@@ -831,3 +831,32 @@ checks it on a simulated 6502; `python3 mk_d64.py routine.d64 ROUTINE part1.prg=
   blank, so there is little left for a loader (a disk loader would need the IEC bus at its own
   timing).  A cartridge would avoid that: the data sit in ROM banks and part 1's rows, whose 43 padding
   cycles could copy about 4 bytes each, would move the rest into RAM in the background.
+
+## PARTS 2-4 on the C64: design (6 columns, procedural movement)
+
+Decided with the user: 6 raster-split columns (32 | 64 x 4 | 32 pixels), movement computed by the program
+(sine / smoothstep tables) instead of stored frame by frame.  What the analysis of part 1's build and of
+`animsplit.s` (the old stage-2 engine) says about how to build it:
+
+* **Timing of a split line:** the 6 columns need 5 timed writes inside the window, one every 8 cycles
+  (`lda abs / sta $d021`, 4 + 4): the colour byte of each column must be read with an ABSOLUTE address, so each
+  column has its own 200-byte buffer of final colour bytes (not swatch indices).  (7 columns would need 6-cycle
+  `lda #imm` writes and rewriting code every frame: not possible in the 6.5 k cycles of the blank.)
+  `(zp),y` reads take 10 cycles with the store: too slow.  The idle byte (ghost pattern) of a line is one more
+  `lda abs / sta $3fff` (8 cycles): a split row is 6 x 8 + 8 + jmp = 59 cycles, so a line can have either all
+  6 columns or ghost swatches -- ghost swatches are used only on lines where all columns agree (plain rows,
+  part 1's index rows), and flat swatches on split lines.  Same rule as the video's `fix_line`.
+* **Rows:** plain rows (part 1: `ldx LINEBUF / lda ght,x / sta $3fff / lda colt,x / sta $d021`) for the lines that
+  are the same in every column, split rows for the lines that are not: a contiguous band of split rows, entered
+  and left by patching two `jmp` operands (animsplit.s' design).
+* **Update budget:** the blank gives about 6.5 k cycles.  Composing all 6 buffers from scratch costs more
+  (clear 6 x 200 = 4.8 k alone), so the update touches only the band: the 6-store trick (one `lda` of a profile row,
+  six `sta abs,y` into the six buffers, whose operands are patched per bar for each column's own shift) draws a
+  bar piece in all 6 columns for about 39 cycles a row; a still floor costs nothing (plain rows).
+* **Movement, procedural:** shakes = sums of sines per column (as the video's `quake`), waves = per (bar, column)
+  tilt `s = round(amp * sin(pi * u / TILT) * c_k)` with the front running down the floor, palette changes = white at
+  the apex then a fade through the palette's own swatches, part 4's random sliding = a small pseudo-random
+  generator of (bar, column, start, speed) driving the same piece moves.  Part 4's roughly 500 changed cells per
+  frame are too many to compose live; the C64 version will move fewer pieces at once.
+* **Order of work:** (1) engine + still floor + shakes (part 2 beginning), VICE-checked pixel by pixel against a Python
+  spec like part 1; (2) waves and palette fades (rest of parts 2 and 3); (3) part 4's motion.
