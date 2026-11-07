@@ -7,7 +7,7 @@ import part1_proc as q
 def main(path, a=0, b=None):
     v = p1.iv.Video(path, p1.W * 3, p1.H * 3)
     for f in range(a, q.p1.T_END if b is None else b):
-        col, par = q.film_buf(f)           # swatch parity = the row's parity in its bar
+        col, par = q.parity_of(q.film_buf(f))              # swatch, and the row's parity inside its bar
         img = np.array([p1.gp.draw([c] * p1.gp.SEGS, (y & ~1) | par[y], f) for y, c in enumerate(col)])
         v.add(p1.lv.crt_look(p1.fb.C64RGB[img].astype(np.uint8), 3))
     v.close(); print("wrote", path, (q.p1.T_END if b is None else b) - a, "frames")
