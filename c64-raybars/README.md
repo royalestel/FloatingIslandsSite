@@ -872,3 +872,22 @@ Decided with the user: 6 raster-split columns (32 | 64 x 4 | 32 pixels), movemen
   every pattern needs its own bank (the rows' addresses are fixed) and an EasyFlash has 64 banks.  So the plan is:
   the offsets come from tables (sines, envelopes), and the data movement is split: 3 of the 6 columns are
   redrawn each frame (each column at 30 Hz, about 3 k cycles), which also leaves time for the rest.
+
+### Part 2's earthquake on the C64: part2c.prg / part2c.crt (VICE-checked)
+
+The user's idea: every column is ONE byte pattern, and the shake is a table lookup.  `part2c.s`:
+* the 200 lines are a single loop, 63 cycles a line, X = the line: `lda P0,x / sta $d021` ... `lda P5,x / sta $d021`
+  (one write every 8 cycles), then `lda G+1,x / sta $3fff` (the next line's idle byte, in the right border), `inx /
+  cpx #200 / bne`.  No unrolled rows, no buffers to fill;
+* each column reads the still floor's colour-byte pattern (one page, line n at offset 28 + n) at `pattern + 28 - d`:
+  shaking is 7 patched operand bytes a frame, from a table of precomputed shifts (`part2.shake_offsets`, 6 columns,
+  7 bytes a frame, 7.4 KB for the 1064 frames).  While all columns share a shift, the ghost-swatch pattern and its idle
+  byte pattern are used; while they differ, the flat-swatch pattern and a zero idle byte (the video's rule);
+* the stable raster: WAITX = 8 with the odd `bit $00`, measured in VICE so that the compare falls on the line change
+  (the old WAITX = 6 left a 1-cycle jitter that only showed now, with writes inside the window);
+* column 1 starts at x = 33 (8 pixels a cycle; the VIC shows a $d021 write one pixel after the cycle boundary).
+* **VICE, original PAL VIC (6569):** frozen frames (still floor, whole-floor quake, split quake, both parities) and
+  an unfrozen run at 5 moments are pixel exact.  **On the newer VIC (8565)** every `$d021` write inside the window
+  shows the 8565's 1-pixel light-grey dot (5 dots a line): a property of that chip, which VICE emulates.
+* `python3 vice_check_2c.py` (with `VICEXTRA="-VICIImodel 6569"`); `FREEZE=n python3 mk_cart_p.py part2c part2c.crt`
+  builds a test cartridge that stays on frame n.
