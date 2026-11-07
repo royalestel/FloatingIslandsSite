@@ -52,13 +52,37 @@ def profile_idx(T):
         lit = sum(gc.row_v3(d, v) for v in r) / 8
         out.append(int(np.argmin(np.abs(Lstar(np.array(lit)) - RAMP_L))))
     return out
-def spread_profile(T, hi):
-    """Symmetric bar, every row pair a different swatch: ceil(T/2) levels spread over 1..hi, mirrored."""
+class BT(int):
+    """A bar thickness that also carries the ramp level of the bar's top/bottom edge: the floor bars
+    each get a different edge swatch (index 0 = nearest bar)."""
+    def __new__(cls, T, e):
+        o = int.__new__(cls, T); o.e = e; return o
+
+NBARS = 20
+def edge_level(i):                                # distinct edge swatches 1..21 for bars 0 (nearest) .. 19
+    return 1 + int(round(i * 20.0 / (NBARS - 1)))
+
+def spread_profile(T, hi, e=1):
+    """Symmetric bar: ceil(T/2) levels spread from the edge swatch e up to hi, mirrored."""
     n = (T + 1) // 2
-    half = [int(v) for v in np.round(np.linspace(1, hi, n))]
+    half = [int(v) for v in np.round(np.linspace(e, max(hi, e), n))] if n > 1 else [e]
     return half + half[::-1][T % 2:]
-SPREAD_MIN = 20                                   # bars at least this thick get the spread profile
-PROF = {T: (spread_profile(T, 23) if T >= SPREAD_MIN else profile_idx(T)) for T in range(1, TMAX + 1)}
+
+class ProfDict(dict):
+    """PROF[T] as usual; PROF[BT] builds that bar's own profile (edge level e) with fn(T, e)."""
+    def __init__(self, base, fn):
+        super().__init__(base); self.fn = fn; self.cache = {}
+    def __getitem__(self, k):
+        if isinstance(k, BT):
+            key = (int(k), k.e)
+            if key not in self.cache:
+                self.cache[key] = self.fn(int(k), k.e)
+            return self.cache[key]
+        return dict.__getitem__(self, k)
+
+SPREAD_MIN = 20                                   # plain-int bars at least this thick: the spread profile
+PROF = ProfDict({T: (spread_profile(T, 23) if T >= SPREAD_MIN else profile_idx(T)) for T in range(1, TMAX + 1)},
+                lambda T, e: spread_profile(T, 23, e))
 
 def frame_list(t):
     out = []
@@ -115,7 +139,7 @@ def film_lines(lst):
 STR = [(y0, T) for y0, T in reversed(frame_list(sc.T_END - 1))]          # nearest first
 if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "floor20.json")):
     import json                                    # the 20-bar floor that part 1 ends on
-    STR = [tuple(b) for b in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "floor20.json")))]
+    STR = [(y0, BT(T, edge_level(i))) for i, (y0, T) in enumerate(json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "floor20.json"))))]
 NS = len(STR)
 TILT, STAG = WV["TILT_T"], WV["STAG"]
 USTART = [i * STAG if WV["NEAR_FIRST"] else (NS - 1 - i) * STAG for i in range(NS)]
