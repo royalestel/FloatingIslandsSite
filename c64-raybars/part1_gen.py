@@ -56,7 +56,8 @@ def visible(arr, y0):
         assert rows == list(range(rows[0], rows[-1] + 1)), "black row inside a bar"
     return (rows[0], rows[-1]) if rows else None
 
-def build():
+def prepare():
+    """The frames' bar arrays (deduplicated into one profile table) -- shared by both builds."""
     lists = [p1.frame_list(f) for f in range(p1.T_END)]
     prof, off = bytearray(), {}
     def intern(arr):
@@ -65,33 +66,53 @@ def build():
             off[key] = len(prof)
             prof.extend(key)
         return off[key]
-    frames, prev = [], None
+    frames, same, prev = [], [], None
     for f, lst in enumerate(lists):
         arrs = [(y0, bar_array(T, f)) for y0, T in lst]
         key = [(y0, tuple(a)) for y0, a in arrs]
-        if key == prev:
-            frames.append(None)
-        else:
-            vis = [(y0, a, visible(a, y0)) for y0, a in arrs]
-            frames.append([(y0, a, v) for y0, a, v in vis if v])
+        vis = [(y0, a, visible(a, y0)) for y0, a in arrs]
+        frames.append([(y0, a, v) for y0, a, v in vis if v])
+        same.append(key == prev)
         prev = key
-    for fr in frames:                                     # intern the profiles first: their size sets the layout
-        for y0, a, v in fr or []:
+    for fr in frames:                                     # intern in frame order: the layout is deterministic
+        for y0, a, v in fr:
             intern(a)
+    return lists, frames, same, bytes(prof), off
+
+def record(fr, off, explicit):
+    body = bytearray([len(fr)])
+    for y0, a, (r0, r1) in fr:
+        ptr = PROF_BASE + off[bytes(a)] + r0
+        body += bytes([ptr & 255, ptr >> 8, y0 + r0, r1 - r0])
+    return bytes(body)
+
+def build():
+    lists, frames, same, prof, off = prepare()
     scene0_start = PROF_BASE + len(prof)
     rec0, rec1 = bytearray(), bytearray()
-    for fr in frames:
-        if fr is None:
-            body = bytes([0xFF])
-        else:
-            body = bytearray([len(fr)])
-            for y0, a, (r0, r1) in fr:
-                ptr = PROF_BASE + off[bytes(a)] + r0
-                body += bytes([ptr & 255, ptr >> 8, y0 + r0, r1 - r0])
+    for fr, sm in zip(frames, same):
+        body = bytes([0xFF]) if sm else record(fr, off, False)
         if not rec1 and scene0_start + len(rec0) + len(body) > IO - 1:
             rec0.append(0xFE)                             # jump to scene1; a record never straddles the hole
         (rec1 if (rec1 or rec0[-1:] == b"\xfe") else rec0).extend(body)
-    return lists, bytes(rec0), bytes(rec1), bytes(prof)
+    return lists, bytes(rec0), bytes(rec1), prof
+
+def scene_banks():
+    """The scene stream for the cartridge: 8 KB banks, each ending in $fe (go on in the next bank); the
+    first record of a bank is always a full one, so the 'same as last frame' pointer never points into
+    another bank."""
+    lists, frames, same, prof, off = prepare()
+    banks, cur = [], bytearray()
+    for n, (fr, sm) in enumerate(zip(frames, same)):
+        body = bytes([0xFF]) if sm and cur else record(fr, off, True)
+        if len(cur) + len(body) > 0x2000 - 1:
+            cur.append(0xFE)
+            banks.append(bytes(cur).ljust(0x2000, b"\xff"))
+            cur = bytearray()
+            body = record(fr, off, True)
+        cur.extend(body)
+    banks.append(bytes(cur).ljust(0x2000, b"\xff"))
+    return banks, prof
 
 def compose_ref(lst, f):
     buf = [0] * H

@@ -29,7 +29,12 @@ ROWS      = 200
 FIRST_LINE = 51
 IRQ0LINE  = 46                  ; DEN low across line $30 (48)
 IRQLINE   = FIRST_LINE - 2      ; the stable double IRQ
+.ifndef HTUNE
 HTUNE     = 0
+.endif
+.ifndef WAITX
+WAITX     = 6                   ; tuned in VICE: the rows start the same cycle on every line
+.endif
 
 VIC_CTRL1  = $d011
 VIC_RASTER = $d012
@@ -46,6 +51,7 @@ LINEBUF    = $0400                ; the screen is never shown
 ; =============================================================================
 .segment "ZEROPAGE"
 rp:      .res 2
+bank:    .res 1                 ; cartridge: the ROML bank the scene stream is in
 cur:     .res 2
 lastp:   .res 2
 lastn:   .res 1
@@ -76,6 +82,8 @@ start:  sei
         sta CIA2_ICR
         lda CIA1_ICR
         lda CIA2_ICR
+        lda #$2f                ; processor port: bits 0-2 outputs
+        sta $00
         lda #$35                ; RAM + I/O
         sta $01
         lda #<nmi
@@ -99,6 +107,12 @@ start:  sei
         sta rp
         lda #>scene
         sta rp+1
+.ifdef CART
+        lda #SCENE_BANK
+        sta bank
+.endif
+        lda #$c8                ; 40 columns (the VIC resets to 38)
+        sta $d016
         lda #$0b                ; DEN low (the irq0/irq1 pair raises it every frame)
         sta VIC_CTRL1
         lda #IRQ0LINE
@@ -121,6 +135,12 @@ dly:    .repeat 14
 ;  update: the next frame's buffer of swatch indices, and which row set shows it
 ; -----------------------------------------------------------------------------
 .proc update
+.ifdef CART
+        lda #$37                ; BASIC/KERNAL/ROML visible while we read the scene (interrupts are off here)
+        sta $01
+        lda bank
+        sta $de00
+.endif
         lda #0
         .repeat ::ROWS, N
         sta LINEBUF + N         ; clear: 4 cycles a line
@@ -129,10 +149,20 @@ dly:    .repeat 14
         lda (rp),y
         cmp #$fe
         bne @nj
+.ifdef CART
+        inc bank                ; the stream goes on at the start of the next ROML bank
+        lda bank
+        sta $de00
+        lda #<scene
+        sta rp
+        lda #>scene
+        sta rp+1
+.else
         lda #<scene1            ; the stream jumps over the I/O hole at $d000
         sta rp
         lda #>scene1
         sta rp+1
+.endif
         lda (rp),y
 @nj:    cmp #$ff
         bne @new
@@ -216,7 +246,16 @@ dly:    .repeat 14
         sta rp
         lda #>scene
         sta rp+1
-@ret:   rts
+.ifdef CART
+        lda #SCENE_BANK
+        sta bank
+.endif
+@ret:
+.ifdef CART
+        lda #$35                ; RAM + I/O again for the rows and the IRQ vectors
+        sta $01
+.endif
+        rts
 .endproc
 
 ; -----------------------------------------------------------------------------
@@ -254,7 +293,7 @@ irq1:   sta save_a
         .endrep
 
 irq2:   txs
-        ldx #8
+        ldx #WAITX
 @w:     dex
         bne @w
         bit $00
@@ -313,8 +352,12 @@ ght:    GHT
 .segment "PROF"
 prof:   .incbin "part1_prof.bin"
 
+.ifdef CART
+scene = $8000                   ; the scene stream is in ROML banks SCENE_BANK.. (mk_cart.py)
+.else
 .segment "SCENE"
 scene:  .incbin "part1_rec0.bin"
 
 .segment "SCENE1"
 scene1: .incbin "part1_rec1.bin"
+.endif
