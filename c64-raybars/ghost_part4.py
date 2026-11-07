@@ -75,7 +75,8 @@ def prof25(T):
         j = int(np.argmin(np.abs(L25 - Lr)))
         out.append(0 if j == 0 else P25 + j)
     return out
-PROF25 = {T: prof25(T) for T in range(1, gp.TMAX + 1)}
+PROF25 = {T: ([P25 + j for j in gp.spread_profile(T, 23)] if T >= gp.SPREAD_MIN else prof25(T))
+          for T in range(1, gp.TMAX + 1)}
 
 def colour(tok, y, f):
     if tok >= P25:
