@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """PART 1: the intro film (ghost-byte swatches, no splits): three bars slide in, circle in
 depth, settle into the stack and tilt into the floor.  In the circle section the whole circle
-now moves off into the distance until its rearmost bar is just visible (a 2-line bar at 31.5 m),
-then comes back to the foreground and the film goes on as before.
+moves off into the distance (no bar smaller than 8 lines: the rearmost is 8 lines at 6 m), then
+closer to the camera than it started (centre 1.6 m instead of 2.0), then back to neutral, and
+the film goes on as before.
 
     python3 part1.py part1.mp4
 """
@@ -15,9 +16,10 @@ import anim_params as ap
 import anim_scene as sc
 import ghost_preview as gp
 
-REAR_JUST_VISIBLE = 31.5                       # m: a bar this far is a 2-line bar, the last one that shows
+REAR_8_LINES = 2 * 200 * 0.12 / 8.0            # 6 m: a bar this far is 8 lines thick
 P = dict(ap.P)
-P.update(FAR_ZC=REAR_JUST_VISIBLE - P["AZ"], FAR_T0=640, FAR_LEN=160, FAR_HOLD=40)
+P.update(FAR_KEYS=[(640, P["ZC"]), (760, REAR_8_LINES - P["AZ"]), (790, REAR_8_LINES - P["AZ"]),
+                   (890, 1.6), (910, 1.6), (1000, P["ZC"])])
 sc.configure(P)
 
 def main(path, a=0, b=None):

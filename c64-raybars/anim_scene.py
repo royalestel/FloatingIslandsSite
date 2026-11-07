@@ -33,15 +33,18 @@ def theta(t):
     """Angle of bar 0 (starts at 270 deg: centre height, nearest on the circle)."""
     return 1.5 * np.pi + OMEGA * t
 
-# Optional: the whole circle moves off into the distance until its rearmost bar is just visible,
-# then back (set FAR_ZC, the circle centre's distance at the far point, in the params).
-FAR_ZC, FAR_T0, FAR_LEN, FAR_HOLD = None, 640, 160, 40
+# Optional: the circle's centre distance follows keyframes (time, distance), eased and
+# interpolated in the logarithm of the distance (a steady shrink / grow); set FAR_KEYS.
+FAR_KEYS = None
 
 def _dz(t):
-    if FAR_ZC is None:
+    if FAR_KEYS is None or t <= FAR_KEYS[0][0] or t >= FAR_KEYS[-1][0]:
         return 0.0
-    b = smooth((t - FAR_T0) / FAR_LEN) * (1.0 - smooth((t - FAR_T0 - FAR_LEN - FAR_HOLD) / FAR_LEN))
-    return ZC * ((FAR_ZC / ZC) ** b - 1.0)                     # a steady shrink: geometric in distance
+    for (t0, z0), (t1, z1) in zip(FAR_KEYS, FAR_KEYS[1:]):
+        if t < t1:
+            x = smooth((t - t0) / float(t1 - t0))
+            return float(np.exp(np.log(z0) + (np.log(z1) - np.log(z0)) * x)) - ZC
+    return 0.0
 
 def bars(t):
     """(distance, centre line, draw-order key) of the six bars at frame t
