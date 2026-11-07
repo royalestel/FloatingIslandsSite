@@ -13,8 +13,13 @@ Wave shorthand:  [<hand>] <direction> pk <white|black> pal <palette>
   3a  every other split column (1st, 3rd, 5th, 7th):  f2b pk white pal blue
   3b  at once:  the columns that just changed:  b2f pk white pal red
                 the other columns:               f2b pk black pal multicolor
+  3c  every other bar (the nearest first):        rh f2b pk white pal blue
+  3d  the other bars:                             lh b2f pk white pal blue
+  3e  at once, per column: even columns f2b pk white pal multicolor,
+                           odd columns  b2f pk white pal red
 
-    python3 part3.py out.mp4
+    python3 part3.py out.mp4          # 3a, 3b
+    python3 part3.py out.mp4 cde      # 3c, 3d, 3e (from the state 3b ends in)
 """
 import os, sys, math
 os.environ.setdefault("SPLITS", "7")
@@ -61,15 +66,18 @@ def fade_tok(pal, T, r, f, peak):
 
 LIFT = 16                                     # lines a column's piece rises at its peak
 
-def tokens(cols, static, tw):
-    """SEGS x H tokens at frame tw.  cols[k]: None (column k stays as static[i][k]) or a dict
-    dir ('f2b' / 'b2f'), end (palette), peak ('white' / 'black').  static[i][k]: the palette
-    of bar i's piece in column k."""
+def tokens(spec, static, tw):
+    """SEGS x H tokens at frame tw.  spec(i, k): None (bar i's piece in column k stays as
+    static[i][k]) or a dict  kind ('lift': the piece rises straight, 'tilt': the bar tilts on
+    side 'R' / 'L'), dir ('f2b' / 'b2f'), end (palette), peak ('white' / 'black')."""
+    if isinstance(spec, list):                                   # one spec per column
+        cols = spec
+        spec = lambda i, k: dict(cols[k], kind="lift") if cols[k] else None
     out = np.zeros((SEGS, H), int)
     for i in range(NS - 1, -1, -1):                              # far first
         y0, T = STR[i]
         for k in range(SEGS):
-            sp = cols[k]
+            sp = spec(i, k)
             pal = static[i][k]
             if sp is None:
                 for r in range(T):
@@ -79,10 +87,17 @@ def tokens(cols, static, tw):
                 continue
             start = i * STAG if sp["dir"] == "f2b" else (NS - 1 - i) * STAG
             u = tw - start
-            a = LIFT * math.sin(math.pi * u / TILT) if 0 < u < TILT else 0.0
+            if 0 < u < TILT:
+                a = math.sin(math.pi * u / TILT)
+                if sp["kind"] == "lift":
+                    s = -int(round(LIFT * a))
+                else:
+                    c = (k + 0.5) / SEGS
+                    s = -int(round(AMP * a * (c if sp["side"] == "R" else 1 - c)))
+            else:
+                s = 0
             uu = u / TILT
             f = 1.0 - (min(uu, 1.0) - 0.5) / 0.5 if uu >= 0.5 else 0.0
-            s = -int(round(a))
             for r in range(T):
                 tok = base_tok(pal, T, r) if uu < 0.5 else fade_tok(sp["end"], T, r, f, sp["peak"])
                 if tok and 0 <= y0 + s + r < H:
@@ -97,14 +112,32 @@ STATE_3A = [["blue" if k % 2 == 0 else START[i][k] for k in range(SEGS)] for i i
 COLS_3B = [dict(dir="b2f", end="red", peak="white") if k % 2 == 0 else
            dict(dir="f2b", end="multi", peak="black") for k in range(SEGS)]
 
-def main(path):
+STATE_3B = [["red" if k % 2 == 0 else "multi" for k in range(SEGS)] for i in range(NS)]
+
+# 3c  every other bar (the nearest first):  rh f2b pk white pal blue
+def SPEC_3C(i, k):
+    return dict(kind="tilt", side="R", dir="f2b", end="blue", peak="white") if i % 2 == 0 else None
+STATE_3C = [["blue" if i % 2 == 0 else STATE_3B[i][k] for k in range(SEGS)] for i in range(NS)]
+# 3d  the other bars:  lh b2f pk white pal blue
+def SPEC_3D(i, k):
+    return dict(kind="tilt", side="L", dir="b2f", end="blue", peak="white") if i % 2 == 1 else None
+STATE_3D = [["blue"] * SEGS for i in range(NS)]
+# 3e  at once, per column:  even columns f2b pk white pal multicolor, odd columns b2f pk white pal red
+COLS_3E = [dict(dir="f2b", end="multi", peak="white") if k % 2 == 0 else
+           dict(dir="b2f", end="red", peak="white") for k in range(SEGS)]
+
+def main(path, which="ab"):
     Z = 3
     v = iv.Video(path, W * Z, H * Z)
     f = 0
     wave = (NS - 1) * STAG + TILT
     # (name, plans, static state of unmoved bars, lead-in, wave length, tail)
-    seq = [("3a", COLS_3A, START, 30, wave, 20),
-           ("3b", COLS_3B, STATE_3A, 0, wave, 90)]
+    seq_ab = [("3a", COLS_3A, START, 30, wave, 20),
+              ("3b", COLS_3B, STATE_3A, 0, wave, 90)]
+    seq_cde = [("3c", SPEC_3C, STATE_3B, 30, wave, 20),
+               ("3d", SPEC_3D, STATE_3C, 0, wave, 20),
+               ("3e", COLS_3E, STATE_3D, 0, wave, 90)]
+    seq = seq_ab if which == "ab" else seq_cde
     for name, cols, static, pre, length, post in seq:
         n = pre + length + post
         for t in range(n):
@@ -121,4 +154,4 @@ def main(path):
     print("wrote", path, f, "frames")
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "ab")
