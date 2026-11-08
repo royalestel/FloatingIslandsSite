@@ -49,7 +49,7 @@ def model(f, edges=EDGES):
         img[y] = row
     return img
 
-def one(wait, shot, crt="part2c.crt"):
+def one(wait, shot, crt="part2c.crt", lbl="part2c.lbl"):
     proc = subprocess.Popen(["xvfb-run", "-a", "x64sc", "+sound", "-warp", "-VICIIfilter", "0", "-VICIIextpal",
                              "-VICIIpalette", "colodore", "-remotemonitor", "-remotemonitoraddress",
                              f"ip4://127.0.0.1:{PORT}", *os.environ.get("VICEXTRA", "").split(), "-cartcrt", crt],
@@ -61,7 +61,7 @@ def one(wait, shot, crt="part2c.crt"):
                 s = socket.create_connection(("127.0.0.1", PORT)); s.settimeout(3); break
             except OSError:
                 time.sleep(0.5)
-        lbl = {l.split()[2].lstrip("."): int(l.split()[1], 16) for l in open("part2c.lbl")}
+        lbl = {l.split()[2].lstrip("."): int(l.split()[1], 16) for l in open(lbl)}
         vcmd(s, f'screenshot "{shot}" 2', 2)
         m = vcmd(s, "m %04x %04x" % (lbl["fcl"], lbl["fcl"] + 1))
         a, b = re.findall(r">C:[0-9a-f]{4}\s+([0-9a-f]{2})\s+([0-9a-f]{2})", m)[0]

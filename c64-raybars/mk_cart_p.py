@@ -32,9 +32,13 @@ def main(name="part1p", out="routine_p.crt"):
     padded = image.ljust(img_banks * 0x2000, b"\xff")
     for b in range(img_banks):
         chip(1 + b, 0x8000, padded[b * 0x2000:(b + 1) * 0x2000])
+    if os.path.exists(f"{name}_str.bin"):                  # the stream: more 8 KB ROML banks after the image
+        st = open(f"{name}_str.bin", "rb").read()
+        for b in range(len(st) // 0x2000):
+            chip(1 + img_banks + b, 0x8000, st[b * 0x2000:(b + 1) * 0x2000])
     hdr = b"C64 CARTRIDGE   " + struct.pack(">IHHBB6x", 0x40, 0x0100, 32, 1, 0) + b"FLOATING ISLANDS".ljust(32, b"\0")
     open(out, "wb").write(hdr + b"".join(chips))
-    print(f"{out}: {1 + img_banks} banks; program image {len(image)} bytes, start ${lbl['start']:04x}")
+    print(f"{out}: {len(chips) - 1} banks; program image {len(image)} bytes, start ${lbl['start']:04x}")
 
 if __name__ == "__main__":
     main(*sys.argv[1:3]) if len(sys.argv) > 2 else main()
