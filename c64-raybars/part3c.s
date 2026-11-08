@@ -20,13 +20,18 @@ LINE1     = 184
 FIRST_LINE = 51 + LINE0
 IRQ0LINE  = 46
 IRQLINE   = FIRST_LINE - 2
+.ifndef PRE
+PRE       = 0
+.endif
 .ifndef HTUNE
 HTUNE     = 0
 .endif
 .ifndef WAITX
 WAITX     = 8
 .endif
-ODD       = 1
+.ifndef NOHBIT
+HBIT      = 1                   ; NTSC (6567R8): WAITX 8, one odd cycle: column 1 at x = 33
+.endif
 .ifndef BASE
 BASE = 1
 .endif
@@ -264,6 +269,9 @@ irq1:   sta save_a
         .endrep
 
 irq2:   txs
+        .repeat PRE
+        nop
+        .endrep
         ldx #WAITX
 @w:     dex
         bne @w

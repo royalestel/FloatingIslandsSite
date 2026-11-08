@@ -25,12 +25,17 @@
 FIRST_LINE = 51
 IRQ0LINE  = 46
 IRQLINE   = FIRST_LINE - 2
+.ifndef PRE
+PRE       = 0
+.endif
 .ifndef HTUNE
-HTUNE     = 0                   ; tuned in VICE (6569): column 1 starts at x = 33
+HTUNE     = 0                   ; tuned in VICE (6567R8): column 1 starts at x = 33
 .endif
 .ifndef WAITX
-WAITX     = 8                   ; with ODD: the stable raster's compare falls on the line change (measured in VICE)
-ODD       = 1
+WAITX     = 8                   ; the stable raster's compare falls on the line change (measured in VICE, 6567R8)
+.endif
+.ifndef NOHBIT
+HBIT      = 1                   ; NTSC: one odd cycle (bit $ea) shifts column 1 to x = 33
 .endif
 
 VIC_CTRL1  = $d011
@@ -106,6 +111,16 @@ start:  sei
 nmi:    rti
 
 restart:
+.ifdef START                    ; test builds: begin at frame START
+        lda #<START
+        sta fcl
+        lda #>START
+        sta fch
+        lda #<(offs + 7 * START)
+        sta op
+        lda #>(offs + 7 * START)
+        sta op+1
+.else
         lda #0
         sta fcl
         sta fch
@@ -113,6 +128,7 @@ restart:
         sta op
         lda #>offs
         sta op+1
+.endif
         rts
 
 ; -----------------------------------------------------------------------------
@@ -251,6 +267,9 @@ irq1:   sta save_a
         .endrep
 
 irq2:   txs
+        .repeat PRE
+        nop
+        .endrep
         ldx #WAITX
 @w:     dex
         bne @w

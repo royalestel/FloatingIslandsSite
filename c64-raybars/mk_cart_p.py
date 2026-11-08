@@ -12,7 +12,7 @@ def run(cmd):
 
 def main(name="part1p", out="routine_p.crt"):
     extra = []
-    for v in ("HTUNE", "WAITX", "FREEZE", "HBIT", "ODD"):
+    for v in ("HTUNE", "WAITX", "FREEZE", "HBIT", "ODD", "PRE", "NOHBIT", "START"):
         if v in os.environ: extra += ["-Wa", f"-D{v}={os.environ[v]}"]
     run(["cl65", "-g", "-t", "none", *extra, "-C", f"{name}.cfg", "-Ln", f"{name}.lbl", "-o", f"{name}.prg", f"{name}.s", f"{name}_tab.s"])
     prg = open(f"{name}.prg", "rb").read()
