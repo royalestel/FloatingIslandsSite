@@ -26,16 +26,17 @@ FIRST_LINE = 51
 IRQ0LINE  = 46
 IRQLINE   = FIRST_LINE - 2
 .ifndef PRE
-PRE       = 0
+PRE       = 1
 .endif
 .ifndef HTUNE
 HTUNE     = 0                   ; tuned in VICE (6567R8): column 1 starts at x = 33
 .endif
-.ifndef WAITX
-WAITX     = 8                   ; the stable raster's compare falls on the line change (measured in VICE, 6567R8)
+.ifndef ODD
+ODD       = 1
 .endif
-.ifndef NOHBIT
-HBIT      = 1                   ; NTSC: one odd cycle (bit $ea) shifts column 1 to x = 33
+.ifndef WAITX
+WAITX     = 8                   ; NTSC (6567R8): WAITX 8 + PRE 1 + bit $00 = the one compare window that
+                                ; absorbs the 1-cycle jitter (VICE: 32/32 frames identical, column 1 at x = 33)
 .endif
 
 VIC_CTRL1  = $d011
@@ -53,8 +54,8 @@ IDLE       = $3fff
 
 .segment "ZEROPAGE"
 fcl:     .res 1
-sub:     .res 1
 fch:     .res 1
+sub:     .res 1
 op:      .res 2                 ; the frame's record in offs
 t1:      .res 2
 save_a:  .res 1
@@ -106,7 +107,10 @@ start:  sei
         sta VIC_IRQ
         jsr update
         cli
-@idle:  jmp @idle
+@idle:  .repeat 100
+        nop                     ; 2-cycle ops only (a 3-cycle jmp adds a third jitter state to the first IRQ)
+        .endrep
+        jmp @idle
 
 nmi:    rti
 
@@ -221,7 +225,11 @@ restart:
 @r:     rts
 .endproc
 
-blank:  lda sub                 ; NTSC: every film frame is shown for 2 frames: update every second blank
+blank:
+.ifdef NOSUB
+        jmp update
+.endif
+        lda sub                 ; NTSC: every film frame is shown for 2 frames: update every second blank
         eor #1
         sta sub
         bne @skip
@@ -265,6 +273,11 @@ irq1:   sta save_a
         .repeat 12
         nop
         .endrep
+.ifdef SLEDPAD
+        .repeat SLEDPAD         ; (build: keeps the row loop inside one page -- a page-crossing bne costs a cycle)
+        nop
+        .endrep
+.endif
 
 irq2:   txs
         .repeat PRE
@@ -273,7 +286,7 @@ irq2:   txs
         ldx #WAITX
 @w:     dex
         bne @w
-        .ifdef ODD
+        .if ODD
         bit $00
         .else
         nop
@@ -309,6 +322,7 @@ rG:     lda pat_z0 + C0 + 1,x   ; the NEXT line's idle byte, written in the righ
         inx
         cpx #200
         bne rloop
+rend:
         jmp blockend
 
 blockend:

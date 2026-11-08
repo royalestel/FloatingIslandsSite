@@ -12,10 +12,10 @@ def run(cmd):
 
 def main(name="part1p", out="routine_p.crt"):
     extra = []
-    for v in ("HTUNE", "WAITX", "FREEZE", "HBIT", "ODD", "PRE", "NOHBIT", "START"):
+    for v in ("HTUNE", "WAITX", "FREEZE", "HBIT", "ODD", "PRE", "NOHBIT", "START", "NOSUB", "SLED"):
         if v in os.environ: extra += ["-Wa", f"-D{v}={os.environ[v]}"]
-    run(["cl65", "-g", "-t", "none", *extra, "-C", f"{name}.cfg", "-Ln", f"{name}.lbl", "-o", f"{name}.prg", f"{name}.s", f"{name}_tab.s"])
-    prg = open(f"{name}.prg", "rb").read()
+    import c64build
+    prg, _ = c64build.build(name, extra)
     image = prg[2:]
     img_banks = -(-len(image) // 0x2000)
     lbl = {l.split()[2].lstrip("."): int(l.split()[1], 16) for l in open(f"{name}.lbl")}

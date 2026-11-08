@@ -12,9 +12,8 @@ def main():
         chips.append(b"CHIP" + struct.pack(">IHHHH", 0x2010, 2, b, addr, 0x2000) + data)
     body = []
     for name in parts:
-        run(["cl65", "-g", "-t", "none", "-Wa", f"-DBASE={bank}", "-C", f"{name}.cfg", "-Ln", f"{name}.lbl", "-o", f"{name}.prg", f"{name}.s", f"{name}_tab.s"] if os.path.exists(f"{name}_tab.s") else
-            ["cl65", "-g", "-t", "none", "-Wa", f"-DBASE={bank}", "-C", f"{name}.cfg", "-Ln", f"{name}.lbl", "-o", f"{name}.prg", f"{name}.s"])
-        image = open(f"{name}.prg", "rb").read()[2:]
+        import c64build
+        image = c64build.build(name, ["-Wa", f"-DBASE={bank}"])[0][2:]
         lbl = {l.split()[2].lstrip("."): int(l.split()[1], 16) for l in open(f"{name}.lbl")}
         nb = -(-len(image) // 0x4000)
         pages = -(-len(image) // 256)

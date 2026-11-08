@@ -21,16 +21,17 @@ FIRST_LINE = 51 + LINE0
 IRQ0LINE  = 46
 IRQLINE   = FIRST_LINE - 2
 .ifndef PRE
-PRE       = 0
+PRE       = 1
 .endif
 .ifndef HTUNE
 HTUNE     = 0
 .endif
-.ifndef WAITX
-WAITX     = 8
+.ifndef ODD
+ODD       = 1
 .endif
-.ifndef NOHBIT
-HBIT      = 1                   ; NTSC (6567R8): WAITX 8, one odd cycle: column 1 at x = 33
+.ifndef WAITX
+WAITX     = 8                   ; NTSC (6567R8): WAITX 8 + PRE 1 + bit $00 = the one compare window that
+                                ; absorbs the 1-cycle jitter (VICE: 32/32 frames identical, column 1 at x = 33)
 .endif
 .ifndef BASE
 BASE = 1
@@ -113,7 +114,10 @@ start:  sei
         sta VIC_IRQ
         jsr update              ; frame 0
         cli
-@idle:  jmp @idle
+@idle:  .repeat 100
+        nop                     ; 2-cycle ops only (a 3-cycle jmp adds a third jitter state to the first IRQ)
+        .endrep
+        jmp @idle
 
 nmi:    rti
 
@@ -267,6 +271,11 @@ irq1:   sta save_a
         .repeat 12
         nop
         .endrep
+.ifdef SLEDPAD
+        .repeat SLEDPAD         ; (build: keeps the row loop inside one page -- a page-crossing bne costs a cycle)
+        nop
+        .endrep
+.endif
 
 irq2:   txs
         .repeat PRE
@@ -275,7 +284,7 @@ irq2:   txs
         ldx #WAITX
 @w:     dex
         bne @w
-        .ifdef ODD
+        .if ODD
         bit $00
         .else
         nop
@@ -311,6 +320,7 @@ rG:     lda pages + 1,x   ; the NEXT line's idle byte, written in the right bord
         inx
         cpx #LINE1 + 1
         bne rloop
+rend:
         lda #0                  ; black below the floor
         sta VIC_BG
         sta IDLE
