@@ -3,7 +3,7 @@
    mode "late": the scene rotates as now and the bars spread (spacing + landing on the floor lines) only from HOLD of the rotation on;
    mode "nospread" (fraction 1.0): the rotation with no spreading at all.  [shift]: lines the aligned stack moves up (eased in/out).
    mode "lerp": like late, with the spreading as a straight line;  [newb0]: film time the 3 bottom bars start rising (default: 1400).
-   python3 mock_rotation.py [fraction] [out.mp4] [hold|late|nospread|lerp] [shift] [newb0]   -> NTSC 60 Hz timeline, film time 1270 .. end"""
+   python3 mock_rotation.py [fraction] [out.mp4] [hold|late|nospread|lerp] [shift] [newb0] [linrot]   -> NTSC 60 Hz timeline, film time 1270 .. end"""
 import sys, math
 import numpy as np
 import flyby3d as fb, ideas_video as iv, loop_video as lv
@@ -32,7 +32,7 @@ def late_spread_stack(t):
     """the scene rotates as now (flat easing) with the bars at the stack's spacing; the spreading (spacing S0 -> S1 and the landing on the
     floor's lines) happens only from SPREAD0 of the rotation on"""
     lin = min(max((t - p1.T_ROT0) / float(p1.T_ROT1 - p1.T_ROT0), 0.0), 1.0)
-    p = 0.5 * lin + 0.5 * p1.smooth(lin)                                   # the rotation
+    p = lin if ROTLIN else 0.5 * lin + 0.5 * p1.smooth(lin)                # the rotation (ROTLIN: a straight line, no easing)
     r = 0.0 if SPREAD0 >= 1.0 else min(max((lin - SPREAD0) / (1.0 - SPREAD0), 0.0), 1.0)
     ps = r if MODE == 'lerp' else p1.smooth(r)     # the spreading, late (none at 1.0; 'lerp' = a straight line)
     alpha = math.pi / 2 * p
@@ -49,6 +49,7 @@ def late_spread_stack(t):
         out.append((d, yc, d, m, p))
     return out
 MODE = sys.argv[3] if len(sys.argv) > 3 else "hold"
+ROTLIN = len(sys.argv) > 6 and sys.argv[6] == "linrot"
 SPREAD0 = HOLD
 p1.stack = late_spread_stack if MODE in ("late", "nospread", "lerp") else delayed_stack
 SHIFT = float(sys.argv[4]) if len(sys.argv) > 4 else 0.0     # lines up: eased in while the 3 bars align (1270 -> 1400), held, eased out with the rotation
