@@ -84,3 +84,15 @@ after each run (`pkill -x`, never `pkill -f`).
 * VICE checks: screenshots crop at y = 23 (CROPY); `-VICIImodel 6567`; `/tmp`-style multi-screenshot sampling (one VICE session, `x` to resume) was what
   exposed the per-frame jitter.  2c, 2w, 3c pixel-exact; 4c exact except stale frames and rows 185-199 (the loop ends at 184, as on PAL).
 * `python3 mk_cart_all.py routine_ntsc.crt` = the whole routine (chains and loops in VICE).  Video: `c64_routine_ntsc.mp4`.
+
+## Part 1 final motion + music (NTSC branch)
+* Motion (decided with mock-ups, see mock_full1d.py / mock_*.py): the 3 aligned bars 6 lines higher (all stack bars shifted together, eased in 1270 -> 1400, out with the
+  rotation), the 3 bottom bars rise from film time 1345 (was 1400), the scene rotates with the stack's own spacing (flatter easing, no spreading), and from 25 % of the
+  rotation every bar moves in a STRAIGHT LINE (centre line + thickness) to its place on the final floor (1 blank line between bars; nearest bar 159..184).
+  All of it is in `part1r_gen.py` (my_stack / my_bars_all / _bars_at).  The mock rose the bottom bars unshifted until 1400 and then jumped 6 lines; the code shifts them with the rest.
+* Music: Alpha by LukHash (2021), used with his permission (the owner has it).  `music/Alpha.sid` -> `music/Alpha.dat` (PSID data, load $1000, init $1000, play $1003, ZP $fe/$ff only,
+  play = 1.1 k cycles mean, 1.6 k max).  Layout: tune $1000-$2A33, rows0 $2B00, tables $3D00, rows1 $4000.  `musicplay` runs in the blank before `update`; NTSC calls it 5 frames in 6
+  (the tune is 50 Hz); the generator reserves each frame's real play cost in the delta budget (stale frames: 2 in 1d).  The SID is silenced at the end of part 1.  NTSC plays the tune
+  ~3.8 % high (the PAL freq table on the NTSC clock).  Sim: update + tune worst 3,667 cycles of a ~3,770-cycle blank (+ ~130 before line 48).
+* The music files and the built files that contain the tune (part1r.prg/.crt, routine_ntsc.crt) are in .gitignore on purpose: ask the owner before pushing them.
+* Checks: sim_part1r.py (all 2,194 frames equal the model), vice_check_1r.py (12/12 exact on the 6567), x64sc audio capture vs the sidplayfp render (envelope corr 0.73, +3.7 % pitch).

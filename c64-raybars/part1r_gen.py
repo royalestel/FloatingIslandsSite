@@ -21,17 +21,33 @@ NTSC = PLAT == "NTSC"
 RATE = 5 / 6 if NTSC else 1.0
 H, PAD, LBW = 200, 63, 0x0500
 BUDGET = 3800 if NTSC else 6500
+PLAYCOST = 1650                  # cycles of the tune's play routine (max 1577) + the call: taken off the blank's budget when it is called
+plays = (lambda n: n != 0 and n % 6 != 0) if NTSC else (lambda n: n != 0)
 T_SPLIT = 1240                                   # film time where the routines end and the delta stream starts
 NN = int((p1.T_END - 1) / RATE) + 1
 NR = int(math.ceil(T_SPLIT / RATE))
 tau = lambda n: n * RATE
 
-# ---- the flatter rotation ------------------------------------------------------------
+# ---- the motion of 1c/1d, decided with the mock-ups ----------------------------------------------------------
+#   * the 3 aligned bars sit SHIFT lines higher (eased in while they align, out again with the rotation);
+#   * the 3 bars from the bottom start rising at film time NEWB0 (the original: 1400);
+#   * the scene rotates (flatter easing) with the stack's own spacing - NO spreading;
+#   * from SPREAD0 of the rotation on, every bar moves in a STRAIGHT LINE (centre line and thickness, linear in time) to its place on the
+#     final floor (1 blank line between bars).
+NEWB0, SHIFT, SPREAD0 = 1345, 6, 0.25
+p1.T_NEWB = [NEWB0, NEWB0 + 20, NEWB0 + 40]
+
+def rot_lin(t):
+    return min(max((t - p1.T_ROT0) / float(p1.T_ROT1 - p1.T_ROT0), 0.0), 1.0)
+
+def rot_p(t):
+    lin = rot_lin(t)
+    return 0.5 * lin + 0.5 * p1.smooth(lin)
+
 def my_stack(t):
-    lin = min(max((t - p1.T_ROT0) / float(p1.T_ROT1 - p1.T_ROT0), 0.0), 1.0)
-    p = 0.5 * lin + 0.5 * p1.smooth(lin)
+    p = rot_p(t)
     alpha = math.pi / 2 * p
-    s = p1.S0 + (p1.S1 - p1.S0) * p
+    s = p1.S0                                                  # the stack's own spacing
     yp = p1.YP0 + (p1.YP1 - p1.YP0) * p
     zp = p1.Z0 + (p1.ZP1 - p1.Z0) * p
     y0 = H / 2 + (p1.HORIZON - H / 2) * p
@@ -40,8 +56,6 @@ def my_stack(t):
         y = yp + m * s * math.cos(alpha)
         z = zp + m * s * math.sin(alpha)
         yc = y0 - p1.F * y / z
-        w = p1.smooth((p - 0.6) / 0.4)
-        yc = (1 - w) * yc + w * p1.floor_yc(z)
         d = math.hypot(z, y * p)
         if m < 3:
             yc += 260 * (1 - p1.smooth((t - p1.T_NEWB[2 - m]) / p1.NEW_LEN))
@@ -51,22 +65,59 @@ def my_stack(t):
     return out
 p1.stack = my_stack
 
+_orig_bars_all = p1.bars_all
+def my_bars_all(t):
+    if t < 1270: return _orig_bars_all(t)
+    if t < p1.T_STACK:                                          # the circle bars settle; the 3 bottom bars may already rise
+        bars = list(_orig_bars_all(t)) + ([b for b in my_stack(t) if b[3] < 3] if t >= NEWB0 - 1 else [])
+        k = p1.smooth((t - 1270) / float(p1.T_STACK - 1270))
+    else:
+        bars = my_stack(t)
+        k = 1.0 - rot_p(t)
+    return [(b[0], b[1] - SHIFT * k) + tuple(b[2:]) for b in bars]                  # (every bar moves up together)
+p1.bars_all = my_bars_all
+
+def floor_state():
+    """the final floor, nearest first: (centre line, base thickness); 1 blank line between the bars."""
+    s, p = p1.S1, 1.0
+    yp = p1.YP0 + (p1.YP1 - p1.YP0) * p; zp = p1.Z0 + (p1.ZP1 - p1.Z0) * p
+    base = [max(1, min(p1.TMAX, int(round(2 * p1.F * p1.R / max(math.hypot(zp + m * s, yp * p), 0.6))))) for m in range(p1.NSTACK)]
+    Td = [p1.gp.BT(base[m], p1.gp.edge_level(m), m, 1.0) for m in range(p1.NSTACK)]
+    y0s = []
+    for m in range(p1.NSTACK):
+        y0s.append(int(round(p1.floor_yc(zp) - Td[0] / 2)) if m == 0 else y0s[-1] - 1 - Td[m])
+    return [(y0s[m] + Td[m] / 2.0, base[m]) for m in range(p1.NSTACK)]
+FLOOR = floor_state()
+
 # ---- draw order without flops: from the settle (film time 1270) on, two bars that overlap on screen never swap their draw order;
 #      they may swap (to the depth order) once they are apart.  Bar identity: circle bars ('c', k), stack bars ('s', m).
 T_ORD0 = 1270
 _orig_frame_list = p1.frame_list
-_state = {"order": None, "last": None, "memo": {}}
+_state = {"order": None, "last": None, "memo": {}, "kinds": {}}
+
+CMAP = {0: 5, 1: 3, 2: 4}                                 # circle bar k settles into stack slot CMAP[k]
 
 def _bars_at(t):
     raw = p1.bars_all(t)
-    out = []
+    out, ncirc = [], 0
     for b in raw:
         z, yc = max(b[0], 0.6), b[1]
         T = max(1, min(p1.TMAX, int(round(2 * p1.F * p1.R / z))))
         if len(b) > 3: T = p1.gp.BT(T, p1.gp.edge_level(b[3]), b[3], b[4])
         y0 = int(round(yc - T / 2))
-        ident = ("s", b[3]) if len(b) > 3 else ("c", len(out))
-        out.append(dict(id=ident, key=-b[2], z=b[0], yc=float(b[1]), y0=y0, T=T))
+        if len(b) > 3: ident = ("s", b[3])
+        else: ident = ("s", CMAP[ncirc]); ncirc += 1
+        out.append(dict(id=ident, key=-b[2], z=b[0], yc=float(b[1]), y0=y0, T=T, circ=len(b) <= 3))
+    w = min(max((rot_lin(t) - SPREAD0) / (1.0 - SPREAD0), 0.0), 1.0)           # the straight-line move to the floor
+    if w > 0:
+        for b in out:
+            m = b["id"][1]
+            yc1, T1 = FLOOR[m]
+            Tb = max(1, min(p1.TMAX, int(round(2 * p1.F * p1.R / max(-b["key"], 0.6)))))
+            Tn = max(1, min(p1.TMAX, int(round(Tb + (T1 - Tb) * w))))
+            Tn = p1.gp.BT(Tn, p1.gp.edge_level(m), m, 1.0)
+            yc = b["yc"] + (yc1 - b["yc"]) * w
+            b.update(yc=yc, T=Tn, y0=int(round(yc - Tn / 2)))
     return out
 
 def _overlap(a, b):
@@ -96,12 +147,12 @@ def sticky_frame_list(t):
                 if rank[a] > rank[b] and not _overlap(bars[a], bars[b]):
                     order[k], order[k + 1] = b, a; changed = True
     _state["order"], _state["last"] = order, bars
-    out = []
+    out, kinds = [], []
     for i in order:
         b = bars[i]
         if b["y0"] >= H or b["y0"] + b["T"] <= 0 or not any(p1.gp.PROF[b["T"]][max(0, -b["y0"]):H - b["y0"]]): continue
-        out.append((b["y0"], b["T"]))
-    _state["memo"][t] = out
+        out.append((b["y0"], b["T"])); kinds.append("full" if b["circ"] and t < p1.T_STACK else "prof")   # the circling bars keep the procedural shape until the stack
+    _state["memo"][t] = out; _state["kinds"][t] = kinds
     return out
 p1.frame_list = sticky_frame_list
 
@@ -162,11 +213,29 @@ def routines_text(seg_of):
 # ---- section 2: the delta stream (as part1n_gen) --------------------------------------------
 def frame_bars2(n):
     t = tau(n); out = []
-    for y0, T in p1.frame_list(t):
-        if t < p1.T_STACK: base = [f & 31 for f in q.FULL[T]]
+    fl = p1.frame_list(t); kinds = _state["kinds"].get(t)
+    for j, (y0, T) in enumerate(fl):
+        full = (kinds[j] == "full") if kinds else (t < p1.T_STACK)
+        if full: base = [f & 31 for f in q.FULL[T]]
         else: base = list(p1.gp.PROF[T])
         out.append((y0, T, base))
     return out
+
+def play_costs():
+    """cycles of the tune's play call in the blank before frame n (0 = not called), by running the tune on the 6502 simulator"""
+    from c64cpu import MPU
+    data = open("music/Alpha.dat", "rb").read()
+    mpu = MPU(); mem = mpu.memory
+    for i, b in enumerate(data): mem[0x1000 + i] = b
+    def call(addr, a=0):
+        for i, v in enumerate([0x20, addr & 255, addr >> 8, 0]): mem[0x0334 + i] = v
+        mpu.pc, mpu.sp, mpu.a, mpu.x, mpu.y = 0x0334, 0xFF, a, 0, 0
+        c = mpu.processorCycles
+        while mpu.pc != 0x0337: mpu.step()
+        return mpu.processorCycles - c
+    call(0x1000, 0)
+    return [(call(0x1003) + 40) if plays(n) else 0 for n in range(NN)]
+PLAY = None
 
 def section2(prev):
     prof, off = bytearray(), {}
@@ -199,7 +268,7 @@ def section2(prev):
         chosen, used, state = [], 150, list(prev)
         for r in sorted(runs, key=lambda r: -r[3]):
             c = 14 * r[3] + 75
-            if used + c <= BUDGET:
+            if used + c <= BUDGET - PLAY[n]:
                 chosen.append(r); used += c
                 arr, i0, y, n_ = r; state[y:y + n_] = list(arr[i0:i0 + n_])
         chosen.sort(key=lambda r: r[2])
@@ -209,6 +278,8 @@ def section2(prev):
     return runs_all, bufs, stale
 
 def main():
+    global PLAY
+    PLAY = play_costs()
     recs, bufs1, dis, clipped = section1()
     runs_all, bufs2, stale = section2(bufs1[-1])
     arrays = {}
@@ -223,7 +294,7 @@ def main():
     for (T, p), r in rids.items():
         sh = shape(T, p)
         sizes[r] = 1 + sum(5 if i == 0 or v != sh[i - 1] else 3 for i, v in enumerate(sh))
-    pools = {"ROUTA": [0x8000, 0x4000 - 0x200, 0], "AR1": [ar1_base, 0x1E00 - ar1_base, 0], "AR3": [0x3200, 0x0DFF, 0], "AR2": [0x5200, 0x2E00, 0]}   # base, size, used
+    pools = {"ROUTA": [0x8000, 0x4000 - 0x200, 0], "AR1": [ar1_base, 0x1000 - ar1_base, 0], "AR3": [0x3F00, 0x00FF, 0], "AR2": [0x5200, 0x2E00, 0]}   # base, size, used
     seg_of = {}
     for r in sorted(sizes):                                  # routines: ROUTA first, then AR2
         for k in ("ROUTA", "AR2"):
@@ -280,14 +351,15 @@ def main():
             f.write(f".macro {name.upper()}\n")
             for t_ in tabs: f.write("        .byte " + ",".join(str(v & 255) for v in t_) + "\n")
             f.write(".endmacro\n")
-    open("part1r.cfg", "w").write(f"""# generated by part1r_gen.py
+    open("part1r.cfg", "w").write(f"""# generated by part1r_gen.py   $1000-$2A33 = Alpha.sid (LukHash), the rows after it; $3FFF is the VIC's idle byte (nothing may use it)
 MEMORY {{
     ZP:       start = $0002, size = $00FE, type = rw;
     LOADADDR: start = $07FF, size = $0002, file = %O;
-    MAIN:     start = $0801, size = $15FF, file = %O, fill = yes;
-    TAB:      start = $1E00, size = $0200, file = %O, fill = yes;
-    ROWS0:    start = $2000, size = $1200, file = %O, fill = yes;
-    AR3:      start = $3200, size = $0E00, file = %O, fill = yes;   # ($3FFF = the idle byte: the pool stops one byte short)
+    MAIN:     start = $0801, size = $07FF, file = %O, fill = yes;
+    MUSIC:    start = $1000, size = $1B00, file = %O, fill = yes;
+    ROWS0:    start = $2B00, size = $1200, file = %O, fill = yes;
+    TAB:      start = $3D00, size = $0200, file = %O, fill = yes;
+    AR3:      start = $3F00, size = $0100, file = %O, fill = yes;
     ROWS1:    start = $4000, size = $1200, file = %O, fill = yes;
     AR2:      start = $5200, size = $2E00, file = %O, fill = yes;
     ROUTA:    start = $8000, size = $4000, file = %O, fill = yes;
@@ -299,8 +371,9 @@ SEGMENTS {{
     EXEHDR:   load = MAIN,     type = ro;
     CODE:     load = MAIN,     type = rw;
     AR1:      load = MAIN,     type = ro, optional = yes, align = $20;
-    TABLES:   load = TAB,      type = ro, align = $100;
+    MUSIC:    load = MUSIC,    type = ro;
     ROWS0:    load = ROWS0,    type = rw;
+    TABLES:   load = TAB,      type = ro, align = $100;
     AR3:      load = AR3,      type = ro, optional = yes;
     ROWS1:    load = ROWS1,    type = rw;
     AR2:      load = AR2,      type = ro, optional = yes;
@@ -308,6 +381,7 @@ SEGMENTS {{
     MAPS:     load = MAPS,     type = ro, align = $80;
 }}
 """)
+
     model = dict(bufs=bufs1 + bufs2, dis=dis + [0] * (NN - NR), plat=PLAT, rate=RATE)
     pickle.dump(model, open("/tmp/part1r_model.pkl", "wb"))
     late = sum(1 for s in stale if s)

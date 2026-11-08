@@ -35,12 +35,14 @@ zp("rp", 0); zp("rp", 0)
 list.__setitem__(mem, lab["rp"], 0x00); list.__setitem__(mem, lab["rp"] + 1, 0x80)
 zp("bank", 1 + IMG); zp("fcl", 0); zp("fch", 0)
 list.__setitem__(mem, lab["dm"], lab["map0"] & 255); list.__setitem__(mem, lab["dm"] + 1, lab["map0"] >> 8)
-worst, bad = (0, 0), 0
+import part1r_gen as G
+PLAY = G.play_costs()
+worst, bad, wt = (0, 0), 0, (0, 0)
 for n in range(last + 1):
     c = call(lab["update"])
-    worst = max(worst, (c, n))
+    worst = max(worst, (c, n)); wt = max(wt, (c + PLAY[n], n))
     got = [list.__getitem__(mem, 0x500 + i) for i in range(200)]
     if got != M["bufs"][n]:
         bad += 1
         if bad < 4: print("frame", n, "differs at rows", [i for i in range(200) if got[i] != M["bufs"][n][i]][:8])
-print(f"{last + 1} frames, {bad} differ; worst update {worst[0]} cycles (frame {worst[1]})")
+print(f"{last + 1} frames, {bad} differ; worst update {worst[0]} cycles (frame {worst[1]}); worst update + the tune {wt[0]} (frame {wt[1]})")

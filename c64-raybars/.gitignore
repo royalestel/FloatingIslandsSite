@@ -11,3 +11,9 @@ goldtwin.lbl
 goldfly.lbl
 goldship.lbl
 __pycache__/
+
+# built files that contain the Alpha tune (LukHash; used with his permission) are not pushed unless the project owner says so
+music/
+part1r.prg
+part1r.crt
+routine_ntsc.crt

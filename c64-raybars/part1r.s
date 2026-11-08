@@ -42,6 +42,8 @@ IDLE       = $3fff
 BASE = 1
 .endif
 STREAM_BANK0 = BASE + IMGBANKS
+MUSIC_INIT = $1000                ; Alpha.sid (LukHash): PSID load address $1000, init $1000, play $1003 (uses zero page $fe/$ff only)
+MUSIC_PLAY = $1003
 
         .import rtlo, rthi, dmlo, dmhi, map0
 
@@ -56,6 +58,7 @@ rec:     .res 7                 ; a copy of the record (1a-1c)
 save_a:  .res 1
 save_x:  .res 1
 save_y:  .res 1
+mc:      .res 1                 ; the play-call counter (NTSC: the tune is called 5 times in 6 frames)
 
 .segment "LOADADDR"
         .word $0801
@@ -113,6 +116,9 @@ start:  sei
         lda #$01
         sta VIC_IRQEN
         sta VIC_IRQ
+        lda #0
+        sta mc
+        jsr MUSIC_INIT          ; tune 0
         jsr update              ; frame 0
         cli
 @idle:  .repeat 100
@@ -124,6 +130,20 @@ nmi:    rti
 
 
 ; -----------------------------------------------------------------------------
+; the tune's play routine, once a frame (PAL) or 5 frames in 6 (NTSC: the tune was written for 50 Hz)
+musicplay:
+.ifdef NTSC
+        inc mc
+        lda mc
+        cmp #6
+        bne @go
+        lda #0
+        sta mc
+        rts
+@go:
+.endif
+        jmp MUSIC_PLAY
+
 clrbuf: lda #0
         .repeat ROWS, N
         sta LBW + N
@@ -263,6 +283,11 @@ u_c:     lda fcl
         lda fch
         cmp #>NF
         bne u_ret
+        lda #0                  ; silence the SID: the next part overwrites the tune
+        sta $d404
+        sta $d40b
+        sta $d412
+        sta $d418
         jmp $0200               ; the chain: the next part is loaded
 u_ret:   rts
 .endproc
@@ -325,6 +350,7 @@ blockend:
         lda #IRQ0LINE
         sta VIC_RASTER
         asl VIC_IRQ
+        jsr musicplay
         jsr update
         lda save_a
         ldx save_x
