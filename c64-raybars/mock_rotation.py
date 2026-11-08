@@ -2,7 +2,8 @@
 """MOCK (not C64 code) of part 1d.  mode "hold": the rotation held until HOLD (fraction), then the flat easing over the rest;
    mode "late": the scene rotates as now and the bars spread (spacing + landing on the floor lines) only from HOLD of the rotation on;
    mode "nospread" (fraction 1.0): the rotation with no spreading at all.  [shift]: lines the aligned stack moves up (eased in/out).
-   python3 mock_rotation.py [fraction] [out.mp4] [hold|late|nospread] [shift]   -> NTSC 60 Hz timeline, film time 1270 .. end"""
+   mode "lerp": like late, with the spreading as a straight line;  [newb0]: film time the 3 bottom bars start rising (default: 1400).
+   python3 mock_rotation.py [fraction] [out.mp4] [hold|late|nospread|lerp] [shift] [newb0]   -> NTSC 60 Hz timeline, film time 1270 .. end"""
 import sys, math
 import numpy as np
 import flyby3d as fb, ideas_video as iv, loop_video as lv
@@ -32,7 +33,8 @@ def late_spread_stack(t):
     floor's lines) happens only from SPREAD0 of the rotation on"""
     lin = min(max((t - p1.T_ROT0) / float(p1.T_ROT1 - p1.T_ROT0), 0.0), 1.0)
     p = 0.5 * lin + 0.5 * p1.smooth(lin)                                   # the rotation
-    ps = 0.0 if SPREAD0 >= 1.0 else p1.smooth(min(max((lin - SPREAD0) / (1.0 - SPREAD0), 0.0), 1.0))  # the spreading, late (none at 1.0)
+    r = 0.0 if SPREAD0 >= 1.0 else min(max((lin - SPREAD0) / (1.0 - SPREAD0), 0.0), 1.0)
+    ps = r if MODE == 'lerp' else p1.smooth(r)     # the spreading, late (none at 1.0; 'lerp' = a straight line)
     alpha = math.pi / 2 * p
     s = p1.S0 + (p1.S1 - p1.S0) * ps; yp = p1.YP0 + (p1.YP1 - p1.YP0) * p; zp = p1.Z0 + (p1.ZP1 - p1.Z0) * p
     y0 = H / 2 + (p1.HORIZON - H / 2) * p
@@ -48,7 +50,7 @@ def late_spread_stack(t):
     return out
 MODE = sys.argv[3] if len(sys.argv) > 3 else "hold"
 SPREAD0 = HOLD
-p1.stack = late_spread_stack if MODE in ("late", "nospread") else delayed_stack
+p1.stack = late_spread_stack if MODE in ("late", "nospread", "lerp") else delayed_stack
 SHIFT = float(sys.argv[4]) if len(sys.argv) > 4 else 0.0     # lines up: eased in while the 3 bars align (1270 -> 1400), held, eased out with the rotation
 if SHIFT:
     _ba = p1.bars_all
@@ -60,6 +62,25 @@ if SHIFT:
             k = 1.0 - (0.5 * lin + 0.5 * p1.smooth(lin))
         return [(b[0], b[1] - SHIFT * k) + tuple(b[2:]) for b in _ba(t)]
     p1.bars_all = shifted_bars_all
+NEWB0 = float(sys.argv[5]) if len(sys.argv) > 5 else 0.0    # film time the 3 bottom bars start to rise in (the original: 1400)
+if NEWB0:
+    p1.T_NEWB = [NEWB0, NEWB0 + 20, NEWB0 + 40]
+    _ba2 = p1.bars_all
+    def early_bars_all(t):
+        if t >= p1.T_STACK: return _ba2(t)
+        return list(_ba2(t)) + ([b for b in p1.stack(t) if b[3] < 3] if t >= NEWB0 - 1 else [])
+    p1.bars_all = early_bars_all
+    CMAP = {0: 5, 1: 3, 2: 4}                                 # circle bar k settles into stack slot CMAP[k]
+    def mock_bars_at(t):
+        out = []
+        for b in p1.bars_all(t):
+            z, yc = max(b[0], 0.6), b[1]
+            T = max(1, min(p1.TMAX, int(round(2 * p1.F * p1.R / z))))
+            if len(b) > 3: T = p1.gp.BT(T, p1.gp.edge_level(b[3]), b[3], b[4])
+            ident = ("s", b[3]) if len(b) > 3 else ("s", CMAP[len(out) if len(out) < 3 else 0])
+            out.append(dict(id=ident, key=-b[2], z=b[0], yc=float(yc), y0=int(round(yc - T / 2)), T=T))
+        return out
+    g._bars_at = mock_bars_at
 g._state.update(order=None, last=None, memo={})
 w = iv.Video(OUT, 960, 600, fps=60)
 n0 = int(math.ceil(g.T_ORD0 / g.RATE))
