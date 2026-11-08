@@ -63,3 +63,11 @@ after each run (`pkill -x`, never `pkill -f`).
 * `ldy #n / bpl` loops only work for n <= 127.  `bpl` after `ldy #0` tests Y, not the loaded value (sign extension bug).
 * A stale "done" monitor event can come from an old log: check the file before trusting it.
 * Do not start a second render writing the same mp4; `pkill -f` kills your own shell.
+
+## Update: everything joined (end of the "go" chat)
+* `python3 mk_cart_all.py` -> `routine_all.crt` (parts part1p, part2c, part2w, part3c, part4c chained; 16K mode, ROML+ROMH banks).  Each part ends with `jmp $0200`: the
+  resident loader (cartboot_all.s, copied to $0200, part number in $02ff) loads the next part to $0801; after the last it wraps to part 1.  Streams: `partNc_gen.py` read
+  /tmp/*_frames.pkl from `part2_dump.py` (2w), `part3_dump.py` (3c), `part4_dump.py` (4c; uses part4m.py = part4.py with columns taking turns + few trips).  Each stream part starts
+  on its own first frames (a cut at the joins).  VICE: chain checked visually through all parts; parts 2w pixel-exact (vice_check_2w.py); part 4c NOT pixel-checked.
+* Part 4 is the thinned model: 245 of 1296 frames have lines one frame late (mean 96 lines).  Part-2 waves 26 late frames, part 3 11.
+* Video: `c64_routine_all.mp4` (part1.mp4 + models of 2c/2w/3c/4c via render_c64_model.py 2|3|4).
