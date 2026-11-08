@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Part 2's waves (frames SHAKE..end) as the C64 shows them (6 columns) -> /tmp/part2w_frames.pkl   (SPLITS=6 python3 part2_dump.py)"""
-import os, pickle
+import os, pickle, math
 os.environ["SPLITS"] = "6"
 import numpy as np
 import part2 as p2, ghost_part4 as g4
-frames, idle, f = [], [], 0
+RATE = 5 / 6 if os.environ.get("PLATFORM", "NTSC") == "NTSC" else 1.0      # NTSC: frame n shows film frame round(n * 5/6)
+segs_all, f = [], 0
 seq = p2.make_seq()
 for n_i, (A, segs, wave) in enumerate(seq):
     pre = p2.SHAKE if n_i == 0 else 10
@@ -12,13 +13,18 @@ for n_i, (A, segs, wave) in enumerate(seq):
     for t in range(pre + wave + post):
         if n_i == 0 and t < p2.SHAKE:
             f += 1; continue
-        seg = segs(t - pre)
-        lines, gh = [], []
-        for y in range(200):
-            toks = [int(seg[k, y]) for k in range(p2.SEGS)]
-            line, flat = p2.fix_line(toks, y, f)
-            lines.append([p2.colour(tk, y, f) if tk else 0 for tk in line])
-            gh.append(p2.ghost(next((tk for tk in line if tk), 0), y, f) if not flat and any(line) else 0)
-        frames.append(np.array(lines, dtype=np.uint8)); idle.append(gh); f += 1
+        segs_all.append(segs(t - pre)); f += 1
+NN = int(math.ceil(len(segs_all) / RATE)); NN += NN % 2                          # an even number of frames (two page sets)
+frames, idle = [], []
+for n in range(NN):
+    seg = segs_all[min(int(round(n * RATE)), len(segs_all) - 1)]
+    f = n                                                                         # the flicker parity of the displayed frame
+    lines, gh = [], []
+    for y in range(200):
+        toks = [int(seg[k, y]) for k in range(p2.SEGS)]
+        line, flat = p2.fix_line(toks, y, f)
+        lines.append([p2.colour(tk, y, f) if tk else 0 for tk in line])
+        gh.append(p2.ghost(next((tk for tk in line if tk), 0), y, f) if not flat and any(line) else 0)
+    frames.append(np.array(lines, dtype=np.uint8)); idle.append(gh)
 pickle.dump((frames, idle), open("/tmp/part2w_frames.pkl", "wb"))
-print(len(frames), "frames, last f", f)
+print(len(frames), "frames")

@@ -102,3 +102,11 @@ after each run (`pkill -x`, never `pkill -f`).
   NTSC samples `shake_offsets` at film time n * 5/6 and updates EVERY blank (60 Hz; the old every-second-blank doubling is gone); PAL (PLATFORM=PAL) samples 1:1.
 * `part2c.s` decodes in `update` (nibble -> operand low byte through `optab`, mode = all six equal, ~100 cycles); `hold` counts the frames of a `$ff, n` run.  The `START` test option is gone (no random access); `FREEZE` still works.
 * VICE 6567: 7/7 captures pixel-exact.  Part 2's waves (part2w) still use the old 2-blanks-a-frame doubling.
+
+## Part 2 waves (part2w): frame doubling removed (NTSC branch)
+* One blank per frame again: `part2_dump.py` samples the film at frame round(n * 5/6) (NTSC, 1000 frames) and colours it with the DISPLAYED frame's parity; `part2w_gen.py` has the single-blank
+  scheduler (record x = the blank before frame x: prepares frame x, may start x+1; NTSC budget 3000 cycles of runs, PAL 6700); `part2w.s` takes the page parity from fcl & 1 again, wrap at NF.
+* Cost: at 60 Hz every frame changes (mean 111 changed bytes, p90 236, max 454 against ~200 bytes of budget), so 600 of 1,000 frames show some stale lines (median 20, 90 % 84, 179 frames over 64
+  lines, max 128).  A whole-lines-from-the-top scheduler was tried and was worse (677 frames).  The doubled version had 9 stale frames of 832 with 2 blanks per film frame.
+* Test carts of the stream parts must be built with `mk_cart_all.py` (16 KB banks): `mk_cart_p.py` cuts 8 KB banks and shows garbage.  VICE 6567: exact on the frames that are not stale by design.
+* Parts 3 and 4 (part3c, part4c) still use the doubled scheme.

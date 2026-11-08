@@ -186,8 +186,7 @@ nmi:    rti
 @a2:    dec nruns
         bne @run
 @done:
-@nw:    lda fcl                 ; the frame's parity (2 blanks a frame): patch the loop's 7 page operands
-        lsr
+@nw:    lda fcl                 ; the next frame's parity: patch the loop's 7 page operands
         and #1
         beq @even
         lda #>pages + 7
@@ -214,10 +213,10 @@ nmi:    rti
         bne @c
         inc fch
 @c:     lda fcl
-        cmp #<NF2
+        cmp #<NF
         bne @r
         lda fch
-        cmp #>NF2
+        cmp #>NF
         bne @r
         jmp $0200               ; the chain: the next part is loaded
         lda #0                  ; (the film loops: the stream starts again)
