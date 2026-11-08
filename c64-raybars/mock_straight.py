@@ -8,7 +8,7 @@ import numpy as np
 import flyby3d as fb, ideas_video as iv, loop_video as lv
 import part1 as p1, part1_proc as q
 OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/mock_straight.mp4"
-RAMP = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 120
+RAMP = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 120      # [--gap N]: the final bars N blank lines apart
 HOLD = 30
 H = 200
 def state(u):                                     # the model's bars at spacing parameter u (0 = stack spacing, 1 = floor): [(centre line, base thickness)]
@@ -24,6 +24,14 @@ def state(u):                                     # the model's bars at spacing 
         out.append((yc, 2 * p1.F * p1.R / max(d, 0.6)))
     return out
 A, B = state(0.0), state(1.0)
+GAP = int(sys.argv[sys.argv.index("--gap") + 1]) if "--gap" in sys.argv else None
+if GAP is not None:                              # the final floor: every bar GAP blank line(s) above the one below it, thicknesses as the model's floor
+    Td = [p1.gp.BT(max(1, min(p1.TMAX, int(round(B[m][1])))), p1.gp.edge_level(m), m, 1.0) for m in range(p1.NSTACK)]
+    y0s = []
+    for m in range(p1.NSTACK):
+        y0s.append(int(round(B[0][0] - Td[0] / 2)) if m == 0 else y0s[-1] - GAP - Td[m])
+    B = [(y0s[m] + Td[m] / 2.0, B[m][1]) for m in range(p1.NSTACK)]
+    print("final y0, thickness (nearest first):", list(zip(y0s, Td)))
 if "--path" in sys.argv:
     for m in (3, 9, 15):
         print("bar", m, "the model's own path (centre line at u = 0, .25, .5, .75, 1):", [round(state(u)[m][0], 1) for u in (0, .25, .5, .75, 1)])
