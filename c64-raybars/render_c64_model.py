@@ -20,9 +20,11 @@ def pk(p):
                 row[v2.EDGES[k]:v2.EDGES[k+1]] = frames[f][y, k]
             if gh[f][y]: row[((gh[f][y] >> (7 - x % 8)) & 1) == 1] = 0
             img[y] = row
+        if CLIP: img[185:] = 0                     # parts 3-4: the C64 loop ends at line 184
         return img
     return len(frames), m
 which = sys.argv[1]
+CLIP = which in ("3", "4")
 if which == "2":
     n, m = pk("/tmp/part2w_frames.pkl")
     wr("c64_part2.mp4", (v2.model(f) for f in range(g.NF)) if False else iter([v2.model(f) for f in range(g.NF)] + [m(f) for f in range(n)]))

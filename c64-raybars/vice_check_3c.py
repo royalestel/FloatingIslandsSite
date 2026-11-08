@@ -30,7 +30,7 @@ def main():
     for w in [float(a) for a in sys.argv[1:]] or [3, 4.5, 6, 7.5]:
         shot = f"/tmp/v3c_{w}.png"
         lblname = "part3c.lbl"
-        fcl = v2.one(w, shot, crt="part3c.crt", lbl=lblname)
+        fcl = v2.one(w, shot, crt="part3c.crt", lbl=lblname) // 2   # NTSC: 2 blanks a film frame
         V = v2.decode(shot, pal)
         best = max(((V == model(f)).mean(), f) for f in range(max(0, fcl - 4), fcl + 1))
         print(f"after {w}s: frame counter {fcl}; best match frame {best[1] % N}: {100 * best[0]:.2f} %" + ("  (a frame with stale lines, by design)" if (best[1] % N) in set(map(int, open("part3c_late.txt").read().split())) else ""))

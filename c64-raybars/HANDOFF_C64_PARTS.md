@@ -71,3 +71,16 @@ after each run (`pkill -x`, never `pkill -f`).
   on its own first frames (a cut at the joins).  VICE: chain checked visually through all parts; parts 2w pixel-exact (vice_check_2w.py); part 4c NOT pixel-checked.
 * Part 4 is the thinned model: 245 of 1296 frames have lines one frame late (mean 96 lines).  Part-2 waves 26 late frames, part 3 11.
 * Video: `c64_routine_all.mp4` (part1.mp4 + models of 2c/2w/3c/4c via render_c64_model.py 2|3|4).
+
+## NTSC branch `claude/c64-raybars-ntsc` (PAL stays on `claude/c64-raytraced-rasterbars-1iigat`)
+* 6567R8: 65 cycles a line, 263 lines.  Every film frame is shown for 2 frames (30 Hz motion, the film runs ~1.67x longer).
+* Part 1: rows padded to 65 cycles (dly 15 nops), two line buffers (LB0 $0400 / LB1 $0600, one per frame parity), the work split over
+  the two blanks (even: bars + clear 0-109, odd: clear 110-199 + draw).  `sim_part1n.py`: all frames equal the spec, worst blank 3.6 k of ~3.8 k.
+  WAITX 5, HTUNE 1, `bit $00`.  VICE pixel-exact.
+* Column engine (2c / 2w / 3c / 4c): loop + `nop` = 65 cycles; the stable raster needs WAITX 8 + PRE 1 + `bit $00` (the single compare window that
+  absorbs the 1-cycle jitter), HTUNE 0; the row loop must stay inside one page (`c64build.py` pads with SLEDPAD nops: a page-crossing `bne` = 66
+  cycles = drifting columns); the idle loop is 100 nops + jmp (2-cycle jitter only).  2c: update every second blank (`sub`).  Streams: one record per
+  blank, `NF2` = 2 x frames, budget 4,000 cycles (stale frames: 2w 9, 3c 0, 4c 218).
+* VICE checks: screenshots crop at y = 23 (CROPY); `-VICIImodel 6567`; `/tmp`-style multi-screenshot sampling (one VICE session, `x` to resume) was what
+  exposed the per-frame jitter.  2c, 2w, 3c pixel-exact; 4c exact except stale frames and rows 185-199 (the loop ends at 184, as on PAL).
+* `python3 mk_cart_all.py routine_ntsc.crt` = the whole routine (chains and loops in VICE).  Video: `c64_routine_ntsc.mp4`.
