@@ -56,7 +56,11 @@ IDLE       = $3fff
 fcl:     .res 1
 fch:     .res 1
 sub:     .res 1
-op:      .res 2                 ; the frame's record in offs
+op:      .res 2                 ; the next record in the packed stream
+dv:      .res 6                 ; the 6 columns' operand low bytes (C0 - shift)
+mode:    .res 1                 ; 1 = all columns have the same shift (ghost swatches), 0 = they differ
+hold:    .res 1                 ; frames left in a `$ff, n` hold
+t0:      .res 1
 t1:      .res 2
 save_a:  .res 1
 save_x:  .res 1
@@ -94,7 +98,6 @@ start:  sei
         sta VIC_BG
         sta VIC_SPREN
         sta IDLE
-        sta sub                 ; (the first update below is frame 0; the next blank is skipped)
         jsr restart
         lda #$c8
         sta $d016
@@ -115,36 +118,110 @@ start:  sei
 nmi:    rti
 
 restart:
-.ifdef START                    ; test builds: begin at frame START
-        lda #<START
-        sta fcl
-        lda #>START
-        sta fch
-        lda #<(offs + 7 * START)
-        sta op
-        lda #>(offs + 7 * START)
-        sta op+1
-.else
         lda #0
         sta fcl
         sta fch
+        sta hold
         lda #<offs
         sta op
         lda #>offs
         sta op+1
-.endif
         rts
 
 ; -----------------------------------------------------------------------------
 ;  update: patch the loop's 7 operands for the next frame
 ; -----------------------------------------------------------------------------
 .proc update
+        lda hold                ; inside a `$ff, n` hold: the shifts stay
+        beq u_fetch
+        dec hold
+        jmp u_apply
+u_fetch:
+        ldy #0
+        lda (op),y
+        cmp #$ff
+        bne u_data
+        iny                     ; $ff, n: keep the shifts for n frames (this is the first)
+        lda (op),y
+        sec
+        sbc #1
+        sta hold
+        clc
+        lda op
+        adc #2
+        sta op
+        bcc u_apply
+        inc op+1
+        jmp u_apply
+u_data: sta t0                  ; 3 bytes, 6 nibbles: shift + 8 -> the operand low byte C0 - shift
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+        lda optab,x
+        sta dv
+        lda t0
+        and #$0f
+        tax
+        lda optab,x
+        sta dv + 1
+        iny
+        lda (op),y
+        sta t0
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+        lda optab,x
+        sta dv + 2
+        lda t0
+        and #$0f
+        tax
+        lda optab,x
+        sta dv + 3
+        iny
+        lda (op),y
+        sta t0
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+        lda optab,x
+        sta dv + 4
+        lda t0
+        and #$0f
+        tax
+        lda optab,x
+        sta dv + 5
+        clc                     ; the next record
+        lda op
+        adc #3
+        sta op
+        bcc u_m
+        inc op+1
+u_m:    lda #0                  ; mode: every column the same?
+        ldx dv
+        cpx dv + 1
+        bne u_mode
+        cpx dv + 2
+        bne u_mode
+        cpx dv + 3
+        bne u_mode
+        cpx dv + 4
+        bne u_mode
+        cpx dv + 5
+        bne u_mode
+        lda #1
+u_mode: sta mode
+u_apply:
         lda fcl                 ; the frame parity picks the patterns' page
         and #1
         tax
-        ldy #6
-        lda (op),y              ; mode: 1 = every column the same shift
-        beq @flat
+        lda mode
+        beq u_flat
         lda pghi,x              ; ghost swatches + the idle byte pattern
         sta rP0 + 2
         sta rP1 + 2
@@ -155,8 +232,7 @@ restart:
         lda phhi,x
         sta rG + 2
         sta t1 + 1
-        ldy #0
-        lda (op),y              ; the idle byte pattern shifts with the columns
+        lda dv                  ; the idle byte pattern shifts with the columns
         sta t1
         clc
         adc #1
@@ -164,8 +240,8 @@ restart:
         ldy #0
         lda (t1),y              ; line 0's idle byte, now (nothing writes $3fff before the first line)
         sta IDLE
-        jmp @lo
-@flat:  lda pfhi,x
+        jmp u_lo
+u_flat: lda pfhi,x
         sta rP0 + 2
         sta rP1 + 2
         sta rP2 + 2
@@ -178,63 +254,46 @@ restart:
         sta rG + 1
         lda #0
         sta IDLE
-@lo:    ldy #0
-        lda (op),y
+u_lo:   lda dv
         sta rP0 + 1
-        iny
-        lda (op),y
+        lda dv + 1
         sta rP1 + 1
-        iny
-        lda (op),y
+        lda dv + 2
         sta rP2 + 1
-        iny
-        lda (op),y
+        lda dv + 3
         sta rP3 + 1
-        iny
-        lda (op),y
+        lda dv + 4
         sta rP4 + 1
-        iny
-        lda (op),y
+        lda dv + 5
         sta rP5 + 1
 .ifdef FREEZE
         lda fcl                 ; test builds: stay on frame FREEZE
         cmp #<FREEZE
-        bne @go
+        bne u_go
         lda fch
         cmp #>FREEZE
-        bne @go
+        bne u_go
         rts
-@go:
+u_go:
 .endif
-        clc                     ; next record
-        lda op
-        adc #7
-        sta op
-        bcc @n
-        inc op+1
-@n:     inc fcl
-        bne @c
+        inc fcl
+        bne u_c
         inc fch
-@c:     lda fcl
+u_c:    lda fcl
         cmp #<NF
-        bne @r
+        bne u_r
         lda fch
         cmp #>NF
-        bne @r
+        bne u_r
         jmp $0200               ; the chain: the next part is loaded
-@r:     rts
+u_r:    rts
 .endproc
 
-blank:
-.ifdef NOSUB
-        jmp update
-.endif
-        lda sub                 ; NTSC: every film frame is shown for 2 frames: update every second blank
-        eor #1
-        sta sub
-        bne @skip
-        jmp update
-@skip:  rts
+blank:  jmp update          ; every blank: 60 Hz film frames on NTSC (the shake table is sampled at film time n * 5/6)
+
+optab:  .repeat 16, N
+        .byte (C0 + 8 - N) & 255
+        .endrep
 
 pghi:   .byte >pat_g0, >pat_g1
 pfhi:   .byte >pat_f0, >pat_f1

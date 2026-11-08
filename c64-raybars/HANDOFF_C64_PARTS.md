@@ -96,3 +96,9 @@ after each run (`pkill -x`, never `pkill -f`).
   ~3.8 % high (the PAL freq table on the NTSC clock).  Sim: update + tune worst 3,667 cycles of a ~3,770-cycle blank (+ ~130 before line 48).
 * The music files and the built files that contain the tune (part1r.prg/.crt, routine_ntsc.crt) are in .gitignore on purpose: ask the owner before pushing them.
 * Checks: sim_part1r.py (all 2,194 frames equal the model), vice_check_1r.py (12/12 exact on the 6567), x64sc audio capture vs the sidplayfp render (envelope corr 0.73, +3.7 % pitch).
+
+## Part 2 earthquake: packed shake table (NTSC branch)
+* `part2c_gen.py` packs the shifts: a frame = 3 bytes (6 nibbles, shift + 8), `$ff, n` = keep the shifts for n more frames (pauses cost 2 bytes).  1,758 bytes (was 8,939) for 1,277 frames.
+  NTSC samples `shake_offsets` at film time n * 5/6 and updates EVERY blank (60 Hz; the old every-second-blank doubling is gone); PAL (PLATFORM=PAL) samples 1:1.
+* `part2c.s` decodes in `update` (nibble -> operand low byte through `optab`, mode = all six equal, ~100 cycles); `hold` counts the frames of a `$ff, n` run.  The `START` test option is gone (no random access); `FREEZE` still works.
+* VICE 6567: 7/7 captures pixel-exact.  Part 2's waves (part2w) still use the old 2-blanks-a-frame doubling.
