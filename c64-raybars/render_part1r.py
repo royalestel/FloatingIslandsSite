@@ -4,7 +4,9 @@ import pickle, sys
 import numpy as np, flyby3d as fb, ideas_video as iv, loop_video as lv
 import vice_check_1r as v
 plat = v.M["plat"].lower()
-w = iv.Video(f"c64_part1r_{plat}.mp4", 960, 600, fps=60 if plat == "ntsc" else 50)
+import os
+OUT = os.environ.get("OUT", f"c64_part1r_{plat}.mp4")
+w = iv.Video(OUT, 960, 600, fps=60 if plat == "ntsc" else 50)
 for n in range(len(v.M["bufs"])):
     w.add(lv.crt_look(fb.C64RGB[v.model(n)].astype(np.uint8), 3))
 w.close()

@@ -51,6 +51,60 @@ def my_stack(t):
     return out
 p1.stack = my_stack
 
+# ---- draw order without flops: from the settle (film time 1270) on, two bars that overlap on screen never swap their draw order;
+#      they may swap (to the depth order) once they are apart.  Bar identity: circle bars ('c', k), stack bars ('s', m).
+T_ORD0 = 1270
+_orig_frame_list = p1.frame_list
+_state = {"order": None, "last": None, "memo": {}}
+
+def _bars_at(t):
+    raw = p1.bars_all(t)
+    out = []
+    for b in raw:
+        z, yc = max(b[0], 0.6), b[1]
+        T = max(1, min(p1.TMAX, int(round(2 * p1.F * p1.R / z))))
+        if len(b) > 3: T = p1.gp.BT(T, p1.gp.edge_level(b[3]), b[3], b[4])
+        y0 = int(round(yc - T / 2))
+        ident = ("s", b[3]) if len(b) > 3 else ("c", len(out))
+        out.append(dict(id=ident, key=-b[2], z=b[0], yc=float(b[1]), y0=y0, T=T))
+    return out
+
+def _overlap(a, b):
+    return a["y0"] < b["y0"] + b["T"] and b["y0"] < a["y0"] + a["T"]
+
+def sticky_frame_list(t):
+    if t < T_ORD0: return _orig_frame_list(t)
+    if t in _state["memo"]: return _state["memo"][t]
+    bars = {b["id"]: b for b in _bars_at(t)}
+    desired = sorted(bars, key=lambda i: bars[i]["key"])             # far first (key = -d: the same order as the original)
+    prev = _state["order"]
+    if prev is None:
+        order = list(desired)
+    else:
+        if any(i[0] == "c" for i in prev) and any(i[0] == "s" for i in bars):      # the stack takes over: circle bar -> stack slot by height
+            last = _state["last"]
+            circ = sorted((i for i in prev if i[0] == "c"), key=lambda i: -last[i]["yc"])
+            mp = {c: ("s", m) for m, c in enumerate(circ)}
+            prev = [mp.get(i, i) for i in prev]
+        order = [i for i in prev if i in bars] + [i for i in desired if i not in prev]
+        rank = {i: r for r, i in enumerate(desired)}
+        changed = True
+        while changed:
+            changed = False
+            for k in range(len(order) - 1):
+                a, b = order[k], order[k + 1]
+                if rank[a] > rank[b] and not _overlap(bars[a], bars[b]):
+                    order[k], order[k + 1] = b, a; changed = True
+    _state["order"], _state["last"] = order, bars
+    out = []
+    for i in order:
+        b = bars[i]
+        if b["y0"] >= H or b["y0"] + b["T"] <= 0 or not any(p1.gp.PROF[b["T"]][max(0, -b["y0"]):H - b["y0"]]): continue
+        out.append((b["y0"], b["T"]))
+    _state["memo"][t] = out
+    return out
+p1.frame_list = sticky_frame_list
+
 # ---- dim maps: buffer value b = level | centre<<5 | parity<<6  ->  swatch index (level' | parity<<5) --------------
 def dimmap(di):
     out = []
