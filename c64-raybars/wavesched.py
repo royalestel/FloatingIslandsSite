@@ -4,16 +4,16 @@
    A frame's runs are a group A (done before line 49) and a group B (after the DEN write, until line 49 + F); F = 0 (or < 3): one group, the old way."""
 import os
 import numpy as np
-A_BUDGET = 4000                  # cycles of runs before line 49 (NTSC, 185 rows; the update's own ~600 not included)
+A_BUDGET = 3600                  # cycles of runs before line 49 (NTSC, 185 rows; the update's own ~600 not included)
 def first_line(img_t):
     nz = np.where(img_t.any(axis=1))[0]
-    return int(nz[0]) if len(nz) else 150
+    return min(int(nz[0]), 150) if len(nz) else 150       # (the rows loop ends at row 184: a start row beyond it would wrap the 8-bit index)
 def F_of(img_t):
     f = first_line(img_t)
     return f if f >= 3 else 0
 def budgets(F):
     if os.environ.get("NOOPT1"): return (A_BUDGET, 0)
-    return (A_BUDGET, 65 * F - 450) if F else (A_BUDGET, 0)
+    return (A_BUDGET, 65 * F - 650) if F else (A_BUDGET, 0)
 def record(F, A, B):
     """[F][nA][runs A][nB][runs B]; a run = [page][line][len] bytes"""
     out = bytearray([F, len(A)])

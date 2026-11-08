@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Part 4's frames as the C64 shows them (6 columns) -> /tmp/part4_frames.pkl   (SPLITS=6 python3 part4_dump.py)"""
-import os, pickle
+import os, pickle, math
 os.environ["SPLITS"] = "6"
 import numpy as np
 import part4m as p4
 g4 = p4.g4
+RATE = 5 / 6                                                 # NTSC: frame n shows film frame round(n * 5/6)
+segs_all = [p4.tokens(f) for f in range(p4.T_END - (p4.T_END % 2))]
+NN = int(math.ceil(len(segs_all) / RATE)); NN += NN % 2
 frames, idle = [], []
-for f in range(p4.T_END - (p4.T_END % 2)):
-    seg = p4.tokens(f)
+for n in range(NN):
+    seg = segs_all[min(int(round(n * RATE)), len(segs_all) - 1)]
+    f = n                                                    # the flicker parity of the displayed frame
     lines, gh = [], []
     for y in range(200):
         toks = [int(seg[k, y]) for k in range(p4.SEGS)]

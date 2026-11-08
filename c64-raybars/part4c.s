@@ -57,6 +57,7 @@ fch:     .res 1
 sp:      .res 2                 ; the stream pointer (in the ROML window)
 bank:    .res 1
 nruns:   .res 1
+nt:      .res 1
 nf:      .res 1                 ; F: the first active line of the frame shown after this blank (0 = from row 0)
 cnt:     .res 1
 save_a:  .res 1
@@ -170,8 +171,7 @@ nmi:    rti
         inc sp+1
 @f2:    jsr doruns              ; group B: after the DEN write, until the stable IRQ at line 49 + F
 @done:
-@nw:    lda fcl                 ; the frame's parity (2 blanks a frame): patch the loop's 7 page operands
-        lsr
+@nw:    lda fcl                 ; the next frame's parity: patch the loop's 7 page operands
         and #1
         beq @even
         lda #>pages + 7
@@ -201,10 +201,10 @@ nmi:    rti
         bne @c
         inc fch
 @c:     lda fcl
-        cmp #<NF2
+        cmp #<NF
         bne @r
         lda fch
-        cmp #>NF2
+        cmp #>NF
         bne @r
         jmp $0200               ; the chain: the next part is loaded
         lda #0                  ; (the film loops: the stream starts again)
@@ -222,11 +222,22 @@ nmi:    rti
         sta $fffe
         lda #>irq1
         sta $ffff
-        asl VIC_IRQ
         lda nf
         clc
         adc #IRQLINE
+        sta nt                  ; the target line
+@chk:   lda VIC_RASTER          ; never arm while the beam is within 3 lines before the target or on it: the IRQ would come late and
+        sec                     ; the stable sync (stage 2) would miss; wait the line out (the IRQ then comes in the next frame)
+        sbc nt
+        clc
+        adc #3
+        cmp #4
+        bcc @chk
+        asl VIC_IRQ
+        lda nt
         sta VIC_RASTER
+        lda #1
+        sta $d01a
         rts
 .endproc
 
@@ -370,6 +381,9 @@ rend:
 blockend:
         lda #$0b                ; DEN low: no badlines in the next frame (the update raises it in lines 49-50, or the stable IRQ does when F = 0)
         sta VIC_CTRL1
+        sei                     ; (if the second sync interrupt ever misses, the I flag is still clear here)
+        lda #0
+        sta $d01a               ; no raster IRQ source while the update runs ($01 = $37: the vector would come from ROM)
         jsr update
         lda save_a
         ldx save_x
