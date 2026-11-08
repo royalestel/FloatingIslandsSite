@@ -17,6 +17,7 @@ between the two: the peak frames (about 290 changed bytes) cost more than one bl
 import os, pickle, sys
 os.environ.setdefault("SPLITS", "6")
 import numpy as np
+import wavesched as ws
 
 H = 200
 BUDGET = 3000 if os.environ.get("PLATFORM", "NTSC") == "NTSC" else 6700            # cycles of delta work in one blank: the blank holds about 7.4 k with the loop on lines 4..184; update itself takes ~600
@@ -65,19 +66,24 @@ def main():
     # the frame's image, applied while the blank's budget lasts; whatever is left is found again in the next blank.
     state = {0: img[0].copy(), 1: img[1].copy()}   # the chain starts each part on its own first frames
     # (the first blanks of the loop start from the same state: images N-2 and N-1 are in the pages)
-    blanks, load_, stale = [], [], []
+    blanks, load_, stale, capacity, Fs = [], [], [], [], []
     for x in range(N):                                       # record x = the blank before frame x: prepares frame x, may start on x+1
         t1 = x % N; t2 = (x + 1) % N
         cand = [(r, 0) for r in runs_between(state[t1 & 1], img[t1], t1 & 1)] + [(r, 1) for r in runs_between(state[t2 & 1], img[t2], t2 & 1)]
-        chosen, used = [], 0
+        Fx = ws.F_of(img[t1])                                        # the first active line of the frame shown after this blank
+        a_cap, b_cap = ws.budgets(Fx)                                # group A: before line 49; group B: after the DEN write, until line 49 + Fx
+        A, B, ua, ub = [], [], 0, 0
         for pri in (0, 1):
             for r, _ in sorted([c for c in cand if c[1] == pri], key=lambda c: -len(c[0][2])):
                 cost = C_BYTE * len(r[2]) + C_RUN
-                if used + cost <= BUDGET or (pri == 0 and used == 0):
-                    chosen.append(r); used += cost
-                    page, line, data = r
-                    state[page // 7][line:line + len(data), page % 7] = np.frombuffer(data, dtype=np.uint8)
-        blanks.append(chosen); load_.append(used)
+                if ua + cost <= a_cap or (pri == 0 and ua == 0 and not A): A.append(r); ua += cost
+                elif ub + cost <= b_cap: B.append(r); ub += cost
+                else: continue
+                page, line, data = r
+                state[page // 7][line:line + len(data), page % 7] = np.frombuffer(data, dtype=np.uint8)
+        chosen, used = A + B, ua + ub
+        capacity.append(a_cap + b_cap); Fs.append(Fx)
+        blanks.append((Fx, A, B)); load_.append(used)
         stale.append(int((state[t1 & 1] != img[t1]).any(axis=1).sum()))      # lines of frame x+1 that are not exact
     # the loop: record x for x in 0..N-1 are the ones in the stream; the lead-in blanks N-2, N-1 are the last two
     blanks = blanks[:N]; load_ = load_[:N]
@@ -86,15 +92,13 @@ def main():
     print("stale lines per frame: median %d, 90%% %d, frames over 64 lines: %d, over 100: %d" % (np.median(stale), np.percentile(stale, 90), sum(s > 64 for s in stale), sum(s > 100 for s in stale)))
     open("part2w_late.txt", "w").write(" ".join(str(x) for x in late))   # frames shown with stale lines
     worst = max(load_)
-    print(f"{N} frames; worst blank {worst} cycles (budget {BUDGET}), mean {int(np.mean(load_))}")
+    print(f"{N} frames; worst blank {worst} cycles, mean {int(np.mean(load_))}; capacity per blank (runs only) mean {int(np.mean(capacity))}, min {min(capacity)}, max {max(capacity)}; first active line F: mean {np.mean(Fs):.0f}, frames with F = 0: {sum(1 for f in Fs if f == 0)}")
     # the stream: 8 KB banks, records never straddle
     banks, cur = [], bytearray()
     start = {}
     for x in range(N):
-        rec = bytearray([len(blanks[x])])
-        for page, line, data in blanks[x]:
-            rec += bytes([page, line, len(data)]) + data
-        assert len(blanks[x]) < 250
+        rec = bytearray(ws.record(*blanks[x]))
+        assert len(blanks[x][1]) < 250 and len(blanks[x][2]) < 250
         if len(cur) + len(rec) > 0x4000 - 1:
             cur.append(0xFF); banks.append(bytes(cur).ljust(0x4000, b"\xff")); cur = bytearray()
         start[x] = (len(banks), len(cur))

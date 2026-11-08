@@ -110,3 +110,12 @@ after each run (`pkill -x`, never `pkill -f`).
   lines, max 128).  A whole-lines-from-the-top scheduler was tried and was worse (677 frames).  The doubled version had 9 stale frames of 832 with 2 blanks per film frame.
 * Test carts of the stream parts must be built with `mk_cart_all.py` (16 KB banks): `mk_cart_p.py` cuts 8 KB banks and shows garbage.  VICE 6567: exact on the frames that are not stale by design.
 * Parts 3 and 4 (part3c, part4c) still use the doubled scheme.
+
+## Parts 2-4 on the NEW floor + option 1 (NTSC branch)
+* New floor (the one part 1 ends on, 1 blank line between bars, lines 58..185): `ghost_preview.NEWFLOOR` (OLDFLOOR=1 keeps the old one).  Regenerate with `part2c_gen.py`, `part2_dump.py`, `part3_dump.py`, `part4_dump.py`, then the wave gens.
+* Option 1 = the update also works through the empty top lines.  `blockend` writes DEN low and calls `update`; the stream record is `[F][nA][runs][nB][runs]` (`wavesched.py`):
+  group A runs before line 49, then `update` polls `$d012` and writes DEN high itself (lines 49-50, no IRQ: the stream window needs $01 = $37, where an IRQ would read its vector
+  from the KERNAL ROM), group B runs until the stable IRQ, which `update` arms at the end for line 49 + F (F = the first active line of the frame about to be shown; F < 3 -> 0 = the old
+  way: rows from 0, the stable IRQ writes DEN at line 49).  The rows loop starts at row F (`rows+1` patched), the first idle byte too.  `irq0` is no longer used.
+* Budgets (runs only, est. cycles): A = 4,000; B = 65 F - 450 (F = 0: none).  VICE 6567: part 3 (part2w/part3c) exact on every capture, part 4 exact apart from the known bottom cut + stale frames.
+* Stale frames (new floor), without / with option 1: part2w 296 / 9 of 1000, part3c 11 / 0 of 484, part4c 187 / 104 of 1296 (258 frames have F = 0: pieces at the top use the old budget).

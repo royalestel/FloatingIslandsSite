@@ -165,6 +165,11 @@ STR = [(y0, T) for y0, T in reversed(frame_list(sc.T_END - 1))]          # neare
 if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "floor20.json")):
     import json                                    # the 20-bar floor that part 1 ends on
     STR = [(y0, BT(T, edge_level(i), i)) for i, (y0, T) in enumerate(json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "floor20.json"))))]
+# the NEW floor (the one part 1's rotation ends on: 1 blank line between the bars, lines 58..185); OLDFLOOR=1 keeps the old one
+NEWFLOOR = [(159, 26), (143, 15), (132, 10), (123, 8), (116, 6), (110, 5), (104, 5), (99, 4), (94, 4), (90, 3),
+            (86, 3), (82, 3), (79, 2), (76, 2), (73, 2), (70, 2), (67, 2), (64, 2), (61, 2), (58, 2)]
+if os.environ.get("OLDFLOOR") != "1":
+    STR = list(NEWFLOOR)
 NS = len(STR)
 TILT, STAG = WV["TILT_T"], WV["STAG"]
 USTART = [i * STAG if WV["NEAR_FIRST"] else (NS - 1 - i) * STAG for i in range(NS)]

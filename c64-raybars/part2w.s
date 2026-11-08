@@ -57,6 +57,7 @@ fch:     .res 1
 sp:      .res 2                 ; the stream pointer (in the ROML window)
 bank:    .res 1
 nruns:   .res 1
+nf:      .res 1                 ; F: the first active line of the frame shown after this blank (0 = from row 0)
 cnt:     .res 1
 save_a:  .res 1
 save_x:  .res 1
@@ -141,12 +142,97 @@ nmi:    rti
         lda #>$8000
         sta sp+1
         lda (sp),y
-@rec:   sta nruns
+@rec:   sta nf                  ; F
         inc sp
-        bne @r0
+        bne @f0
         inc sp+1
-@r0:    lda nruns
-        beq @done
+@f0:    ldy #0
+        lda (sp),y              ; nA
+        sta nruns
+        inc sp
+        bne @f1
+        inc sp+1
+@f1:    jsr doruns              ; group A: before line 49
+        lda nf
+        beq @noden
+@dw:    lda VIC_RASTER          ; wait for line 49 (also true when we are already in 49..98), then DEN high: the window opens at line 51
+        sec
+        sbc #49
+        cmp #50
+        bcs @dw
+        lda #$1b
+        sta VIC_CTRL1
+@noden: ldy #0
+        lda (sp),y              ; nB
+        sta nruns
+        inc sp
+        bne @f2
+        inc sp+1
+@f2:    jsr doruns              ; group B: after the DEN write, until the stable IRQ at line 49 + F
+@done:
+@nw:    lda fcl                 ; the next frame's parity: patch the loop's 7 page operands
+        and #1
+        beq @even
+        lda #>pages + 7
+        bne @pg
+@even:  lda #>pages
+@pg:    sta rP0 + 2
+        clc
+        adc #1
+        sta rP1 + 2
+        adc #1
+        sta rP2 + 2
+        adc #1
+        sta rP3 + 2
+        adc #1
+        sta rP4 + 2
+        adc #1
+        sta rP5 + 2
+        adc #1
+        sta rG + 2
+        sta @i0 + 2
+        lda nf                  ; the loop starts at row F (the rows above are black anyway)
+        sta rows + 1
+        sta @i0 + 1
+@i0:    lda pages + LINE0       ; (the first line's idle byte; the loop writes the NEXT line's after each line)
+        sta IDLE
+        inc fcl
+        bne @c
+        inc fch
+@c:     lda fcl
+        cmp #<NF
+        bne @r
+        lda fch
+        cmp #>NF
+        bne @r
+        jmp $0200               ; the chain: the next part is loaded
+        lda #0                  ; (the film loops: the stream starts again)
+        sta fcl
+        sta fch
+        lda #<$8000
+        sta sp
+        lda #>$8000
+        sta sp+1
+        lda #STREAM_BANK0
+        sta bank
+@r:     lda #$35                ; RAM + I/O again for the rows and the IRQ vectors
+        sta $01
+        lda #<irq1              ; arm the stable raster IRQ (stage 1) for line 49 + F: 2 lines before the first row
+        sta $fffe
+        lda #>irq1
+        sta $ffff
+        asl VIC_IRQ
+        lda nf
+        clc
+        adc #IRQLINE
+        sta VIC_RASTER
+        rts
+.endproc
+
+; the runs of a group: [page][line][len] bytes, copied into the pages (the stream is in the ROML window, $01 = $37)
+.proc doruns
+        lda nruns
+        beq @dn
 @run:   ldy #0
         lda (sp),y              ; page id
         tax
@@ -185,52 +271,7 @@ nmi:    rti
         inc sp+1
 @a2:    dec nruns
         bne @run
-@done:
-@nw:    lda fcl                 ; the next frame's parity: patch the loop's 7 page operands
-        and #1
-        beq @even
-        lda #>pages + 7
-        bne @pg
-@even:  lda #>pages
-@pg:    sta rP0 + 2
-        clc
-        adc #1
-        sta rP1 + 2
-        adc #1
-        sta rP2 + 2
-        adc #1
-        sta rP3 + 2
-        adc #1
-        sta rP4 + 2
-        adc #1
-        sta rP5 + 2
-        adc #1
-        sta rG + 2
-        sta @i0 + 2
-@i0:    lda pages + LINE0       ; (the first line's idle byte; the loop writes the NEXT line's after each line)
-        sta IDLE
-        inc fcl
-        bne @c
-        inc fch
-@c:     lda fcl
-        cmp #<NF
-        bne @r
-        lda fch
-        cmp #>NF
-        bne @r
-        jmp $0200               ; the chain: the next part is loaded
-        lda #0                  ; (the film loops: the stream starts again)
-        sta fcl
-        sta fch
-        lda #<$8000
-        sta sp
-        lda #>$8000
-        sta sp+1
-        lda #STREAM_BANK0
-        sta bank
-@r:     lda #$35                ; RAM + I/O again for the rows and the IRQ vectors
-        sta $01
-        rts
+@dn:     rts
 .endproc
 
 pghi:   .repeat 14, I
@@ -326,13 +367,8 @@ rend:
         jmp blockend
 
 blockend:
-        lda #<irq0
-        sta $fffe
-        lda #>irq0
-        sta $ffff
-        lda #IRQ0LINE
-        sta VIC_RASTER
-        asl VIC_IRQ
+        lda #$0b                ; DEN low: no badlines in the next frame (the update raises it in lines 49-50, or the stable IRQ does when F = 0)
+        sta VIC_CTRL1
         jsr update
         lda save_a
         ldx save_x
