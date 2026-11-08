@@ -48,6 +48,7 @@ IDLE       = $3fff
 
 .segment "ZEROPAGE"
 fcl:     .res 1
+sub:     .res 1
 fch:     .res 1
 op:      .res 2                 ; the frame's record in offs
 t1:      .res 2
@@ -87,6 +88,7 @@ start:  sei
         sta VIC_BG
         sta VIC_SPREN
         sta IDLE
+        sta sub                 ; (the first update below is frame 0; the next blank is skipped)
         jsr restart
         lda #$c8
         sta $d016
@@ -203,6 +205,13 @@ restart:
 @r:     rts
 .endproc
 
+blank:  lda sub                 ; NTSC: every film frame is shown for 2 frames: update every second blank
+        eor #1
+        sta sub
+        bne @skip
+        jmp update
+@skip:  rts
+
 pghi:   .byte >pat_g0, >pat_g1
 pfhi:   .byte >pat_f0, >pat_f1
 phhi:   .byte >pat_h0, >pat_h1
@@ -277,6 +286,7 @@ rP5:    lda pat_g0 + C0,x
         sta VIC_BG
 rG:     lda pat_z0 + C0 + 1,x   ; the NEXT line's idle byte, written in the right border
         sta IDLE
+        nop                     ; NTSC: 65 cycles a line
         inx
         cpx #200
         bne rloop
@@ -290,7 +300,7 @@ blockend:
         lda #IRQ0LINE
         sta VIC_RASTER
         asl VIC_IRQ
-        jsr update
+        jsr blank
         lda save_a
         ldx save_x
         ldy save_y

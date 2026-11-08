@@ -5,6 +5,7 @@ model (part1_gen.compose_ref + ghost_preview.draw) pixel for pixel.
 
     python3 vice_check.py [seconds ...]        needs: vice (x64sc), xvfb, dummy ROMs in /usr/share/vice/C64
 """
+CROPY = int(__import__("os").environ.get("CROPY", "23"))   # NTSC (6567R8) screenshot: line 51 at y = 23 (PAL: 35)
 import re, socket, subprocess, sys, time
 import numpy as np
 from PIL import Image
@@ -35,7 +36,7 @@ def model(f):
 def one(wait, shot, crt="routine_p.crt", extra=()):
     proc = subprocess.Popen(["xvfb-run", "-a", "x64sc", "+sound", "-warp", "-VICIIfilter", "0", "-VICIIextpal",
                              "-VICIIpalette", "colodore", "-remotemonitor", "-remotemonitoraddress",
-                             f"ip4://127.0.0.1:{PORT}", "-cartcrt", crt, *extra],
+                             f"ip4://127.0.0.1:{PORT}", "-cartcrt", crt, *extra, *__import__("os").environ.get("VICEXTRA", "").split()],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         time.sleep(wait)
@@ -60,7 +61,7 @@ def main():
     for w in [float(a) for a in sys.argv[1:]] or [4, 5, 6, 7, 8, 9, 10, 11]:
         shot = f"/tmp/vcheck_{w}.png"
         fcl = one(w, shot)
-        im = np.array(Image.open(shot).convert("RGB")).astype(int)[35:235, 32:352]
+        im = np.array(Image.open(shot).convert("RGB")).astype(int)[CROPY:CROPY + 200, 32:352]
         V = ((im[:, :, None, :] - pal[None, None, :, :]) ** 2).sum(-1).argmin(-1)
         best = max(((V == model(f)).mean(), f) for f in range(max(0, fcl - 4), fcl + 1))
         print(f"after {w}s: frame counter {fcl}; best match frame {best[1]}: {100 * best[0]:.2f} % of 64,000 pixels")

@@ -4,6 +4,7 @@ what the loop shows (part2c_gen's patterns read at the frame's shifts).
 
     SPLITS=6 python3 vice_check_2c.py [seconds ...]
 """
+CROPY = int(__import__("os").environ.get("CROPY", "23"))   # NTSC (6567R8) screenshot: line 51 at y = 23 (PAL: 35)
 import os, re, socket, subprocess, sys, time
 os.environ.setdefault("SPLITS", "6")
 import numpy as np
@@ -72,7 +73,7 @@ def one(wait, shot, crt="part2c.crt", lbl="part2c.lbl"):
         subprocess.run(["pkill", "-x", "x64sc"]); subprocess.run(["pkill", "-x", "Xvfb"])
 
 def decode(shot, pal):
-    im = np.array(Image.open(shot).convert("RGB")).astype(int)[35:235, 32:352]
+    im = np.array(Image.open(shot).convert("RGB")).astype(int)[CROPY:CROPY + 200, 32:352]
     return ((im[:, :, None, :] - pal[None, None, :, :]) ** 2).sum(-1).argmin(-1)
 
 def main():

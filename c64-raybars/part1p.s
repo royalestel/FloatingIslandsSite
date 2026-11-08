@@ -28,10 +28,10 @@ FIRST_LINE = 51
 IRQ0LINE  = 46                  ; DEN low across line $30 (48)
 IRQLINE   = FIRST_LINE - 2      ; the stable double IRQ
 .ifndef HTUNE
-HTUNE     = 0
+HTUNE     = 1
 .endif
 .ifndef WAITX
-WAITX     = 6                   ; tuned in VICE: the rows start the same cycle on every line
+WAITX     = 5                   ; tuned in VICE: the rows start the same cycle on every line
 .endif
 
 VIC_CTRL1  = $d011
@@ -44,7 +44,8 @@ VIC_BG     = $d021
 CIA1_ICR   = $dc0d
 CIA2_ICR   = $dd0d
 IDLE       = $3fff
-LINEBUF    = $0400              ; the screen is never shown; 64 bytes of padding either side
+LB0        = $0400              ; two line buffers (frame parity), 64 bytes of padding either side
+LB1        = $0600
 
         .import p_sin, p_sk, p_azs, p_sb, p_se, p_sc, p_risel, p_riseh, p_zbfl, p_zbfh
         .import p_kyl, p_kyh, p_tt, p_dx, p_dimt, p_full, p_foffl, p_foffh, p_sqlo, p_sqhi
@@ -97,6 +98,8 @@ bkh:     .res 3
 ordr:    .res 3
 dst:     .res 2
 di:      .res 1
+ph:      .res 1                 ; 0: the next blank is the even one (before a frame's first display), 1: the odd one
+bh:      .res 1                 ; high byte of the buffer being drawn
 
 ; =============================================================================
 .segment "LOADADDR"
@@ -147,7 +150,11 @@ start:  sei
         lda #$01
         sta VIC_IRQEN
         sta VIC_IRQ
-        jsr update              ; frame 0
+        jsr ework               ; frame 0: bars, clear
+        jsr owork               ; draw (fcl = 1)
+        jsr ework               ; frame 1's bars
+        lda #1
+        sta ph
         cli
 @idle:  jmp @idle
 
@@ -167,7 +174,7 @@ restart:
         sta rp+1
         rts
 
-dly:    .repeat 14
+dly:    .repeat 15
         nop
         .endrep
         rts
@@ -673,10 +680,10 @@ enth:   .byte >T_ENTER0, >T_ENTER1, >T_ENTER2
         sta @ld + 2
         clc                     ; dst = LINEBUF + y0
         lda yl
-        adc #<LINEBUF
+        adc #<LB0
         sta @st + 1
         lda yh
-        adc #>LINEBUF
+        adc bh
         sta @st + 2
         lda yl                  ; | 32 if y0 is odd
         and #1
@@ -702,11 +709,48 @@ enth:   .byte >T_ENTER0, >T_ENTER1, >T_ENTER2
 ; -----------------------------------------------------------------------------
 ;  update: the next frame's buffer of swatch indices, and which row set shows it
 ; -----------------------------------------------------------------------------
-.proc update
+.macro CLR BASE, LO, HI
         lda #0
-        .repeat ::ROWS, N
-        sta LINEBUF + N         ; clear: 4 cycles a line
+        .repeat HI - LO, N
+        sta BASE + LO + N
         .endrep
+        rts
+.endmacro
+clr0a:  CLR LB0, 0, 110
+clr0b:  CLR LB0, 110, 200
+clr1a:  CLR LB1, 0, 110
+clr1b:  CLR LB1, 110, 200
+
+; even blank (before a frame's first display): the bars of frame fcl, the first half of its buffer cleared
+.proc ework
+        lda fch
+        cmp #>T_PROC
+        bcc @proc
+        bne @cl
+        lda fcl
+        cmp #<T_PROC
+        bcs @cl
+@proc:  jsr pbars
+@cl:    lda fcl
+        and #1
+        bne @1
+        jmp clr0a
+@1:     jmp clr1a
+.endproc
+
+; odd blank (between the two displays): the rest of the buffer of frame fcl, drawn
+.proc owork
+        lda fcl
+        and #1
+        bne @1
+        lda #>LB0
+        sta bh
+        jsr clr0b
+        jmp @cd
+@1:     lda #>LB1
+        sta bh
+        jsr clr1b
+@cd:
         lda fch
         cmp #>T_PROC
         bcc @proc
@@ -714,8 +758,7 @@ enth:   .byte >T_ENTER0, >T_ENTER1, >T_ENTER2
         lda fcl
         cmp #<T_PROC
         bcs @stream
-@proc:  jsr pbars
-        jsr pdraw
+@proc:  jsr pdraw
         clc                     ; the phase moves on
         lda pa
         adc #<PINC
@@ -758,7 +801,9 @@ enth:   .byte >T_ENTER0, >T_ENTER1, >T_ENTER2
         sta rp
         bcc @go
         inc rp+1
-@go:    ldy #0
+@go:    lda bh
+        sta @st + 2
+        ldy #0
 @bar:   lda nbars
         beq @done
         lda (cur),y             ; source address, first line, rows - 1
@@ -775,24 +820,13 @@ enth:   .byte >T_ENTER0, >T_ENTER1, >T_ENTER2
         sty ri
         tay
 @ld:    lda $ffff,y             ; the bar array's swatch index (+ 32 for an odd first line)
-@st:    sta LINEBUF,y
+@st:    sta LB0,y
         dey
         bpl @ld
         ldy ri
         dec nbars
         jmp @bar
-@done:  lda fcl                 ; the row set for this frame: parity of the frame number
-        and #1
-        beq @even
-        lda #<rows1
-        sta entry + 1
-        lda #>rows1
-        sta entry + 2
-        jmp @adv
-@even:  lda #<rows0
-        sta entry + 1
-        lda #>rows0
-        sta entry + 2
+@done:
 @adv:   inc fcl
         bne @c
         inc fch
@@ -805,6 +839,30 @@ enth:   .byte >T_ENTER0, >T_ENTER1, >T_ENTER2
         jmp $0200               ; the chain: the next part is loaded
 @ret:   rts
 .endproc
+
+blank:  lda ph
+        bne @odd
+        lda fcl                 ; the frame shown after this blank is fcl-1
+        and #1
+        bne @r0
+        lda #<rows1
+        sta entry + 1
+        lda #>rows1
+        sta entry + 2
+        jmp @w
+@r0:    lda #<rows0
+        sta entry + 1
+        lda #>rows0
+        sta entry + 2
+@w:     jsr ework
+        lda #1
+        sta ph
+        rts
+@odd:   jsr owork
+        lda #0
+        sta ph
+        rts
+
 
 ; -----------------------------------------------------------------------------
 ;  irq0 (line 46): DEN low, so line $30 makes no badlines.  irq1 (line 49): DEN high again
@@ -862,7 +920,7 @@ blockend:
         lda #IRQ0LINE
         sta VIC_RASTER
         asl VIC_IRQ
-        jsr update
+        jsr blank
         lda save_a
         ldx save_x
         ldy save_y
@@ -872,10 +930,10 @@ blockend:
 ;  The 200 rows, twice (one set for each frame parity), 63 cycles each:
 ;  ldx 4, lda abs,x 4, sta 4, lda abs,x 4, sta 4, bit zp 3, jsr dly 6 + 28 + 6
 ; =============================================================================
-.macro ROWSET FP, LAB
+.macro ROWSET FP, LAB, LB
 LAB:
         .repeat ROWS, N
-        ldx LINEBUF + N
+        ldx LB + N
         lda ght + 64 * (FP * 2 + (N .mod 2)), x
         sta IDLE
         lda colt + 64 * (FP * 2 + (N .mod 2)), x
@@ -888,10 +946,10 @@ LAB:
 
 
 .segment "ROWS0"
-        ROWSET 0, rows0
+        ROWSET 0, rows0, LB0
 
 .segment "ROWS1"
-        ROWSET 1, rows1
+        ROWSET 1, rows1, LB1
 
 ; =============================================================================
 .segment "TABLES"
