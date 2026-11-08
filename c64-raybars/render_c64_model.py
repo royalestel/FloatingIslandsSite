@@ -26,6 +26,9 @@ which = sys.argv[1]
 if which == "2":
     n, m = pk("/tmp/part2w_frames.pkl")
     wr("c64_part2.mp4", (v2.model(f) for f in range(g.NF)) if False else iter([v2.model(f) for f in range(g.NF)] + [m(f) for f in range(n)]))
+elif which == "4":
+    n, m = pk("/tmp/part4_frames.pkl")
+    wr("c64_part4.mp4", (m(f) for f in range(n)))
 else:
     n, m = pk("/tmp/part3_frames.pkl")
     wr("c64_part3.mp4", (m(f) for f in range(n)))

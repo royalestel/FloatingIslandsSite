@@ -802,7 +802,7 @@ enth:   .byte >T_ENTER0, >T_ENTER1, >T_ENTER2
         lda fch
         cmp #>T_END
         bne @ret
-        jsr restart             ; the film loops
+        jmp $0200               ; the chain: the next part is loaded
 @ret:   rts
 .endproc
 

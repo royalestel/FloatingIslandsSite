@@ -199,7 +199,7 @@ restart:
         lda fch
         cmp #>NF
         bne @r
-        jsr restart
+        jmp $0200               ; the chain: the next part is loaded
 @r:     rts
 .endproc
 

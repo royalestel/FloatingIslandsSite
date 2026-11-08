@@ -27,7 +27,10 @@ HTUNE     = 0
 WAITX     = 8
 .endif
 ODD       = 1
-STREAM_BANK0 = 1 + IMGBANKS      ; the stream's first ROML bank (cartboot: bank 0 = boot, banks 1.. = the program image)
+.ifndef BASE
+BASE = 1
+.endif
+STREAM_BANK0 = BASE + IMGBANKS      ; the stream's first ROML bank (cartboot: bank 0 = boot, banks 1.. = the program image)
 
 VIC_CTRL1  = $d011
 VIC_RASTER = $d012
@@ -206,7 +209,8 @@ nmi:    rti
         lda fch
         cmp #>NF
         bne @r
-        lda #0                  ; the film loops: the stream starts again
+        jmp $0200               ; the chain: the next part is loaded
+        lda #0                  ; (the film loops: the stream starts again)
         sta fcl
         sta fch
         lda #<$8000
