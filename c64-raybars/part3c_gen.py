@@ -19,8 +19,8 @@ os.environ.setdefault("SPLITS", "6")
 import numpy as np
 
 H = 200
-BUDGET = 5800            # cycles of delta work in one blank (the blank has about 6.5 k; the rest is the engine)
-C_BYTE, C_RUN = 14, 70   # cost model: cycles a byte, cycles a run
+BUDGET = 6700            # cycles of delta work in one blank: the blank holds about 7.4 k with the loop on lines 4..184; update itself takes ~600
+C_BYTE, C_RUN = 14, 81   # cost model (measured in the simulator): cycles a byte, cycles a run
 
 def load():
     frames, gh = pickle.load(open("/tmp/part3_frames.pkl", "rb"))
@@ -33,7 +33,7 @@ def load():
     return img
 
 MAXRUN = 120             # a run is at most 120 bytes: the copy loop counts down with bpl
-GAP = 6                  # runs closer than this are merged (a run costs more than a few bytes)
+GAP = 8                  # runs closer than this are merged (a run costs more than a few bytes)
 
 def runs_between(a, b, parity):
     """runs of bytes where b differs from a: (page id, line, bytes); gaps of up to GAP equal bytes are copied too."""
@@ -50,7 +50,8 @@ def runs_between(a, b, parity):
                     if nxt < H and d[nxt]: y1 = nxt + 1
                     else: break
                 for s0 in range(y, y1, MAXRUN):
-                    out.append((parity * 7 + k, s0, bytes(b[s0:min(y1, s0 + MAXRUN), k].tolist())))
+                    e0 = min(y1, s0 + MAXRUN)
+                    out.append((parity * 7 + k, s0, bytes(b[s0:e0, k].tolist())))
                 y = y1
             else:
                 y += 1
@@ -59,22 +60,32 @@ def runs_between(a, b, parity):
 def main():
     img = load(); N = len(img)
     assert N % 2 == 0
-    # per frame t: runs against frame t-2 (the loop wraps)
-    deltas = [runs_between(img[(t - 2) % N], img[t], t & 1) for t in range(N)]
-    # blank b_x (after frame x's rows) prepares frame x+1; the blank before frame t are b_{t-2} and b_{t-1}:
-    # delta(t) is split between them: b_{t-2} takes runs while its budget lasts, the rest go to b_{t-1}
-    blanks = [[] for _ in range(N)]
-    load_ = [0] * N
-    for t in range(N):
-        x1 = (t - 2) % N; x2 = (t - 1) % N
-        for r in sorted(deltas[t], key=lambda r: -len(r[2])):          # big runs first, each into the lighter of the two blanks
-            cost = C_BYTE * len(r[2]) + C_RUN
-            x = x1 if load_[x1] <= load_[x2] else x2
-            blanks[x].append(r); load_[x] += cost
-    # b_{x} also carries the rest of delta(x+1) (put there above by x2 = x): both lists are in blanks[x]
+    # The schedule: the pages are simulated.  Blank b_x (before frame x+1) must bring the set of frame x+1 up to date
+    # (priority: the frame is imminent) and may start on the set of frame x+2 (free now): runs = bytes that differ from
+    # the frame's image, applied while the blank's budget lasts; whatever is left is found again in the next blank.
+    state = {0: img[N - 2].copy(), 1: img[N - 1].copy()}
+    # (the first blanks of the loop start from the same state: images N-2 and N-1 are in the pages)
+    blanks, load_, stale = [], [], []
+    for x in range(N):                                       # record j = the blank before frame j: prepares frame j, may start on j+1
+        t1 = x % N; t2 = (x + 1) % N
+        cand = [(r, 0) for r in runs_between(state[t1 & 1], img[t1], t1 & 1)] + [(r, 1) for r in runs_between(state[t2 & 1], img[t2], t2 & 1)]
+        chosen, used = [], 0
+        for pri in (0, 1):
+            for r, _ in sorted([c for c in cand if c[1] == pri], key=lambda c: -len(c[0][2])):
+                cost = C_BYTE * len(r[2]) + C_RUN
+                if used + cost <= BUDGET or (pri == 0 and used == 0):
+                    chosen.append(r); used += cost
+                    page, line, data = r
+                    state[page // 7][line:line + len(data), page % 7] = np.frombuffer(data, dtype=np.uint8)
+        blanks.append(chosen); load_.append(used)
+        stale.append(int((state[t1 & 1] != img[t1]).any(axis=1).sum()))      # lines of frame x+1 that are not exact
+    # the loop: record x for x in 0..N-1 are the ones in the stream; the lead-in blanks N-2, N-1 are the last two
+    blanks = blanks[:N]; load_ = load_[:N]
+    late = [x for x in range(N) if stale[x]]
+    print(f"frames with a stale line: {len(late)} of {N}; stale lines mean {np.mean([stale[x] for x in late] or [0]):.1f}, max {max(stale[:N])}")
+    open("part3c_late.txt", "w").write(" ".join(str(x) for x in late))   # frames shown with stale lines
     worst = max(load_)
-    print(f"{N} frames; runs {sum(len(d) for d in deltas)}; changed bytes {sum(len(r[2]) for d in deltas for r in d)}; "
-          f"worst blank {worst} cycles (budget {BUDGET}), mean {int(np.mean(load_))}")
+    print(f"{N} frames; worst blank {worst} cycles (budget {BUDGET}), mean {int(np.mean(load_))}")
     # the stream: 8 KB banks, records never straddle
     banks, cur = [], bytearray()
     start = {}
@@ -97,8 +108,7 @@ def main():
                 b = img[fr][:, k].tolist() + [0] * 56
                 for i in range(0, 256, 16):
                     f.write("        .byte " + ",".join(str(v) for v in b[i:i + 16]) + "\n")
-    sb, so = start[N - 2]
-    open("part3c.inc", "w").write(f"; generated by part3c_gen.py\nIMGBANKS = 1\nNF = {N}\nNBANKS = {len(banks)}\nSTART_BANK = {sb}\nSTART_OFF = {so}\n")
+    open("part3c.inc", "w").write(f"; generated by part3c_gen.py\nIMGBANKS = 1\nNF = {N}\nNBANKS = {len(banks)}\n")
     print(f"stream: {len(banks)} bank(s) of 8 KB")
 
 if __name__ == "__main__":

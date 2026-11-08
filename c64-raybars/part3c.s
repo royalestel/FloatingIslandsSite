@@ -15,7 +15,9 @@
         .setcpu "6502"
         .include "part3c.inc"
 
-FIRST_LINE = 51
+LINE0     = 0                   ; (a later start would not help: DEN must be high before line 51, so the stable IRQ stays at line 49)
+LINE1     = 184
+FIRST_LINE = 51 + LINE0
 IRQ0LINE  = 46
 IRQLINE   = FIRST_LINE - 2
 .ifndef HTUNE
@@ -83,17 +85,15 @@ start:  sei
         sta VIC_BG
         sta VIC_SPREN
         sta IDLE
-        lda #<(NF - 1)          ; the pages hold frames N-2 and N-1: two updates bring them to frames 0 and 1
+        lda #0                  ; the pages hold frames N-2 and N-1; record j is the blank before frame j
         sta fcl
-        lda #>(NF - 1)
         sta fch
-        lda #<(START_OFF + $8000)
+        lda #<$8000
         sta sp
-        lda #>(START_OFF + $8000)
+        lda #>$8000
         sta sp+1
-        lda #(STREAM_BANK0 + START_BANK)
+        lda #STREAM_BANK0
         sta bank
-        jsr update
         lda #$c8
         sta $d016
         lda #$0b
@@ -173,16 +173,7 @@ nmi:    rti
         inc sp+1
 @a2:    dec nruns
         bne @run
-@done:  lda fch                 ; the record of frame N-1 was the last: the stream starts again
-        bne @nw
-        lda fcl
-        bne @nw
-        lda #<$8000
-        sta sp
-        lda #>$8000
-        sta sp+1
-        lda #STREAM_BANK0
-        sta bank
+@done:
 @nw:    lda fcl                 ; the next frame's parity: patch the loop's 7 page operands
         and #1
         beq @even
@@ -204,7 +195,7 @@ nmi:    rti
         adc #1
         sta rG + 2
         sta @i0 + 2
-@i0:    lda pages               ; (line 0's idle byte; the loop writes the NEXT line's after each line)
+@i0:    lda pages + LINE0       ; (the first line's idle byte; the loop writes the NEXT line's after each line)
         sta IDLE
         inc fcl
         bne @c
@@ -215,9 +206,15 @@ nmi:    rti
         lda fch
         cmp #>NF
         bne @r
-        lda #0
+        lda #0                  ; the film loops: the stream starts again
         sta fcl
         sta fch
+        lda #<$8000
+        sta sp
+        lda #>$8000
+        sta sp+1
+        lda #STREAM_BANK0
+        sta bank
 @r:     lda #$35                ; RAM + I/O again for the rows and the IRQ vectors
         sta $01
         rts
@@ -281,7 +278,7 @@ irq2:   txs
         bit $ea                 ; one odd cycle (3)
 .endif
 entry:                          ; the loop follows at once (no jmp)
-rows:   ldx #0                  ; (the first line's idle byte is written by update)
+rows:   ldx #LINE0              ; (the first line's idle byte is written by update)
 rloop:
 rP0:    lda pages,x
         sta VIC_BG
@@ -298,8 +295,11 @@ rP5:    lda pages,x
 rG:     lda pages + 1,x   ; the NEXT line's idle byte, written in the right border
         sta IDLE
         inx
-        cpx #200
+        cpx #LINE1 + 1
         bne rloop
+        lda #0                  ; black below the floor
+        sta VIC_BG
+        sta IDLE
         jmp blockend
 
 blockend:
