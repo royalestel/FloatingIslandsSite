@@ -71,3 +71,12 @@ after each run (`pkill -x`, never `pkill -f`).
   on its own first frames (a cut at the joins).  VICE: chain checked visually through all parts; parts 2w pixel-exact (vice_check_2w.py); part 4c NOT pixel-checked.
 * Part 4 is the thinned model: 245 of 1296 frames have lines one frame late (mean 96 lines).  Part-2 waves 26 late frames, part 3 11.
 * Video: `c64_routine_all.mp4` (part1.mp4 + models of 2c/2w/3c/4c via render_c64_model.py 2|3|4).
+
+## Part 1 rebuilt (`part1r`, PAL file set generated with `PLATFORM=PAL python3 part1r_gen.py`)
+* One source for NTSC (60 Hz) and PAL (50 Hz).  1a-1c: per frame a 7-byte record (dim level + (routine, x) x 3) and one UNROLLED ROUTINE per
+  (thickness, start-line parity) (`lda #index / sta buf+i,x`, ~19 KB at $8000, RAM under the cartridge window); dimming = a 128-byte MAP per level applied
+  in the raster rows (`ldy buf+n / lda (dm),y / tax`, row 0's lookup done in irq1); 1d (film time >= 1240): the delta stream of part1n.  Rotation eased flatter.
+* Build: `PLATFORM=PAL python3 part1r_gen.py; cl65 ...` is done by `mk_cart_all.py out.crt part1r part2c ...` (generate first; run the generator twice
+  after a change in the code size: AR1 starts after the code).  Checks: `sim_part1r.py` (update on the 6502, buffer vs model), `vice_check_1r.py` (PLATFORM=PAL for 6569).
+* PAL status: VICE 6569 mostly exact, 3 of 12 shots differ by a few pixels (to tune: the idle loop / WAITX).  `part1p` stays the default part 1 of `mk_cart_all.py`.
+* Gotchas found: row code must not cover $3FFF (the idle byte); ld65 does not pad gaps between memory areas in the output file (a 1-byte gap shifted the image).
