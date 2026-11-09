@@ -6,13 +6,17 @@ os.environ.setdefault("SPLITS", "6")
 import numpy as np
 import vice_check_2c as v2
 
-frames, gh = pickle.load(open("/tmp/part4_frames.pkl", "rb"))
+frames, gh = pickle.load(open(os.environ.get("FRAMES", "/tmp/part4_frames.pkl"), "rb"))
 N = len(frames)
+SHOWN = pickle.load(open(os.environ['SHOWN'], 'rb')) if os.environ.get('SHOWN') else None
 EDGES = v2.EDGES
 
 def model(f):
     f %= N
-    cols, idle = frames[f], gh[f]
+    if SHOWN is not None:
+        cols, idle = SHOWN[f][:, :6], SHOWN[f][:, 6]
+    else:
+        cols, idle = frames[f], gh[f]
     x = np.arange(320)
     img = np.zeros((200, 320), int)
     for y in range(200):

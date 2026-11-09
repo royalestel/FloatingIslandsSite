@@ -145,14 +145,15 @@ def tokens(t):
                 if tok and 0 <= y0 + r < H: out[k, y0 + r] = tok
     return out
 
-out = sys.argv[1] if len(sys.argv) > 1 else "/tmp/mock_part4_seq.mp4"
-print("frames", T_END, "all moving at", T_MOVING, "matches", int(T_ALIGN), "-", int(T_LAST), flush=True)
-Z = 3
-v = iv.Video(out, m.W * Z, H * Z)
-for f in range(T_END):
-    seg = tokens(f); img = []
-    for y in range(H):
-        line, _ = g4.fix_line([int(seg[k, y]) for k in range(SEGS)], y, f)
-        img.append(g4.draw(line, y, f))
-    v.add(lv.crt_look(fb.C64RGB[np.array(img)].astype(np.uint8), Z))
-v.close(); print("wrote", out)
+if __name__ == "__main__":
+    out = sys.argv[1] if len(sys.argv) > 1 else "/tmp/mock_part4_seq.mp4"
+    print("frames", T_END, "all moving at", T_MOVING, "matches", int(T_ALIGN), "-", int(T_LAST), flush=True)
+    Z = 3
+    v = iv.Video(out, m.W * Z, H * Z)
+    for f in range(T_END):
+        seg = tokens(f); img = []
+        for y in range(H):
+            line, _ = g4.fix_line([int(seg[k, y]) for k in range(SEGS)], y, f)
+            img.append(g4.draw(line, y, f))
+        v.add(lv.crt_look(fb.C64RGB[np.array(img)].astype(np.uint8), Z))
+    v.close(); print("wrote", out)
