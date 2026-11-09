@@ -6,7 +6,7 @@ def run(cmd):
     if r.returncode: sys.exit(" ".join(cmd) + "\n" + r.stdout + r.stderr)
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "routine_all.crt"
-    parts = sys.argv[2:] or ["part1p", "part2c", "part2w", "part3c", "part4c"]
+    parts = sys.argv[2:] or ["part1r", "part2c", "part2w", "part3c", "part4c"]
     chips, bank, table = [], 1, []
     def chip(b, addr, data):
         chips.append(b"CHIP" + struct.pack(">IHHHH", 0x2010, 2, b, addr, 0x2000) + data)

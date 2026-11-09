@@ -119,3 +119,18 @@ after each run (`pkill -x`, never `pkill -f`).
   way: rows from 0, the stable IRQ writes DEN at line 49).  The rows loop starts at row F (`rows+1` patched), the first idle byte too.  `irq0` is no longer used.
 * Budgets (runs only, est. cycles): A = 4,000; B = 65 F - 450 (F = 0: none).  VICE 6567: part 3 (part2w/part3c) exact on every capture, part 4 exact apart from the known bottom cut + stale frames.
 * Stale frames (new floor), without / with option 1: part2w 296 / 9 of 1000, part3c 11 / 0 of 484, part4c 187 / 104 of 1296 (258 frames have F = 0: pieces at the top use the old budget).
+
+## NTSC: part 4 = new motion (mock_part4_seq), busy stretch held, crash fixed
+* Motion: `mock_part4_seq.py` (one random bar per column starts every 10 frames, random speed/swing, a random subset speeds up as more move,
+  original matching/slowdown; nothing above visible line 50 or below row 184; nearest bars rise 76 lines).  Frames: `part4h_dump.py` ->
+  /tmp/part4h_frames.pkl; `HOLD2=1 FRAMES=/tmp/part4h_frames.pkl python3 part4c_gen.py`.
+* Busy stretch (frames 270..729) is HELD in pairs: picture AND flicker phase the same for frames 2k, 2k+1 and both shown from the same page set
+  (record F bit 7 = hold: the engine's set variable `pset` does not toggle).  Stale frames 681 -> 212 of 1116 (median 0 lines).
+  Holding only the picture (flicker at 60 Hz) saves nothing: the flicker makes the two sets differ every frame.
+* Stream record x is applied in the blank BEFORE frame x + 1 (the generator now writes blanks[x + 1] at position x; F is that frame's).
+* Crash fixed (all three parts): when arming the stable IRQ, write the new compare BEFORE acking $d019 -- a match of the old compare (last
+  frame's stage-2 line) while the update ran stayed latched and fired stage 1 at once -> stage 2 broken, irq2 txs with junk X.  Also stage 1
+  writes nt1 instead of inc $d012, and DEN is lowered if the target was missed.
+* VICE 6567: part2w, part3c pixel exact; part4c pixel exact against the generator's shown frames (stale lines modelled:
+  /tmp/part4c_shown.pkl, `SHOWN=... vice_check_4c.py`, strict); no stack drift over ~21,500 frames.
+* Cartridge (part1r + part2c + part2w + part3c + part4c): 58 of 64 16K banks (~928 KB of 1 MB).

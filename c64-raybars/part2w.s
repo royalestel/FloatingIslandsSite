@@ -245,9 +245,9 @@ nmi:    rti
         lda #$0b
         sta VIC_CTRL1
 @ok:
+        lda nt                  ; the new target FIRST, then the ack: a match of the OLD compare (last frame's stage 2 line)
+        sta VIC_RASTER          ; while we were busy would otherwise stay latched and fire stage 1 at once
         asl VIC_IRQ
-        lda nt
-        sta VIC_RASTER
         lda #1
         sta $d01a
         rts

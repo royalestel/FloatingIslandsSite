@@ -12,7 +12,7 @@ fb, iv, lv, p3, g4 = m.fb, m.iv, m.lv, m.p3, m.g4
 STR, NS, H, SEGS, YC = m.STR, m.NS, m.H, m.SEGS, m.YC
 smooth = m.smooth
 rng = random.Random(11)
-CAPY, FLOORY = 50.0, 199.0
+CAPY, FLOORY = 50.0, 185.0                 # the C64 draws rows 0..184 (the floor ends at 184): nothing goes below
 EASE, SETTLE, T_UP, T_DOWN = 20, 90, 120, 90      # the original values
 RAMP = 40                                                  # a bar's swing grows in over 40 frames
 
@@ -47,8 +47,8 @@ for key in start:
     c = rng.uniform(lo + 14, hi - 14)
     amp[key] = rng.uniform(0.5, 1.0) * min(c - lo, hi - c)
     if key[0] == 0:                                   # the nearest bars: swing from 76 lines above rest (top line ~96) down to the bottom
-        c = YC[0] - 32.0
-        amp[key] = 44.0
+        c = YC[0] - 38.0                          # nearest bars: from rest (bottom at row 184) up 76 lines
+        amp[key] = 38.0
     cen[key] = c
     ph[key] = rng.uniform(0, 2 * math.pi)
     ph3[key] = rng.uniform(0, 2 * math.pi)

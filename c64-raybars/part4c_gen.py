@@ -72,7 +72,7 @@ def main():
     img = load(); N = len(img)
     assert N % 2 == 0
     S = page_sets(N)
-    NOTOG = [S[x] == S[x - 1] for x in range(N)]           # NOTOG[0]: S[-1] = S[N-1]
+    NOTOG = [S[x] == S[x - 1] for x in range(N)]           # blanks[x] precedes frame x: hold = frame x keeps frame x-1's set
     assert S[N - 1] == 1, "the sets must alternate across the wrap"
     # The schedule: the pages are simulated.  Blank b_x (before frame x+1) must bring the set of frame x+1 up to date
     # (priority: the frame is imminent) and may start on the set of frame x+2 (free now): runs = bytes that differ from
@@ -111,8 +111,9 @@ def main():
     banks, cur = [], bytearray()
     start = {}
     for x in range(N):
-        rec = bytearray(ws.record(*blanks[x]))
-        assert len(blanks[x][1]) < 250 and len(blanks[x][2]) < 250
+        bx = blanks[(x + 1) % N]                        # stream record x is applied in the blank BEFORE frame x + 1
+        rec = bytearray(ws.record(*bx))
+        assert len(bx[1]) < 250 and len(bx[2]) < 250
         if len(cur) + len(rec) > 0x4000 - 1:
             cur.append(0xFF); banks.append(bytes(cur).ljust(0x4000, b"\xff")); cur = bytearray()
         start[x] = (len(banks), len(cur))

@@ -101,7 +101,7 @@ start:  sei
         sta IDLE
         lda #0                  ; the pages hold frames N-2 and N-1; record j is the blank before frame j
         sta fcl
-        lda #1                  ; the set before frame 0 is 1 (frame N-1's)
+        lda #0                  ; the set of frame 0 (blank x patches the set of frame x + 1)
         sta pset
         sta fch
         lda #<$8000
@@ -260,9 +260,9 @@ nmi:    rti
         lda #$0b
         sta VIC_CTRL1
 @ok:
+        lda nt                  ; the new target FIRST, then the ack: a match of the OLD compare (last frame's stage 2 line)
+        sta VIC_RASTER          ; while we were busy would otherwise stay latched and fire stage 1 at once
         asl VIC_IRQ
-        lda nt
-        sta VIC_RASTER
         lda #1
         sta $d01a
         rts
