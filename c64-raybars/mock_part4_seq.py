@@ -24,7 +24,7 @@ for k in range(SEGS):
     for n, i in enumerate(order):
         start[i, k] = T_START + n * 10                        # gradual: one more bar per column every 10 frames
 T_MOVING = T_START + NS * 10 + RAMP                            # all bars moving at full swing
-T_ALIGN = T_MOVING + 240                                  # a few seconds of everything moving
+T_ALIGN = T_MOVING + 60                                   # the matches follow soon after everything is moving
 # ---- the matches ----
 pairs = [(i, k) for i in range(NS) for k in range(SEGS - 1)]
 rng.shuffle(pairs)
