@@ -83,16 +83,20 @@ def prof25(T):
 PROF25 = gp.ProfDict({T: [P25 + j for j in gp.standard_profile(T, 23)] for T in range(1, gp.TMAX + 1)},
                      lambda T, i, b=1.0: [P25 + j for j in gp.bar_profile(T, i, 23, lambda t: [x - P25 if x else 0 for x in prof25(t)], b)])
 
+# PART 1 COLOURS: the palette25 entries are mapped onto part 1's own ramp (ghost_part2 tokens 1..RED-1, the same colours part 1
+# draws) by lightness, so the floor reads the same at the part 1 -> part 2 join
+MAP25 = [0] + [min(range(1, 25), key=lambda t: abs(gp2.light(t) - float(L25[j]))) for j in range(1, N25)]     # part 1's ramp: tokens 1..24
+
 def colour(tok, y, f):
     if tok >= P25:
-        return ENT25[tok - P25][1](y & 1, f & 1, y % 3)[0]
+        return gp2.colour(MAP25[tok - P25], y, f)
     if tok >= P16:
         return ORDER16[tok - P16]
     return gp2.colour(tok, y, f)
 
 def ghost(tok, y, f):
     if tok >= P25:
-        return ENT25[tok - P25][1](y & 1, f & 1, y % 3)[1]
+        return gp2.ghost(MAP25[tok - P25], y, f)
     return 0 if tok >= P16 else gp2.ghost(tok, y, f)
 
 def is_black(tok):

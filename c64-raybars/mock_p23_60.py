@@ -16,8 +16,8 @@ v = iv.Video(OUT, 960, 600, fps=60)
 f = 0; n = 0
 seq = p2.make_seq()
 for n_i, (A, segs, wave) in enumerate(seq):                       # part 2's waves (the earthquake skipped: a short lead-in)
-    pre = 20 if n_i == 0 else 10
-    post = 10 if n_i < len(seq) - 1 else 60
+    pre = 20 if n_i == 0 else 0                     # no pauses between the waves (f2b and b2f run straight on)
+    post = 0 if n_i < len(seq) - 1 else 60
     for t in range(pre + wave + post):
         seg = segs(t - pre); img = []
         for y in range(p2.H):
