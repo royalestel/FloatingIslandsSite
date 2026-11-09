@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Part 4 (mock_part4_seq motion, HOLD2) as the C64 shows it, 60 Hz NTSC: frames -> /tmp/part4h_frames.pkl (same format as part4_dump.py)."""
+"""Part 4 (mock_part4_seq motion) as the C64 shows it, 60 Hz NTSC, with the busy stretch HELD: in frames 270..729 each
+pair (even, odd) shows the even frame's picture AND the same flicker phase (no flicker there); elsewhere the usual
+60 Hz flicker.  -> /tmp/part4h_frames.pkl (same format as part4_dump.py)."""
 import os, pickle
 os.environ["SPLITS"] = "6"
 import numpy as np
 import mock_part4_seq as ms
 g4 = ms.g4
+HOLD = (270, 730)
 frames, idle = [], []
-for f in range(ms.T_END):
-    seg = ms.tokens(f - f % 2)                                    # HOLD2: the picture changes every other frame; colours use f
+for t in range(ms.T_END):
+    f = t - 1 if (HOLD[0] < t < HOLD[1] and t % 2 == 1) else t          # held: the even frame's picture and colours
+    seg = ms.tokens(f)
     lines, gh = [], []
     for y in range(200):
         toks = [int(seg[k, y]) for k in range(ms.SEGS)]

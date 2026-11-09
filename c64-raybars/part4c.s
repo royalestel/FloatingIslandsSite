@@ -59,6 +59,8 @@ bank:    .res 1
 nruns:   .res 1
 nt:      .res 1
 nt1:     .res 1                 ; the stage-2 target line (nt + 1)
+pset:    .res 1                 ; the page set of the next frame (0/1); toggles unless the record says hold
+tgl:     .res 1                 ; 1 = this record toggles the set (bit 7 of F clear)
 nf:      .res 1                 ; F: the first active line of the frame shown after this blank (0 = from row 0)
 cnt:     .res 1
 save_a:  .res 1
@@ -99,6 +101,8 @@ start:  sei
         sta IDLE
         lda #0                  ; the pages hold frames N-2 and N-1; record j is the blank before frame j
         sta fcl
+        lda #1                  ; the set before frame 0 is 1 (frame N-1's)
+        sta pset
         sta fch
         lda #<$8000
         sta sp
@@ -144,7 +148,14 @@ nmi:    rti
         lda #>$8000
         sta sp+1
         lda (sp),y
-@rec:   sta nf                  ; F
+@rec:   tax                     ; F, bit 7 = hold (the set does not toggle)
+        and #$7f
+        sta nf
+        ldy #1
+        txa
+        bpl @tg0
+        ldy #0
+@tg0:   sty tgl
         inc sp
         bne @f0
         inc sp+1
@@ -172,8 +183,12 @@ nmi:    rti
         inc sp+1
 @f2:    jsr doruns              ; group B: after the DEN write, until the stable IRQ at line 49 + F
 @done:
-@nw:    lda fcl                 ; the next frame's parity: patch the loop's 7 page operands
-        and #1
+@nw:    lda tgl
+        beq @keep
+        lda pset
+        eor #1
+        sta pset
+@keep:  lda pset                ; the next frame's set: patch the loop's 7 page operands
         beq @even
         lda #>pages + 7
         bne @pg

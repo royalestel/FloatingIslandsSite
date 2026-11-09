@@ -58,9 +58,22 @@ def runs_between(a, b, parity):
                 y += 1
     return out
 
+HOLD = (270, 730) if os.environ.get("HOLD2") else None     # busy stretch: held frames (picture and flicker) in pairs (HS+2k, HS+2k+1)
+
+def page_sets(N):
+    """the set (0/1) each frame is shown from: alternate, except the odd frame of a held pair keeps its partner's set"""
+    S = [0] * N
+    for t in range(1, N):
+        held = HOLD is not None and HOLD[0] < t < HOLD[1] and t % 2 == 1
+        S[t] = S[t - 1] if held else S[t - 1] ^ 1
+    return S
+
 def main():
     img = load(); N = len(img)
     assert N % 2 == 0
+    S = page_sets(N)
+    NOTOG = [S[x] == S[x - 1] for x in range(N)]           # NOTOG[0]: S[-1] = S[N-1]
+    assert S[N - 1] == 1, "the sets must alternate across the wrap"
     # The schedule: the pages are simulated.  Blank b_x (before frame x+1) must bring the set of frame x+1 up to date
     # (priority: the frame is imminent) and may start on the set of frame x+2 (free now): runs = bytes that differ from
     # the frame's image, applied while the blank's budget lasts; whatever is left is found again in the next blank.
@@ -69,8 +82,8 @@ def main():
     blanks, load_, stale, capacity, Fs, shown = [], [], [], [], [], []
     for x in range(N):                                       # record x = the blank before frame x: prepares frame x, may start on x+1
         t1 = x % N; t2 = (x + 1) % N
-        cand = [(r, 0) for r in runs_between(state[t1 & 1], img[t1], t1 & 1)] + [(r, 1) for r in runs_between(state[t2 & 1], img[t2], t2 & 1)]
-        Fx = ws.F_of(img[t1])                                        # the first active line of the frame shown after this blank
+        cand = [(r, 0) for r in runs_between(state[S[t1]], img[t1], S[t1])] + [(r, 1) for r in runs_between(state[S[t2]], img[t2], S[t2])]
+        Fx = min(ws.F_of(img[t1]), 127)                           # bit 7 of the record's F = hold                                        # the first active line of the frame shown after this blank
         a_cap, b_cap = ws.budgets(Fx)                                # group A: before line 49; group B: after the DEN write, until line 49 + Fx
         A, B, ua, ub = [], [], 0, 0
         for pri in (0, 1):
@@ -83,9 +96,9 @@ def main():
                 state[page // 7][line:line + len(data), page % 7] = np.frombuffer(data, dtype=np.uint8)
         chosen, used = A + B, ua + ub
         capacity.append(a_cap + b_cap); Fs.append(Fx)
-        blanks.append((Fx, A, B)); load_.append(used)
-        stale.append(int((state[t1 & 1] != img[t1]).any(axis=1).sum()))      # lines of frame x+1 that are not exact
-        shown.append(state[t1 & 1].copy())                                    # what frame x really shows (stale lines included)
+        blanks.append((Fx | (0x80 if NOTOG[x] else 0), A, B)); load_.append(used)
+        stale.append(int((state[S[t1]] != img[t1]).any(axis=1).sum()))      # lines of frame x+1 that are not exact
+        shown.append(state[S[t1]].copy())                                    # what frame x really shows (stale lines included)
     # the loop: record x for x in 0..N-1 are the ones in the stream; the lead-in blanks N-2, N-1 are the last two
     blanks = blanks[:N]; load_ = load_[:N]
     late = [x for x in range(N) if stale[x]]
