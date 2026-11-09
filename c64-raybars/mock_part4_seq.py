@@ -151,7 +151,7 @@ if __name__ == "__main__":
     Z = 3
     v = iv.Video(out, m.W * Z, H * Z)
     for f in range(T_END):
-        seg = tokens(f); img = []
+        seg = tokens(f - f % 2 if os.environ.get("HOLD2") else f); img = []      # HOLD2: the picture only changes every other frame (the flicker still uses f)
         for y in range(H):
             line, _ = g4.fix_line([int(seg[k, y]) for k in range(SEGS)], y, f)
             img.append(g4.draw(line, y, f))
