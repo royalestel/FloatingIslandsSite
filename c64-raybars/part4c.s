@@ -77,6 +77,11 @@ save_y:  .res 1
 
 .segment "CODE"
 start:  sei
+        lda #0                  ; silence the SID (parts 2-3 play the tune; this part's pages overwrite it)
+        sta $d404
+        sta $d40b
+        sta $d412
+        sta $d418
         lda #$7f
         sta CIA1_ICR
         sta CIA2_ICR

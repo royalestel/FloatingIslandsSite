@@ -51,6 +51,7 @@ def model(f, edges=EDGES):
     return img
 
 def one(wait, shot, crt="part2c.crt", lbl="part2c.lbl"):
+    crt = os.environ.get("CRT", crt)
     proc = subprocess.Popen(["xvfb-run", "-a", "x64sc", "+sound", "-warp", "-VICIIfilter", "0", "-VICIIextpal",
                              "-VICIIpalette", "colodore", "-remotemonitor", "-remotemonitoraddress",
                              f"ip4://127.0.0.1:{PORT}", *os.environ.get("VICEXTRA", "").split(), "-cartcrt", crt],

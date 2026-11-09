@@ -8,6 +8,7 @@ dst = $fd
 pgs = $fa
 bk  = $f9
 jv  = $f7
+skp = $f6
 PART = $02ff
 
 .segment "CODE"
@@ -50,6 +51,14 @@ tramp:  sei
         sta $de00
         lda ptab+1,x
         sta pgs
+        lda #0
+        sta skp
+        lda pgs
+        bpl @ns
+        and #$7f
+        sta pgs
+        inc skp                 ; the part sits above the tune: the image bytes for $1000.. go to $2B00..
+@ns:
         lda ptab+2,x
         sta jv
         lda ptab+3,x
@@ -59,9 +68,9 @@ tramp:  sei
         sta src
         lda #>$8000
         sta src+1
-        lda #<$0801
+        lda #<$0800
         sta dst
-        lda #>$0801
+        lda #>$0800
         sta dst+1
 @page:  ldy #0
 @b:     lda (src),y
@@ -70,6 +79,16 @@ tramp:  sei
         bne @b
         inc src+1
         inc dst+1
+        lda skp
+        beq @nsk
+        lda dst+1
+        cmp #$10
+        bne @nsk
+        lda #$2b
+        sta dst+1
+        lda #0
+        sta skp
+@nsk:
         lda src+1
         cmp #$c0
         bne @np

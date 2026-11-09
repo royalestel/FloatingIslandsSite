@@ -283,12 +283,7 @@ u_c:     lda fcl
         lda fch
         cmp #>NF
         bne u_ret
-        lda #0                  ; silence the SID: the next part overwrites the tune
-        sta $d404
-        sta $d40b
-        sta $d412
-        sta $d418
-        jmp $0200               ; the chain: the next part is loaded
+        jmp $0200               ; (the tune plays on in parts 2 and 3, which keep it resident)               ; the chain: the next part is loaded
 u_ret:   rts
 .endproc
 
