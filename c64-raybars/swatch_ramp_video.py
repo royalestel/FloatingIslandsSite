@@ -39,6 +39,8 @@ def reorder(lad):
 
 DROP = {13, 15, 19, 24, 27}           # by eye: dark grey, cyan checker inverting,
                                       # dark grey / grey, grey, light grey
+DROP_PAL = {2}                         # swatch-table numbers: dropped from the ramp
+ADD_PAL = 22                           # swatch-table number: added to the ramp
 DROP2 = {7, 10, 25}                   # then: dark grey checker inverting,
                                       # grey checker inverting, light grey / white
 SHIFT_N = {6}                         # light blue 1/4 inverting: pixels one to the right
@@ -63,6 +65,9 @@ def ladder():
     lad = reorder(lad)
     lad = [k for i, k in enumerate(lad) if i + 1 not in DROP]
     lad = [k for i, k in enumerate(lad) if i + 1 not in DROP2]
+    lad = [k for k in lad if k not in DROP_PAL]          # by swatch-table number: drop #2 ...
+    if ADD_PAL in lad: lad.remove(ADD_PAL)              # ... add #22 between #21 and #23 (directly before #23)
+    lad.insert(lad.index(23) if 23 in lad else len(lad), ADD_PAL)
     SHIFT.update(lad[i - 1] for i in SHIFT_N)
     return lad, lums
 

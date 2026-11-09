@@ -9,7 +9,7 @@ in metres (focal length 200 lines, bar radius 0.12 m: a bar at d metres is
 """
 P = dict(
     # -- the three bars: slide in, slide past each other, circle in depth
-    T_ENTER   = [30, 90, 150],    # frame each of the first three bars starts to slide up
+    T_ENTER   = [25, 130, 220],    # frame each of the first three bars starts to slide up
     ENTER_LEN = 90,               # frames a bar takes to slide up
     TURN      = 240,              # frames per turn of the depth circle (and of the sliding)
     ZC        = 2.0,              # circle centre distance (m)

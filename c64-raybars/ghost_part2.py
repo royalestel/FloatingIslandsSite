@@ -66,6 +66,7 @@ def segments(A, tw):
     out = np.zeros((SEGS, H), int)
     for i in range(NS - 1, -1, -1):                           # far first
         y0, T = STR[i]
+        Tb = gp.BT(T, gp.edge_level(i), i)                      # this bar's own profile, as part 1's floor has it (far bars dimmer)
         us = i * A["STAG"] if A["near_first"] else (NS - 1 - i) * A["STAG"]
         u = tw - us
         moving = 0 < u < A["TILT"]
@@ -75,13 +76,13 @@ def segments(A, tw):
             s = -int(round(a * (k + 0.5) / SEGS)) if moving else 0
             for r in range(T):
                 if A["red"] and uu >= 0.5:                    # white at the apex, down the red ramp
-                    kr = PROF_R[T][r]
+                    kr = PROF_R[Tb][r]
                     if not kr:
                         continue
                     f_ = max(0.0, 1 - (uu - 0.5) / 0.5)
                     tok = RED + kr + int(round((TOP_R - kr) * f_))
                 else:
-                    tok = gp.PROF[T][r]
+                    tok = gp.PROF[Tb][r]
                     if not tok:
                         continue
                 if 0 <= y0 + s + r < H:

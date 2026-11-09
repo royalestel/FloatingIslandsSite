@@ -83,16 +83,20 @@ def prof25(T):
 PROF25 = gp.ProfDict({T: [P25 + j for j in gp.standard_profile(T, 23)] for T in range(1, gp.TMAX + 1)},
                      lambda T, i, b=1.0: [P25 + j for j in gp.bar_profile(T, i, 23, lambda t: [x - P25 if x else 0 for x in prof25(t)], b)])
 
+# PART 1 COLOURS: the palette25 entries are mapped onto part 1's own ramp (ghost_part2 tokens 1..RED-1, the same colours part 1
+# draws) by lightness, so the floor reads the same at the part 1 -> part 2 join
+MAP25 = [0] + [min(range(1, 25), key=lambda t: abs(gp2.light(t) - float(L25[j]))) for j in range(1, N25)]     # part 1's ramp: tokens 1..24
+
 def colour(tok, y, f):
     if tok >= P25:
-        return ENT25[tok - P25][1](y & 1, f & 1, y % 3)[0]
+        return gp2.colour(MAP25[tok - P25], y, f)
     if tok >= P16:
         return ORDER16[tok - P16]
     return gp2.colour(tok, y, f)
 
 def ghost(tok, y, f):
     if tok >= P25:
-        return ENT25[tok - P25][1](y & 1, f & 1, y % 3)[1]
+        return gp2.ghost(MAP25[tok - P25], y, f)
     return 0 if tok >= P16 else gp2.ghost(tok, y, f)
 
 def is_black(tok):
@@ -138,6 +142,7 @@ def wave_tokens(A, tw):
     out = np.zeros((SEGS, H), int)
     for i in range(NS - 1, -1, -1):                             # far first
         y0, T = STR[i]
+        Tb = gp.BT(T, gp.edge_level(i), i)                      # this bar's own profile, as part 1's floor has it (far bars dimmer)
         us = i * A["STAG"] if A["start"] == "front" else (NS - 1 - i) * A["STAG"]
         u = tw - us
         a = A["amp"] * math.sin(math.pi * u / A["TILT"]) if 0 < u < A["TILT"] else 0.0
@@ -151,12 +156,12 @@ def wave_tokens(A, tw):
             c = (k + 0.5) / SEGS
             s = -int(round(a * c)) if side == "R" else -int(round(a * (1 - c)))
             for r in range(T):
-                base = gp.PROF[T][r]                             # blue, before the peak
+                base = gp.PROF[Tb][r]                             # blue, before the peak
                 if not base:
                     continue
                 if uu < 0.5:
                     if A.get("base") == "red":
-                        kr = PROF_R[T][r]
+                        kr = PROF_R[Tb][r]
                         if not kr:
                             continue
                         tok = RED + kr
@@ -165,12 +170,12 @@ def wave_tokens(A, tw):
                 elif mode == "blue":
                     tok = base + int(round((TOPB - base) * f))
                 elif mode == "red":
-                    kr = PROF_R[T][r]
+                    kr = PROF_R[Tb][r]
                     if not kr:
                         continue
                     tok = RED + kr + int(round((TOP_R - kr) * f))
                 else:                                            # multicolour
-                    target = PROF25[T][r]
+                    target = PROF25[Tb][r]
                     if not target:
                         continue
                     pr = target - P25

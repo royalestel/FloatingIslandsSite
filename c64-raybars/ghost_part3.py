@@ -61,6 +61,7 @@ def segments(A, tw):
     out = np.zeros((SEGS, H), int)
     for i in range(NS - 1, -1, -1):                                # far first
         y0, T = STR[i]
+        Tb = gp.BT(T, gp.edge_level(i), i)                      # this bar's own profile, as part 1's floor has it (far bars dimmer)
         u = tw - i * A["STAG"]
         a = A["amp"](i, T0, T) * math.sin(math.pi * u / TILT) if 0 < u < TILT else 0.0
         ul = (tw - (T_hit + (NS - 1 - i) * LIFT_STAG)) / LIFT_LEN   # left lift: back first
@@ -70,9 +71,9 @@ def segments(A, tw):
             s = -int(round(a * c + b * (1 - c)))                  # right up, left up
             for r in range(T):
                 if ul < 0.5:
-                    tok = gp.PROF[T][r]                           # blue, no change
+                    tok = gp.PROF[Tb][r]                           # blue, no change
                 else:
-                    kr = PROF_R[T][r]
+                    kr = PROF_R[Tb][r]
                     if not kr:
                         continue
                     f_ = max(0.0, 1 - (min(ul, 1.0) - 0.5) / 0.5)  # white at the peak, red at rest
