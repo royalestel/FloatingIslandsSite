@@ -19,8 +19,7 @@ def main():
         nb = -(-len(image) // 0x4000)
         pages = -(-len(image) // 256)
         assert pages < 256 or True
-        if name in SKIP_TUNE: assert pages < 128; pages |= 0x80          # bit 7: this part sits above the tune
-        table.append((bank, pages, lbl["start"]))
+        table.append((bank, pages, lbl["start"] | (0x8000 if name in SKIP_TUNE else 0)))   # bit 15 of the start: this part sits above the tune
         padded = image.ljust(nb * 0x4000, b"\xff")
         for b in range(nb): body.append((bank + b, padded[b * 0x4000:(b + 1) * 0x4000]))
         bank += nb

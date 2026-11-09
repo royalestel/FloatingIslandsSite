@@ -51,17 +51,14 @@ tramp:  sei
         sta $de00
         lda ptab+1,x
         sta pgs
-        lda #0
-        sta skp
-        lda pgs
-        bpl @ns
-        and #$7f
-        sta pgs
-        inc skp                 ; the part sits above the tune: the image bytes for $1000.. go to $2B00..
-@ns:
         lda ptab+2,x
         sta jv
         lda ptab+3,x
+        sta jv+1
+        and #$80                ; bit 7 of the start address: the part sits above the tune (the image bytes for $1000.. go to $2B00..)
+        sta skp
+        lda jv+1
+        and #$7f
         sta jv+1
         inc PART
         lda #<$8000
