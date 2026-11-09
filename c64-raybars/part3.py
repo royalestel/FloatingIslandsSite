@@ -79,12 +79,13 @@ def tokens(spec, static, tw):
     out = np.zeros((SEGS, H), int)
     for i in range(NS - 1, -1, -1):                              # far first
         y0, T = STR[i]
+        Tb = gp.BT(T, gp.edge_level(i), i)                      # this bar's own profile, as part 1's floor has it (far bars dimmer)
         for k in range(SEGS):
             sp = spec(i, k)
             pal = static[i][k]
             if sp is None:
                 for r in range(T):
-                    tok = base_tok(pal, T, r)
+                    tok = base_tok(pal, Tb, r)
                     if tok and 0 <= y0 + r < H:
                         out[k, y0 + r] = tok
                 continue
@@ -102,7 +103,7 @@ def tokens(spec, static, tw):
             uu = u / TILT
             f = 1.0 - (min(uu, 1.0) - 0.5) / 0.5 if uu >= 0.5 else 0.0
             for r in range(T):
-                tok = base_tok(pal, T, r) if uu < 0.5 else fade_tok(sp["end"], T, r, f, sp["peak"])
+                tok = base_tok(pal, Tb, r) if uu < 0.5 else fade_tok(sp["end"], Tb, r, f, sp["peak"])
                 if tok and 0 <= y0 + s + r < H:
                     out[k, y0 + s + r] = tok
     return out

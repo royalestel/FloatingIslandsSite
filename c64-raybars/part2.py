@@ -142,6 +142,7 @@ def wave_tokens(A, tw):
     out = np.zeros((SEGS, H), int)
     for i in range(NS - 1, -1, -1):                             # far first
         y0, T = STR[i]
+        Tb = gp.BT(T, gp.edge_level(i), i)                      # this bar's own profile, as part 1's floor has it (far bars dimmer)
         us = i * A["STAG"] if A["start"] == "front" else (NS - 1 - i) * A["STAG"]
         u = tw - us
         a = A["amp"] * math.sin(math.pi * u / A["TILT"]) if 0 < u < A["TILT"] else 0.0
@@ -155,12 +156,12 @@ def wave_tokens(A, tw):
             c = (k + 0.5) / SEGS
             s = -int(round(a * c)) if side == "R" else -int(round(a * (1 - c)))
             for r in range(T):
-                base = gp.PROF[T][r]                             # blue, before the peak
+                base = gp.PROF[Tb][r]                             # blue, before the peak
                 if not base:
                     continue
                 if uu < 0.5:
                     if A.get("base") == "red":
-                        kr = PROF_R[T][r]
+                        kr = PROF_R[Tb][r]
                         if not kr:
                             continue
                         tok = RED + kr
@@ -169,12 +170,12 @@ def wave_tokens(A, tw):
                 elif mode == "blue":
                     tok = base + int(round((TOPB - base) * f))
                 elif mode == "red":
-                    kr = PROF_R[T][r]
+                    kr = PROF_R[Tb][r]
                     if not kr:
                         continue
                     tok = RED + kr + int(round((TOP_R - kr) * f))
                 else:                                            # multicolour
-                    target = PROF25[T][r]
+                    target = PROF25[Tb][r]
                     if not target:
                         continue
                     pr = target - P25
