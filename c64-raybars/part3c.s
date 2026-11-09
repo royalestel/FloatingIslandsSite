@@ -58,6 +58,7 @@ sp:      .res 2                 ; the stream pointer (in the ROML window)
 bank:    .res 1
 nruns:   .res 1
 nt:      .res 1
+nt1:     .res 1                 ; the stage-2 target line (nt + 1)
 nf:      .res 1                 ; F: the first active line of the frame shown after this blank (0 = from row 0)
 cnt:     .res 1
 save_a:  .res 1
@@ -226,6 +227,9 @@ nmi:    rti
         clc
         adc #IRQLINE
         sta nt                  ; the target line
+        clc
+        adc #1
+        sta nt1
 @chk:   lda VIC_RASTER          ; never arm while the beam is within 3 lines before the target or on it: the IRQ would come late and
         sec                     ; the stable sync (stage 2) would miss; wait the line out (the IRQ then comes in the next frame)
         sbc nt
@@ -233,6 +237,14 @@ nmi:    rti
         adc #3
         cmp #4
         bcc @chk
+        lda VIC_RASTER          ; missed this frame's target (the update ran past it)? the IRQ then comes in the next frame:
+        cmp nt                  ; DEN must be low again before that frame's line 48, or badlines start (and break the sync)
+        bcc @ok
+        cmp #230                ; (lines >= 230: still the blank before this frame, not late)
+        bcs @ok
+        lda #$0b
+        sta VIC_CTRL1
+@ok:
         asl VIC_IRQ
         lda nt
         sta VIC_RASTER
@@ -316,7 +328,8 @@ irq1:   sta save_a
         sta $fffe
         lda #>irq2
         sta $ffff
-        inc VIC_RASTER
+        lda nt1                 ; (not inc: inc reads the CURRENT line, so a late stage 1 armed stage 2 a line too late)
+        sta VIC_RASTER
         asl VIC_IRQ
         tsx
         cli
