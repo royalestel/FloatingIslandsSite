@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """MOCK (no C64 code): part 4, new motion model.
-  1. every frame, in each column, one more bar (chosen at random) starts moving with its own random speed and random swing, until all 20 bars of all 6 columns move.
-  2. then the matching: two neighbouring columns' bars join and flash blue; they (and the groups they belong to) continue at half the slower of the two speeds.
-  3. the motion dies out, then the nearest bar sweeps up and off (unchanged).
+  1. a gradual run-up: every 10 frames, in each column, one more bar (chosen at random) starts moving with its own random speed and swing; the more bars move, the faster a random subset of them goes.
+  2. then the ORIGINAL matching and slowdown (matches accelerate, groups follow one bar, the motion eases out after the last match).
+  3. the nearest bar sweeps up and off (unchanged).
   Nothing rises above visible line 50.    python3 mock_part4_seq.py [out.mp4]"""
 import os, sys, math, random
 os.environ["SPLITS"] = "6"
@@ -13,7 +13,7 @@ STR, NS, H, SEGS, YC = m.STR, m.NS, m.H, m.SEGS, m.YC
 smooth = m.smooth
 rng = random.Random(11)
 CAPY, FLOORY = 50.0, 199.0
-EASE, SETTLE, T_UP, T_DOWN = 34, 150, 120, 90
+EASE, SETTLE, T_UP, T_DOWN = 20, 90, 120, 90      # the original values
 RAMP = 40                                                  # a bar's swing grows in over 40 frames
 
 # ---- when bars start moving: every frame one more bar per column ----
@@ -22,27 +22,28 @@ start = {}
 for k in range(SEGS):
     order = list(range(NS)); rng.shuffle(order)
     for n, i in enumerate(order):
-        start[i, k] = T_START + n
-T_MOVING = T_START + NS + RAMP                            # all bars moving at full swing
+        start[i, k] = T_START + n * 10                        # gradual: one more bar per column every 10 frames
+T_MOVING = T_START + NS * 10 + RAMP                            # all bars moving at full swing
 T_ALIGN = T_MOVING + 240                                  # a few seconds of everything moving
 # ---- the matches ----
 pairs = [(i, k) for i in range(NS) for k in range(SEGS - 1)]
 rng.shuffle(pairs)
 match_t, tt = [], float(T_ALIGN)
 for j in range(len(pairs)):
-    match_t.append(tt); tt += max(1.5, 26 * 0.965 ** j)
+    match_t.append(tt); tt += max(0.4, 20 * 0.95 ** j)     # the original match pace
 T_LAST = match_t[-1]
-T_SETTLE0 = int(T_LAST) + EASE + 40
+T_SETTLE0 = int(T_LAST) + EASE + 5
 T_SWEEP0 = T_SETTLE0 + SETTLE
 T_END = T_SWEEP0 + T_UP + T_DOWN + 60
 
 # ---- per-piece motion: random speed (period) and random swing ----
-om = {}; amp = {}; ph = {}; ph3 = {}
+om = {}; amp = {}; ph = {}; ph3 = {}; boost = {}
 for key in start:
     om[key] = 2 * math.pi / rng.uniform(45, 230) * rng.choice([-1, 1])
     amp[key] = rng.uniform(12, 80)
     ph[key] = rng.uniform(0, 2 * math.pi)
     ph3[key] = rng.uniform(0, 2 * math.pi)
+    boost[key] = rng.random() ** 2                          # a random subset speeds up the most
 group = {i: list(range(SEGS)) for i in range(NS)}
 events = {key: [] for key in start}                       # (t0, palette)
 hist = {key: [] for key in start}                         # (t_change, rep column)
@@ -87,12 +88,12 @@ phase = dict(ph); phase3 = dict(ph3)
 for t in range(T_END + 1):
     while si < len(sc) and sc[si][0] <= t:
         _, i, k, members = sc[si]; si += 1
-        slow = min(abs(om[i, k]), abs(om[i, k + 1])) * 0.5          # half the slower of the two
-        for kk in members:
-            om[i, kk] = math.copysign(slow, om[i, kk])
+        pass                                                         # (original: no speed change at a match)
     st = 1.0 - smooth((t - T_SETTLE0) / SETTLE)
+    frac = sum(1 for key in start if t >= start[key]) / float(len(start))     # how many bars move so far
     for (i, k) in start:
-        phase[i, k] += om[i, k]; phase3[i, k] += om[i, k] * 0.8
+        mult = 1.0 + 3.0 * boost[i, k] * frac
+        phase[i, k] += om[i, k] * mult; phase3[i, k] += om[i, k] * mult * 0.8
         a = smooth((t - start[i, k]) / RAMP) * st
         rho = 1.0 + 0.25 * a * math.sin(phase3[i, k])
         T = STR[i][1] / max(rho, 0.35)
