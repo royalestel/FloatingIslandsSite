@@ -37,10 +37,16 @@ T_SWEEP0 = T_SETTLE0 + SETTLE
 T_END = T_SWEEP0 + T_UP + T_DOWN + 60
 
 # ---- per-piece motion: random speed (period) and random swing ----
-om = {}; amp = {}; ph = {}; ph3 = {}; boost = {}
+om = {}; amp = {}; ph = {}; ph3 = {}; boost = {}; cen = {}
 for key in start:
     om[key] = 2 * math.pi / rng.uniform(45, 230) * rng.choice([-1, 1])
-    amp[key] = rng.uniform(12, 80)
+    # a swing that fits the screen: centre c and amplitude A such that the whole sine stays between line 50 and the bottom
+    # (with the depth wobble allowed for), so a bar never sits at a limit or leaves the screen; it is always moving
+    Tm = STR[key[0]][1] * 1.4
+    lo, hi = CAPY + Tm / 2.0 + 1, FLOORY - Tm / 2.0 - 1
+    c = rng.uniform(lo + 14, hi - 14)
+    cen[key] = c
+    amp[key] = rng.uniform(0.5, 1.0) * min(c - lo, hi - c)
     ph[key] = rng.uniform(0, 2 * math.pi)
     ph3[key] = rng.uniform(0, 2 * math.pi)
     boost[key] = rng.random() ** 2                          # a random subset speeds up the most
@@ -97,7 +103,7 @@ for t in range(T_END + 1):
         a = smooth((t - start[i, k]) / RAMP) * st
         rho = 1.0 + 0.25 * a * math.sin(phase3[i, k])
         T = STR[i][1] / max(rho, 0.35)
-        own[t, i, k] = cap(YC[i] + amp[i, k] * a * math.sin(phase[i, k]), T) if a > 1e-4 else YC[i]
+        own[t, i, k] = cap(YC[i] + (cen[i, k] - YC[i]) * a + amp[i, k] * a * math.sin(phase[i, k]), T) if a > 1e-4 else YC[i]
         thick[t, i, k] = T if a > 1e-4 else STR[i][1]
 
 def pos(i, k, t):
