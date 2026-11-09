@@ -46,9 +46,9 @@ for key in start:
     lo, hi = CAPY + Tm / 2.0 + 1, FLOORY - Tm / 2.0 - 1
     c = rng.uniform(lo + 14, hi - 14)
     amp[key] = rng.uniform(0.5, 1.0) * min(c - lo, hi - c)
-    if key[0] == 0:                                   # the nearest bars: at least 100 video px (= 34 lines at 3x) up and down
-        c = rng.uniform(lo + 34, hi - 34)
-        amp[key] = rng.uniform(34, min(c - lo, hi - c))
+    if key[0] == 0:                                   # the nearest bars: swing from 76 lines above rest (top line ~96) down to the bottom
+        c = YC[0] - 32.0
+        amp[key] = 44.0
     cen[key] = c
     ph[key] = rng.uniform(0, 2 * math.pi)
     ph3[key] = rng.uniform(0, 2 * math.pi)
