@@ -84,6 +84,17 @@ def palette(i, k, t):
     return base, flash
 
 # ---- simulate the phases frame by frame (speed changes at the matches) ----
+# PAIR=1: each bar is paired with the opposite end of the floor (nearest with farthest, 19 - i); in the crazy stretch the two take
+# turns (turns of 4..10 frames, even): the one whose turn it is moves at double speed, the other holds still where it is
+PAIR = bool(os.environ.get("PAIR"))
+prng = random.Random(5)
+TURN = {(p, k): (prng.choice([4, 6, 8, 10]), prng.randrange(0, 20)) for p in range(NS // 2) for k in range(SEGS)}
+def active(i, k, t):
+    if not PAIR or not (T_START <= t < T_SETTLE0 + SETTLE): return True
+    p = min(i, NS - 1 - i); L, off = TURN[p, k]
+    near_turn = ((t + off) // L) % 2 == 0
+    return near_turn if i < NS // 2 else not near_turn
+
 def cap(y, T):
     lo, hi = CAPY + T / 2.0, FLOORY - T / 2.0
     for sgn, lim in ((1, lo), (-1, hi)):
@@ -102,7 +113,9 @@ for t in range(T_END + 1):
     frac = sum(1 for key in start if t >= start[key]) / float(len(start))     # how many bars move so far
     for (i, k) in start:
         mult = 1.0 + 3.0 * boost[i, k] * frac
-        phase[i, k] += om[i, k] * mult; phase3[i, k] += om[i, k] * mult * 0.8
+        if active(i, k, t):
+            sp = om[i, k] * mult * (2.0 if PAIR and T_START <= t < T_SETTLE0 + SETTLE else 1.0)
+            phase[i, k] += sp; phase3[i, k] += sp * 0.8
         a = smooth((t - start[i, k]) / RAMP) * st
         rho = 1.0                                       # no depth wobble: bars keep their starting thickness
         T = STR[i][1] / max(rho, 0.35)
@@ -151,9 +164,12 @@ if __name__ == "__main__":
     Z = 3
     v = iv.Video(out, m.W * Z, H * Z)
     for f in range(T_END):
-        seg = tokens(f - f % 2 if os.environ.get("HOLD2") else f); img = []      # HOLD2: the picture only changes every other frame (the flicker still uses f)
+        f1 = f - f % 2 if os.environ.get("HOLD2") else f                  # HOLD2: the picture only changes every other frame (the flicker still uses f)
+        if os.environ.get("HOLDBUSY") and 270 < f < 730 and f % 2 == 1: f1 = f - 1     # HOLDBUSY: as on the C64: picture and flicker held in pairs, frames 270..729
+        seg = tokens(f1); img = []
         for y in range(H):
-            line, _ = g4.fix_line([int(seg[k, y]) for k in range(SEGS)], y, f)
-            img.append(g4.draw(line, y, f))
+            fl = f1 if os.environ.get("HOLDBUSY") else f
+            line, _ = g4.fix_line([int(seg[k, y]) for k in range(SEGS)], y, fl)
+            img.append(g4.draw(line, y, fl))
         v.add(lv.crt_look(fb.C64RGB[np.array(img)].astype(np.uint8), Z))
     v.close(); print("wrote", out)
