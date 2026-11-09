@@ -113,6 +113,7 @@ for t in range(T_END + 1):
     frac = sum(1 for key in start if t >= start[key]) / float(len(start))     # how many bars move so far
     for (i, k) in start:
         mult = 1.0 + 3.0 * boost[i, k] * frac
+        if i == 0: mult = 1.0 + 2.0 * frac           # nearest bars: 3x their base speed at the peak (all bars moving)
         if active(i, k, t):
             sp = om[i, k] * mult * (2.0 if PAIR and T_START <= t < T_SETTLE0 + SETTLE else 1.0)
             phase[i, k] += sp; phase3[i, k] += sp * 0.8
