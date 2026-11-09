@@ -101,7 +101,7 @@ for t in range(T_END + 1):
         mult = 1.0 + 3.0 * boost[i, k] * frac
         phase[i, k] += om[i, k] * mult; phase3[i, k] += om[i, k] * mult * 0.8
         a = smooth((t - start[i, k]) / RAMP) * st
-        rho = 1.0 + 0.25 * a * math.sin(phase3[i, k])
+        rho = 1.0                                       # no depth wobble: bars keep their starting thickness
         T = STR[i][1] / max(rho, 0.35)
         own[t, i, k] = cap(YC[i] + (cen[i, k] - YC[i]) * a + amp[i, k] * a * math.sin(phase[i, k]), T) if a > 1e-4 else YC[i]
         thick[t, i, k] = T if a > 1e-4 else STR[i][1]
