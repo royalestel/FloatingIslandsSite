@@ -45,8 +45,11 @@ for key in start:
     Tm = STR[key[0]][1] * 1.4
     lo, hi = CAPY + Tm / 2.0 + 1, FLOORY - Tm / 2.0 - 1
     c = rng.uniform(lo + 14, hi - 14)
-    cen[key] = c
     amp[key] = rng.uniform(0.5, 1.0) * min(c - lo, hi - c)
+    if key[0] == 0:                                   # the nearest bars: at least 100 video px (= 34 lines at 3x) up and down
+        c = rng.uniform(lo + 34, hi - 34)
+        amp[key] = rng.uniform(34, min(c - lo, hi - c))
+    cen[key] = c
     ph[key] = rng.uniform(0, 2 * math.pi)
     ph3[key] = rng.uniform(0, 2 * math.pi)
     boost[key] = rng.random() ** 2                          # a random subset speeds up the most
