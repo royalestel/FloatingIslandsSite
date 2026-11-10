@@ -105,7 +105,9 @@ def rows_for(t):
         b = bars[idx]
         z, yc = max(b[0], 0.6), b[1]
         T = max(1, min(p1.TMAX, int(round(2 * p1.F * p1.R / z))))
-        if len(b) > 3: T = gp.BT(T, gp.edge_level(b[3]), b[3], b[4])      # the stack bars have their own edge swatch (as part1.frame_list)
+        if len(b) > 3:
+            e_i = b[5] if len(b) > 5 else b[3]
+            T = gp.BT(T, gp.edge_level(e_i), e_i, b[4])                 # the stack bars have their own edge swatch (as part1.frame_list)
         y0 = int(round(yc - T / 2))
         if y0 >= H or y0 + T <= 0 or not any(gp.PROF[T][max(0, -y0):H - y0]): continue
         prof = gp.PROF[T]

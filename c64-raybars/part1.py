@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os as _os
-_os.environ.setdefault("PART1_RAMP", "1")       # part 1's blue ramp: drop swatch #2, add #22 (must be set before the ramp is built)
+# (part 1 uses part 2's 25-entry blue ramp: the PART1_RAMP swap is off)
 """PART 1: the intro film (ghost-byte swatches, no splits).
 
 Three bars slide in, circle in depth (the whole circle goes off into the distance -- no bar
@@ -132,7 +132,7 @@ def bars_all(t):
         d, yc, key = out[i][0], out[i][1], out[i][2]
         z = (1 - u) * d + u * z_t
         y = (1 - u) * yc + u * yc_t
-        new[i] = (z, y, z) + tuple(out[i][3:])
+        new[i] = (z, y, z) + tuple(out[i][3:5]) + (len(tgt) - 1 - rank,)     # the floor index (nearest = 0), as part 2 numbers its bars
     return new
 
 def frame_list(t):
@@ -141,7 +141,8 @@ def frame_list(t):
         z, yc = max(b[0], 0.6), b[1]
         T = max(1, min(TMAX, int(round(2 * F * R / z))))
         if len(b) > 3:
-            T = gp.BT(T, gp.edge_level(b[3]), b[3], b[4])                       # this bar's own edge swatch
+            e_i = b[5] if len(b) > 5 else b[3]                                  # the floor index after the move (part 2's), else the slot
+            T = gp.BT(T, gp.edge_level(e_i), e_i, b[4])                         # this bar's own edge swatch
         y0 = int(round(yc - T / 2))
         if y0 >= H or y0 + T <= 0 or not any(gp.PROF[T][max(0, -y0):H - y0]):
             continue
