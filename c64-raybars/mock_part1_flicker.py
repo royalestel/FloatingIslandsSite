@@ -77,14 +77,27 @@ def red_swatch_for(z):
     d = (z - ZMIN) / max(ZMAX - ZMIN, 1e-6)
     return int(np.clip(4 - int(d * 4), 1, 4))
 
+def red_state(t, idx, b):
+    """is bar idx red at frame t?  Red from the first flicker (red_on) until it lines up in the stack; then it flickers to blue:
+    2 blue, 2 red, 2 blue, 2 red, then blue for good.  Each red bar lines up 10 frames after the one before it."""
+    if t < p1.T_STACK:
+        if idx not in (0, 1, 2): return False
+        start = p1.T_STACK + 10 * idx
+    else:
+        m = b[3] if len(b) > 3 else -1
+        if m not in (3, 4, 5): return False
+        start = p1.T_STACK + 10 * (m - 3)
+    if t < start: return red_on(t)
+    u = t - start
+    if u < 8: return (u // 2) % 2 == 1                 # blue, red, blue, red
+    return False                                       # blue for good
+
 def rows_for(t):
     """Two layers.  blue[y] = swatch of the nearest blue bar on line y (0 = none); redcov[y] = a red bar covers line y.
     The red bars are TRANSPARENT: where a red bar overlaps a blue bar, the line shows the blue bar's swatch from the red ramp
     (same swatch number); where a red bar is alone, the flat red checkerboard; where only a blue bar is, the blue ramp."""
     bars = p1.bars_all(t)
-    if not red_on(t): chosen = set()
-    elif t < p1.T_STACK: chosen = {0, 1, 2}               # the original circling bars: every other bar of the ring
-    else: chosen = {i for i, b in enumerate(bars) if len(b) > 3 and b[3] in (3, 4, 5)}   # the same bars once they sit in the stack (slots 3, 4, 5)
+    chosen = {i for i, b in enumerate(bars) if red_state(t, i, b)}
     H = p1.H
     blue = np.zeros(H, int); bpar = np.arange(H) & 1
     redcov = np.zeros(H, bool); rpar = np.arange(H) & 1; redk = np.full(H, RED_SWATCH, int); redn = np.zeros(H, int)
