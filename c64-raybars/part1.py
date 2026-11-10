@@ -129,7 +129,17 @@ def main(path, a=0, b=None):
     v = iv.Video(path, W * Z, H * Z)
     n = T_END if b is None else b
     for f in range(a, n):
-        col = gp.film_lines(frame_list(f))
+        lst = frame_list(f)
+        col = gp.film_lines(lst)
+        # BAR-RELATIVE ROW PARITY.  A swatch's colour depends on a row parity and the frame parity.  With the screen row's parity (a) the
+        # top and bottom rows of an even-thickness bar differ, so the ramp is not mirror-symmetric, and (b) a bar moving an odd number of
+        # rows a frame cancels the frame parity, so its flicker freezes until it slows down.  Using the row's place IN the bar, counted from
+        # the nearer edge (min(i, T-1-i)), gives a mirror-symmetric ramp that flickers every frame however the bar moves.
+        rpar = np.arange(H) & 1
+        for y0_, T_ in lst:
+            T_ = int(T_)
+            for i_ in range(T_):
+                if 0 <= y0_ + i_ < H: rpar[y0_ + i_] = min(i_, T_ - 1 - i_) & 1
         g = dim(f)
         if g < 1.0:                                   # fade down the ramp (black stays black)
             u = (1.0 - g) / (1.0 - DIM[1][1])             # 0 = full bright, 1 = darkest
@@ -148,7 +158,7 @@ def main(path, a=0, b=None):
                 if k >= 16: v = max(v, k * (1 - u) + (11 + k - 16 + (1 if c else 0)) * u)
                 return max(1, int(round(v)))
             col = np.array([dimk(k, c) for k, c in zip(col, cen)])
-        img = np.array([gp.draw([c] * gp.SEGS, y, f) for y, c in enumerate(col)])
+        img = np.array([gp.draw([c] * gp.SEGS, int(rpar[y]), f) for y, c in enumerate(col)])
         v.add(lv.crt_look(fb.C64RGB[img].astype(np.uint8), Z))
     v.close()
     print("wrote", path, n - a, "frames")
