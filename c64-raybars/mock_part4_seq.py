@@ -172,5 +172,10 @@ if __name__ == "__main__":
             fl = f1 if os.environ.get("HOLDBUSY") else f
             line, _ = g4.fix_line([int(seg[k, y]) for k in range(SEGS)], y, fl)
             img.append(g4.draw(line, y, fl))
-        v.add(lv.crt_look(fb.C64RGB[np.array(img)].astype(np.uint8), Z))
+        pix = fb.C64RGB[np.array(img)].astype(np.uint8)
+        if os.environ.get("NOCRT"):                                    # plain 3x nearest-neighbour, no CRT filter
+            from PIL import Image
+            v.add(Image.fromarray(np.repeat(np.repeat(pix, Z, axis=0), Z, axis=1)))
+        else:
+            v.add(lv.crt_look(pix, Z))
     v.close(); print("wrote", out)
