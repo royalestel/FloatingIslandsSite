@@ -87,7 +87,7 @@ YP1, ZP1, HORIZON = -CAM, FLOOR_Z0, FLOOR_Y_FAR
 
 def stack(t):
     """[(size distance, centre line, key)] of the 28 stacked / rotating bars at frame t >= T_STACK."""
-    p = smooth((t - T_ROT0) / float(T_ROT1 - T_ROT0))
+    p = 0.0                                                    # no rotation: the stack stays vertical (it moves straight to part 2's floor from T_BLEND0)
     alpha = math.pi / 2 * p
     s = S0 + (S1 - S0) * p
     yp = YP0 + (YP1 - YP0) * p
@@ -108,7 +108,7 @@ def stack(t):
         out.append((d, yc, d, m, p))
     return out
 
-T_BLEND0 = T_ROT1                                 # the last 120 frames: the floor settles into part 2's starting floor
+T_BLEND0 = T_STACK                                # from the vertical stack, the bars move straight (linearly) to part 2's starting floor
 def _target_floor():
     """part 2's starting floor (ghost_preview.NEWFLOOR), top to bottom: (centre line, thickness, z)"""
     out = []
@@ -122,7 +122,7 @@ def bars_all(t):
         return [b for b in sc.bars(t)[:3]]                        # the three circling bars
     out = stack(t)
     if t < T_BLEND0: return out
-    u = smooth((t - T_BLEND0) / float(T_END - 1 - T_BLEND0))
+    u = min(1.0, max(0.0, (t - T_BLEND0) / float(T_END - 1 - T_BLEND0)))      # straight line: linear in time
     tgt = _target_floor()
     order = sorted(range(len(out)), key=lambda i: out[i][1])       # top to bottom
     new = list(out)
