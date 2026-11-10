@@ -124,7 +124,10 @@ def render(out, last, crt=False):
             elif redonly[y]: rows.append(red_row(int(rpar[y]), f))
             else:         rows.append(swatch_row("blue", int(col[y]), int(bpar[y]), f))
         img = p1.fb.C64RGB[np.array(rows)].astype(np.uint8)
-        v.add(p1.lv.crt_look(img, 3) if crt else np.repeat(np.repeat(img, 3, axis=0), 3, axis=1))      # plain 3x (no CRT effect) unless crt
+        if crt: v.add(p1.lv.crt_look(img, 3))
+        else:                                                                 # plain 3x nearest-neighbour (no CRT effect)
+            from PIL import Image
+            v.add(Image.fromarray(np.repeat(np.repeat(img, 3, axis=0), 3, axis=1)))
     v.close(); print("wrote", out, last, "frames")
 
 if __name__ == "__main__":
