@@ -6,13 +6,14 @@ import os, sys
 os.environ.setdefault("SPLITS", "6")
 import part1 as p1
 
-T0, BLINK, N_BLINK = 960, 6, 3          # 16 s; each blink 6 frames off, 6 on
+T0, N_BLINK = 960, 3                    # 16 s; three off/on blinks, one per two frames
 
 def extra_visible(t):
+    """off, on, off, on, off, on: every other frame, three times; then they stay"""
     u = t - T0
     if u < 0: return False
-    if u >= 2 * BLINK * N_BLINK: return True          # then they stay
-    return (u // BLINK) % 2 == 1                      # off, on, off, on, off, on
+    if u < 2 * N_BLINK: return u % 2 == 1
+    return True
 
 _orig = p1.bars_all
 
