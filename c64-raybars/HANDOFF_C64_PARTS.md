@@ -134,3 +134,21 @@ after each run (`pkill -x`, never `pkill -f`).
 * VICE 6567: part2w, part3c pixel exact; part4c pixel exact against the generator's shown frames (stale lines modelled:
   /tmp/part4c_shown.pkl, `SHOWN=... vice_check_4c.py`, strict); no stack drift over ~21,500 frames.
 * Cartridge (part1r + part2c + part2w + part3c + part4c): 58 of 64 16K banks (~928 KB of 1 MB).
+
+## NTSC SID pitch (branch claude/c64-raybars-ntsc-sid)
+* Alpha.sid is a PAL tune (header flags: PAL clock; note table tuned for 985248 Hz: A-4 = 439.97 Hz).  On NTSC (1022727 Hz) it played 3.8 % (65 cents) sharp.
+  Calling the player less often would only slow the tempo (pitch comes from the frequency values), so the fix is in the data: `music_ntsc_patch.py`
+  rescales the 95-note 16-bit table (hi bytes $1714.., lo bytes $177c.., read as lda $1713,y / lda $177b,y) by 985248/1022727 ->
+  `music/Alpha_ntsc.dat` (A-4 = 439.94 Hz on NTSC).  Zero run-time cost.  `part1r_music.s` includes the NTSC file; c64build.py runs the patch when
+  needed (the music files stay out of the repository).  VICE 6567 check: strong spectral peaks drop by 0.957-0.966 (expected 0.963).
+* The tune is still called 5 times in 6 frames (50 Hz tempo).  Only part 1 plays music.
+
+## SID playback in parts 2 and 3 (branch claude/c64-raybars-ntsc-sid)
+* Alpha.sid stays resident at $1000-$2A33 from part 1.  Parts 2c/2w/3c run their tables above it ($2B00+: cfg `load` at $1000 in the image, `run` at $2B00);
+  the loader (cartboot_all.s) starts at $0800 (mk_cart_all.py prefixes the image with one byte so the 256-byte chunks line up with $1000) and parts flagged
+  in bit 15 of their start address skip $1000-$2AFF (dst jumps to $2B00).  Part 4 is not flagged (its pages overwrite the tune) and silences the SID at its start.
+* `musicplay` (5 calls in 6 frames, NTSC) in each part's blank: 2w/3c in `blockend` before the update, 2c after `update` (tail call).  A call costs 280-1540 cycles
+  (mean 1000; py65 over 1500 calls): wavesched.A_BUDGET = 3600 - MUSIC_COST (run the generators with MUSIC_COST=1700).  Stale frames: 2w 24 -> 134 of 1000, 3c 42 -> 130 of 582.
+* Part 1 no longer silences the SID at its end.  Test carts: `python3 mk_cart_all.py /tmp/t2w.crt tunepart part2w` (tunepart.s loads + inits the tune, then chains);
+  `CRT=/tmp/t2w.crt python3 vice_check_2w.py ...`.  The loader gap between parts (~5 frames) pauses the tune.
+* VICE 6567: 2c, 2w, 3c pixel exact; chained audio: music plays from part 1 through part 3 (~86 s), silent in part 4, restarts with the loop.

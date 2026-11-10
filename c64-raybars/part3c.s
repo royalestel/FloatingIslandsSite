@@ -54,6 +54,7 @@ IDLE       = $3fff
 .segment "ZEROPAGE"
 fcl:     .res 1
 fch:     .res 1
+mc:      .res 1                 ; the music play-call counter
 sp:      .res 2                 ; the stream pointer (in the ROML window)
 bank:    .res 1
 nruns:   .res 1
@@ -100,6 +101,7 @@ start:  sei
         lda #0                  ; the pages hold frames N-2 and N-1; record j is the blank before frame j
         sta fcl
         sta fch
+        sta mc
         lda #<$8000
         sta sp
         lda #>$8000
@@ -391,10 +393,25 @@ rend:
         sta IDLE
         jmp blockend
 
+
+; the tune's play routine (Alpha.sid stays resident at $1000-$2A33 from part 1): 5 calls in 6 frames (NTSC: the tune was written for 50 Hz).
+; A call costs 280-1540 cycles (mean 1000); the generators leave 1700 cycles of the blank for it.
+MUSIC_PLAY = $1003
+musicplay:
+        inc mc
+        lda mc
+        cmp #6
+        bne @go
+        lda #0
+        sta mc
+        rts
+@go:    jmp MUSIC_PLAY
+
 blockend:
         lda #$0b                ; DEN low: no badlines in the next frame (the update raises it in lines 49-50, or the stable IRQ does when F = 0)
         sta VIC_CTRL1
         sei                     ; (if the second sync interrupt ever misses, the I flag is still clear here)
+        jsr musicplay
         lda #0
         sta $d01a               ; no raster IRQ source while the update runs ($01 = $37: the vector would come from ROM)
         jsr update

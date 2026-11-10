@@ -55,6 +55,7 @@ IDLE       = $3fff
 .segment "ZEROPAGE"
 fcl:     .res 1
 fch:     .res 1
+mc:      .res 1                 ; the music play-call counter
 sub:     .res 1
 op:      .res 2                 ; the next record in the packed stream
 dv:      .res 6                 ; the 6 columns' operand low bytes (C0 - shift)
@@ -122,6 +123,7 @@ restart:
         sta fcl
         sta fch
         sta hold
+        sta mc
         lda #<offs
         sta op
         lda #>offs
@@ -289,7 +291,21 @@ u_c:    lda fcl
 u_r:    rts
 .endproc
 
-blank:  jmp update          ; every blank: 60 Hz film frames on NTSC (the shake table is sampled at film time n * 5/6)
+blank:  jsr update          ; every blank: 60 Hz film frames on NTSC (the shake table is sampled at film time n * 5/6)
+        jmp musicplay       ; then the tune (a tail call: its rts returns to blockend's caller)
+
+; the tune's play routine (Alpha.sid stays resident at $1000-$2A33 from part 1): 5 calls in 6 frames (NTSC: the tune was written for 50 Hz).
+; A call costs 280-1540 cycles (mean 1000); the generators leave 1700 cycles of the blank for it.
+MUSIC_PLAY = $1003
+musicplay:
+        inc mc
+        lda mc
+        cmp #6
+        bne @go
+        lda #0
+        sta mc
+        rts
+@go:    jmp MUSIC_PLAY
 
 optab:  .repeat 16, N
         .byte (C0 + 8 - N) & 255
