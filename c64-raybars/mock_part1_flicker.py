@@ -10,6 +10,7 @@ import part1 as p1
 
 T0, N_BLINK = 960, 3
 BEAT = 1218                             # 20.3 s: the red flicker starts here (frame 1218)
+SOLID_RED = 11                          # red_ramp_saved swatch #11: flat C64 red, no checkerboard (lines where two red bars overlap)
 RED_SWATCH = 4                          # red_ramp_saved swatch #4: flat red, black checkerboard alternating by row and frame                    # 16 s; three off/on blinks, one per two frames
 
 def extra_visible(t):
@@ -86,7 +87,7 @@ def rows_for(t):
     else: chosen = {i for i, b in enumerate(bars) if len(b) > 3 and b[3] in (3, 4, 5)}   # the same bars once they sit in the stack (slots 3, 4, 5)
     H = p1.H
     blue = np.zeros(H, int); bpar = np.arange(H) & 1
-    redcov = np.zeros(H, bool); rpar = np.arange(H) & 1; redk = np.full(H, RED_SWATCH, int)
+    redcov = np.zeros(H, bool); rpar = np.arange(H) & 1; redk = np.full(H, RED_SWATCH, int); redn = np.zeros(H, int)
     for idx in sorted(range(len(bars)), key=lambda i: -bars[i][2]):       # far first
         b = bars[idx]
         z, yc = max(b[0], 0.6), b[1]
@@ -100,15 +101,15 @@ def rows_for(t):
             if not (0 <= y < H): continue
             par = min(i, int(T) - 1 - i) & 1
             if idx in chosen:
-                redcov[y] = True; rpar[y] = par; redk[y] = red_swatch_for(z)
+                redcov[y] = True; rpar[y] = par; redk[y] = red_swatch_for(z); redn[y] += 1
             elif prof[i]:
                 blue[y] = prof[i]; bpar[y] = par
-    return blue, redcov, bpar, rpar, redk
+    return blue, redcov, bpar, rpar, redk, redn
 
 def render(out, last, crt=False):
     v = p1.iv.Video(out, p1.W * 3, p1.H * 3)
     for f in range(0, last):
-        blue, redcov, bpar, rpar, redk = rows_for(f)
+        blue, redcov, bpar, rpar, redk, redn = rows_for(f)
         tint = redcov & (blue > 0)                        # a red bar over a blue bar
         redonly = redcov & (blue == 0)
         col = blue.copy()
@@ -131,7 +132,8 @@ def render(out, last, crt=False):
             col = np.array([dimk(k, c) for k, c in zip(col, cen)])
         rows = []
         for y in range(p1.H):
-            if tint[y]:   rows.append(swatch_row("red", min(int(col[y]), len(rr.RAMP_L) - 1), int(bpar[y]), f))   # the blue bar's swatch, red ramp
+            if redn[y] >= 2: rows.append(swatch_row("red", SOLID_RED, int(rpar[y]), f))   # two red bars overlap: solid red
+            elif tint[y]:   rows.append(swatch_row("red", min(int(col[y]), len(rr.RAMP_L) - 1), int(bpar[y]), f))   # the blue bar's swatch, red ramp
             elif redonly[y]: rows.append(swatch_row("red", int(redk[y]), int(rpar[y]), f))
             else:         rows.append(swatch_row("blue", int(col[y]), int(bpar[y]), f))
         img = p1.fb.C64RGB[np.array(rows)].astype(np.uint8)
