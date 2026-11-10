@@ -9,7 +9,7 @@ os.environ.setdefault("SPLITS", "6")
 import part1 as p1
 
 T0, N_BLINK = 960, 3
-BEAT = 1228                             # 20.467 s: 30 frames after the red change was first set one second after the beat (1198)
+BEAT = 1218                             # 20.3 s: the red flicker starts here (frame 1218)
 RED_SWATCH = 4                          # red_ramp_saved swatch #4: flat red, black checkerboard alternating by row and frame                    # 16 s; three off/on blinks, one per two frames
 
 def extra_visible(t):
