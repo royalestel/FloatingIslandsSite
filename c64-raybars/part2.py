@@ -185,7 +185,7 @@ def wave_tokens(A, tw):
     return out
 
 # ---- the start ------------------------------------------------------------------------
-SHAKE = 1064
+SHAKE = 860                                    # the earthquake ends at 800; 1 s (60 frames) later the waves start
 
 # An earthquake: each position is a sum of sines at four unrelated frequencies
 # (periods about 14, 7, 5 and 3 frames), each column with its own phases, under a slow
@@ -220,7 +220,7 @@ def shake_offsets(t):
        260-380   pause (2 s)
        380-800   the split columns, each shaking on its own, from small, getting bigger
                  to a peak of about 6 lines, and dying away
-       800-1064  pause (about 4 s), then the waves."""
+       800-860   pause (1 s), then the waves."""
     if t < 40:
         return quake(t, 0, 1.5 * math.sin(math.pi * t / 40)), [0] * SEGS
     if t < 160:
