@@ -108,10 +108,31 @@ def stack(t):
         out.append((d, yc, d, m, p))
     return out
 
+T_BLEND0 = T_ROT1                                 # the last 120 frames: the floor settles into part 2's starting floor
+def _target_floor():
+    """part 2's starting floor (ghost_preview.NEWFLOOR), top to bottom: (centre line, thickness, z)"""
+    out = []
+    for y0, T in gp.NEWFLOOR:
+        yc = y0 + T / 2.0
+        out.append((yc, T, 2 * F * R / T))
+    return sorted(out, key=lambda x: x[0])
+
 def bars_all(t):
     if t < T_STACK:
         return [b for b in sc.bars(t)[:3]]                        # the three circling bars
-    return stack(t)
+    out = stack(t)
+    if t < T_BLEND0: return out
+    u = smooth((t - T_BLEND0) / float(T_END - 1 - T_BLEND0))
+    tgt = _target_floor()
+    order = sorted(range(len(out)), key=lambda i: out[i][1])       # top to bottom
+    new = list(out)
+    for rank, i in enumerate(order):
+        yc_t, T_t, z_t = tgt[rank]
+        d, yc, key = out[i][0], out[i][1], out[i][2]
+        z = (1 - u) * d + u * z_t
+        y = (1 - u) * yc + u * yc_t
+        new[i] = (z, y, z) + tuple(out[i][3:])
+    return new
 
 def frame_list(t):
     out = []
