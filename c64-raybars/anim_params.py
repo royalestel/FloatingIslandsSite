@@ -19,14 +19,14 @@ P = dict(
     GAP       = 3,                # black lines between bars in the stack
     T_B0      = 500,              # sliding at one distance ...
     T_B1      = 620,              # ... has become the circle
-    T_C0      = 1210,             # circle ... (settling starts at 1380 = 23 s after the EXTRA offset)
-    T_C1      = 1230,             # ... has settled into the top three slots of the stack
+    T_C0      = 1390,             # circle ... (settling starts at 1560 = 26 s after the EXTRA offset)
+    T_C1      = 1410,             # ... has settled into the top three slots of the stack (at 1580)
     # -- three more bars slide up from the bottom
     T_NEW     = [1230, 1290, 1350],
     NEW_LEN   = 70,
     # -- the stack tilts into the distance and becomes a floor
-    T_TILT0   = 1450,
-    T_TILT1   = 1610,
+    T_TILT0   = 1630,
+    T_TILT1   = 1790,
     X_START   = 20,               # the other strings start this long after the tilt starts
     X_STAG    = 3,                # ... each this much later than the nearer one
     X_LEN     = 60,               # ... and slide in from the top in this many frames
