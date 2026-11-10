@@ -7,7 +7,7 @@ it (number, name, L* by linear light).
 
     python3 swatch_ramp_video.py out.mp4
 """
-import sys
+import os, sys
 import numpy as np
 from PIL import Image, ImageDraw
 import flyby3d as fb
@@ -65,9 +65,10 @@ def ladder():
     lad = reorder(lad)
     lad = [k for i, k in enumerate(lad) if i + 1 not in DROP]
     lad = [k for i, k in enumerate(lad) if i + 1 not in DROP2]
-    lad = [k for k in lad if k not in DROP_PAL]          # by swatch-table number: drop #2 ...
-    if ADD_PAL in lad: lad.remove(ADD_PAL)              # ... add #22 between #21 and #23 (directly before #23)
-    lad.insert(lad.index(23) if 23 in lad else len(lad), ADD_PAL)
+    if os.environ.get("PART1_RAMP") == "1":              # part 1 only: drop #2, add #22 (part 2 keeps the 25-entry ramp)
+        lad = [k for k in lad if k not in DROP_PAL]
+        if ADD_PAL in lad: lad.remove(ADD_PAL)
+        lad.insert(lad.index(23) if 23 in lad else len(lad), ADD_PAL)   # directly before #23
     SHIFT.update(lad[i - 1] for i in SHIFT_N)
     return lad, lums
 

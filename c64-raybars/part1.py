@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import os as _os
+_os.environ.setdefault("PART1_RAMP", "1")       # part 1's blue ramp: drop swatch #2, add #22 (must be set before the ramp is built)
 """PART 1: the intro film (ghost-byte swatches, no splits).
 
 Three bars slide in, circle in depth (the whole circle goes off into the distance -- no bar
