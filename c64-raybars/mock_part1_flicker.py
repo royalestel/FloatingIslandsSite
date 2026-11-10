@@ -121,9 +121,9 @@ def rows_for(t):
                 blue[y] = prof[i]; bpar[y] = par
     return blue, redcov, bpar, rpar, redk, redn
 
-def render(out, last, crt=False):
+def render(out, last, crt=False, start=0):
     v = p1.iv.Video(out, p1.W * 3, p1.H * 3)
-    for f in range(0, last):
+    for f in range(start, last):
         blue, redcov, bpar, rpar, redk, redn = rows_for(f)
         tint = redcov & (blue > 0)                        # a red bar over a blue bar
         redonly = redcov & (blue == 0)
@@ -161,4 +161,4 @@ def render(out, last, crt=False):
 if __name__ == "__main__":
     out = sys.argv[1]
     last = int(sys.argv[2]) if len(sys.argv) > 2 else 1240
-    render(out, last, crt=bool(os.environ.get("CRT")))
+    render(out, last, crt=bool(os.environ.get("CRT")), start=int(os.environ.get("START", "0")))
