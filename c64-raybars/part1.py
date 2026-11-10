@@ -109,7 +109,7 @@ def stack(t):
     return out
 
 T_BLEND0 = T_STACK                                # from the vertical stack, the bars move straight (linearly) to part 2's starting floor
-BLEND_LEN = 60                                    # frames for that move (1 s)
+BLEND_LEN = 90                                    # frames for that move (1.5 s)
 def _target_floor():
     """part 2's starting floor (ghost_preview.NEWFLOOR), top to bottom: (centre line, thickness, z)"""
     out = []

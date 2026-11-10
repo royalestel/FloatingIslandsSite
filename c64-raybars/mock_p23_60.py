@@ -21,10 +21,13 @@ def look(img):                                   # CRT filter unless NOCRT=1 (pl
 f = 0; n = 0
 seq = p2.make_seq()
 for n_i, (A, segs, wave) in enumerate(seq):                       # part 2's waves (the earthquake skipped: a short lead-in)
-    pre = 20 if n_i == 0 else 0                     # no pauses between the waves (f2b and b2f run straight on)
+    pre = p2.SHAKE if n_i == 0 else 0               # the earthquake first (part 2's own shake), then no pauses between the waves
     post = 0 if n_i < len(seq) - 1 else 60
     for t in range(pre + wave + post):
         seg = segs(t - pre); img = []
+        if n_i == 0 and t < pre:                    # the earthquake: the same whole-floor and column shifts as part2.main
+            dy, dk = p2.shake_offsets(t)
+            seg = np.stack([p2.shift_rows(seg[k:k + 1], dy + dk[k])[0] for k in range(p2.SEGS)])
         for y in range(p2.H):
             toks = [int(seg[k, y]) for k in range(p2.SEGS)]
             line, _ = p2.fix_line(toks, y, f)
