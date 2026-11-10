@@ -109,6 +109,7 @@ def stack(t):
     return out
 
 T_BLEND0 = T_STACK                                # from the vertical stack, the bars move straight (linearly) to part 2's starting floor
+BLEND_LEN = 60                                    # frames for that move (1 s)
 def _target_floor():
     """part 2's starting floor (ghost_preview.NEWFLOOR), top to bottom: (centre line, thickness, z)"""
     out = []
@@ -122,7 +123,7 @@ def bars_all(t):
         return [b for b in sc.bars(t)[:3]]                        # the three circling bars
     out = stack(t)
     if t < T_BLEND0: return out
-    u = min(1.0, max(0.0, (t - T_BLEND0) / float(T_END - 1 - T_BLEND0)))      # straight line: linear in time
+    u = min(1.0, max(0.0, (t - T_BLEND0) / float(BLEND_LEN)))                 # straight line, linear in time; done after BLEND_LEN frames, then held
     tgt = _target_floor()
     order = sorted(range(len(out)), key=lambda i: out[i][1])       # top to bottom
     new = list(out)
