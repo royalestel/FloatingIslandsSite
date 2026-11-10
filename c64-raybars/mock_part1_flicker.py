@@ -9,14 +9,14 @@ os.environ.setdefault("SPLITS", "6")
 import part1 as p1
 
 T0, N_BLINK = 960, 3
-BEAT = 1198                             # 19.975 s: one second after the loud beat (18.975 s); the red bars start here
+BEAT = 1228                             # 20.467 s: 30 frames after the red change was first set one second after the beat (1198)
 RED_SWATCH = 4                          # red_ramp_saved swatch #4: flat red, black checkerboard alternating by row and frame                    # 16 s; three off/on blinks, one per two frames
 
 def extra_visible(t):
     """off, on, off, on, off, on: every other frame, three times; then they stay"""
     u = t - T0
     if u < 0: return False
-    if u < 2 * N_BLINK: return u % 2 == 1
+    if u < 8: return (u // 2) % 2 == 0               # on 2, off 2, on 2, off 2
     return True
 
 _orig = p1.bars_all
