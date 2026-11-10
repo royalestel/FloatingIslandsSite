@@ -43,15 +43,20 @@ p1.bars_all = bars_all
 import numpy as np
 import red_ramp_saved as rr
 import ghost_preview as gp
-gpm = p1.gp
 
-def red_row(par, f):
-    row = np.full(gp.W, rr.colour(RED_SWATCH, par, f), int)
-    g = rr.ghost(RED_SWATCH, par, f)
+def swatch_row(ramp, k, par, f):
+    """320 colours of a row drawn with swatch k of the blue ramp (gp) or the red ramp (rr; part 2's)"""
+    if ramp == "blue":
+        return gp.draw([k] * gp.SEGS, par, f)
+    row = np.full(gp.W, rr.colour(k, par, f), int)
+    g = rr.ghost(k, par, f)
     if g:
         x = np.arange(gp.W)
         row[((g >> (7 - x % 8)) & 1) == 1] = 0
     return row
+
+def red_row(par, f):
+    return swatch_row("red", RED_SWATCH, par, f)
 
 def red_on(t):
     """red 2 frames, blue ramp 2, red 2, blue ramp 2, then red for good"""
@@ -61,32 +66,43 @@ def red_on(t):
     return True
 
 def rows_for(t):
-    """tokens per row, which rows are red, each row's bar-relative parity"""
+    """Two layers.  blue[y] = swatch of the nearest blue bar on line y (0 = none); redcov[y] = a red bar covers line y.
+    The red bars are TRANSPARENT: where a red bar overlaps a blue bar, the line shows the blue bar's swatch from the red ramp
+    (same swatch number); where a red bar is alone, the flat red checkerboard; where only a blue bar is, the blue ramp."""
     bars = p1.bars_all(t)
-    n_orig = 3
-    chosen = {0, 1, 2} if red_on(t) else set()            # the original circling bars: every other bar of the ring
-    col = np.zeros(p1.H, int); red = np.zeros(p1.H, bool); rpar = np.arange(p1.H) & 1
+    if not red_on(t): chosen = set()
+    elif t < p1.T_STACK: chosen = {0, 1, 2}               # the original circling bars: every other bar of the ring
+    else: chosen = {i for i, b in enumerate(bars) if len(b) > 3 and b[3] in (3, 4, 5)}   # the same bars once they sit in the stack (slots 3, 4, 5)
+    H = p1.H
+    blue = np.zeros(H, int); bpar = np.arange(H) & 1
+    redcov = np.zeros(H, bool); rpar = np.arange(H) & 1
     for idx in sorted(range(len(bars)), key=lambda i: -bars[i][2]):       # far first
         b = bars[idx]
         z, yc = max(b[0], 0.6), b[1]
         T = max(1, min(p1.TMAX, int(round(2 * p1.F * p1.R / z))))
+        if len(b) > 3: T = gp.BT(T, gp.edge_level(b[3]), b[3], b[4])      # the stack bars have their own edge swatch (as part1.frame_list)
         y0 = int(round(yc - T / 2))
-        if y0 >= p1.H or y0 + T <= 0 or not any(gp.PROF[T][max(0, -y0):p1.H - y0]): continue
+        if y0 >= H or y0 + T <= 0 or not any(gp.PROF[T][max(0, -y0):H - y0]): continue
         prof = gp.PROF[T]
-        for i in range(T):
+        for i in range(int(T)):
             y = y0 + i
-            if 0 <= y < p1.H and (prof[i] or idx in chosen):
-                col[y] = prof[i] or 1
-                red[y] = idx in chosen
-                rpar[y] = min(i, T - 1 - i) & 1
-    return col, red, rpar
+            if not (0 <= y < H): continue
+            par = min(i, int(T) - 1 - i) & 1
+            if idx in chosen:
+                redcov[y] = True; rpar[y] = par
+            elif prof[i]:
+                blue[y] = prof[i]; bpar[y] = par
+    return blue, redcov, bpar, rpar
 
-def render(out, last):
+def render(out, last, crt=False):
     v = p1.iv.Video(out, p1.W * 3, p1.H * 3)
     for f in range(0, last):
-        col, red, rpar = rows_for(f)
+        blue, redcov, bpar, rpar = rows_for(f)
+        tint = redcov & (blue > 0)                        # a red bar over a blue bar
+        redonly = redcov & (blue == 0)
+        col = blue.copy()
         g = p1.dim(f)
-        if g < 1.0:                                   # the dimming of part 1 (copied from part1.main); red rows are not dimmed
+        if g < 1.0:                                       # the dimming of part 1 (copied from part1.main), on the blue layer
             u = (1.0 - g) / (1.0 - p1.DIM[1][1])
             cen = np.zeros(len(col), bool); y = 0
             while y < len(col):
@@ -102,11 +118,16 @@ def render(out, last):
                 if k >= 16: v_ = max(v_, k * (1 - u) + (11 + k - 16 + (1 if c else 0)) * u)
                 return max(1, int(round(v_)))
             col = np.array([dimk(k, c) for k, c in zip(col, cen)])
-        img = np.array([red_row(int(rpar[y]), f) if red[y] else gp.draw([c] * gp.SEGS, int(rpar[y]), f) for y, c in enumerate(col)])
-        v.add(p1.lv.crt_look(p1.fb.C64RGB[img].astype(np.uint8), 3))
+        rows = []
+        for y in range(p1.H):
+            if tint[y]:   rows.append(swatch_row("red", min(int(col[y]), len(rr.RAMP_L) - 1), int(bpar[y]), f))   # the blue bar's swatch, red ramp
+            elif redonly[y]: rows.append(red_row(int(rpar[y]), f))
+            else:         rows.append(swatch_row("blue", int(col[y]), int(bpar[y]), f))
+        img = p1.fb.C64RGB[np.array(rows)].astype(np.uint8)
+        v.add(p1.lv.crt_look(img, 3) if crt else np.repeat(np.repeat(img, 3, axis=0), 3, axis=1))      # plain 3x (no CRT effect) unless crt
     v.close(); print("wrote", out, last, "frames")
 
 if __name__ == "__main__":
     out = sys.argv[1]
     last = int(sys.argv[2]) if len(sys.argv) > 2 else 1240
-    render(out, last)
+    render(out, last, crt=bool(os.environ.get("CRT")))
