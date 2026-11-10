@@ -85,7 +85,7 @@ PROF25 = gp.ProfDict({T: [P25 + j for j in gp.standard_profile(T, 23)] for T in 
 
 # PART 1 COLOURS: the palette25 entries are mapped onto part 1's own ramp (ghost_part2 tokens 1..RED-1, the same colours part 1
 # draws) by lightness, so the floor reads the same at the part 1 -> part 2 join
-MAP25 = [0] + [min(range(1, 25), key=lambda t: abs(gp2.light(t) - float(L25[j]))) for j in range(1, N25)]     # part 1's ramp: tokens 1..24
+MAP25 = [0] + [min(range(1, len(gp2.gp.RAMP_L)), key=lambda t: abs(gp2.light(t) - float(L25[j]))) for j in range(1, N25)]     # part 1's ramp (its length follows the swatch table)     # part 1's ramp: tokens 1..24
 
 def colour(tok, y, f):
     if tok >= P25:
