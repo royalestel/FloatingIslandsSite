@@ -13,6 +13,11 @@ for A in list(gp2.ANIMS) + [gp3.ANIM4]:
 p2.W5["amp"] = min(p2.W5["amp"], CAP); p2.W6["amp"] = min(p2.W6["amp"], CAP)
 p3.AMP = min(p3.AMP, CAP); p3.LIFT = 15
 v = iv.Video(OUT, 960, 600, fps=60)
+def look(img):                                   # CRT filter unless NOCRT=1 (plain 3x nearest-neighbour, as part 1's no-CRT mock)
+    if os.environ.get("NOCRT"):
+        from PIL import Image
+        return Image.fromarray(np.repeat(np.repeat(img, 3, axis=0), 3, axis=1))
+    return lv.crt_look(img, 3)
 f = 0; n = 0
 seq = p2.make_seq()
 for n_i, (A, segs, wave) in enumerate(seq):                       # part 2's waves (the earthquake skipped: a short lead-in)
@@ -24,7 +29,7 @@ for n_i, (A, segs, wave) in enumerate(seq):                       # part 2's wav
             toks = [int(seg[k, y]) for k in range(p2.SEGS)]
             line, _ = p2.fix_line(toks, y, f)
             img.append(p2.draw(line, y, f))
-        v.add(lv.crt_look(fb.C64RGB[np.array(img)].astype(np.uint8), 3)); f += 1
+        v.add(look(fb.C64RGB[np.array(img)].astype(np.uint8))); f += 1
 wave = (p3.NS - 1) * p3.STAG + p3.TILT
 for name, cols, static, pre, length, post in [("3c", p3.SPEC_3C, p3.START, 30, wave, 20), ("3d", p3.SPEC_3D, p3.STATE_3C, 0, wave, 20),
                                               ("3e", p3.COLS_3E, p3.STATE_3D, 0, wave, 90)]:
@@ -34,5 +39,5 @@ for name, cols, static, pre, length, post in [("3c", p3.SPEC_3C, p3.START, 30, w
             toks = [int(seg[k, y]) for k in range(p3.SEGS)]
             line, _ = p3.g4.fix_line(toks, y, f)
             img.append(p3.g4.draw(line, y, f))
-        v.add(lv.crt_look(fb.C64RGB[np.array(img)].astype(np.uint8), 3)); f += 1
+        v.add(look(fb.C64RGB[np.array(img)].astype(np.uint8))); f += 1
 v.close(); print("wrote", OUT, f, "frames")
