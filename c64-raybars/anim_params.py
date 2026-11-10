@@ -19,7 +19,7 @@ P = dict(
     GAP       = 3,                # black lines between bars in the stack
     T_B0      = 500,              # sliding at one distance ...
     T_B1      = 620,              # ... has become the circle
-    T_C0      = 1100,             # circle ...
+    T_C0      = 1210,             # circle ... (settling starts at 1380 = 23 s after the EXTRA offset)
     T_C1      = 1230,             # ... has settled into the top three slots of the stack
     # -- three more bars slide up from the bottom
     T_NEW     = [1230, 1290, 1350],
