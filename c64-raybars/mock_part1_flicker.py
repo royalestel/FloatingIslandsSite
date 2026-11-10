@@ -65,6 +65,17 @@ def red_on(t):
     if u < 8: return (u // 2) % 2 == 0
     return True
 
+def _depth_range():
+    """nearest and farthest depth (z) the circling bars reach in the part where they are red"""
+    zs = [b[0] for t in range(BEAT, 1800, 4) for b in p1.sc.bars(t)[:3]]
+    return min(zs), max(zs)
+ZMIN, ZMAX = _depth_range()
+
+def red_swatch_for(z):
+    """red ramp swatch by depth: nearest = #4, then #3, #2, farthest = #1 (receding steps 4->3->2->1, returning 1->2->3->4)"""
+    d = (z - ZMIN) / max(ZMAX - ZMIN, 1e-6)
+    return int(np.clip(4 - int(d * 4), 1, 4))
+
 def rows_for(t):
     """Two layers.  blue[y] = swatch of the nearest blue bar on line y (0 = none); redcov[y] = a red bar covers line y.
     The red bars are TRANSPARENT: where a red bar overlaps a blue bar, the line shows the blue bar's swatch from the red ramp
@@ -75,7 +86,7 @@ def rows_for(t):
     else: chosen = {i for i, b in enumerate(bars) if len(b) > 3 and b[3] in (3, 4, 5)}   # the same bars once they sit in the stack (slots 3, 4, 5)
     H = p1.H
     blue = np.zeros(H, int); bpar = np.arange(H) & 1
-    redcov = np.zeros(H, bool); rpar = np.arange(H) & 1
+    redcov = np.zeros(H, bool); rpar = np.arange(H) & 1; redk = np.full(H, RED_SWATCH, int)
     for idx in sorted(range(len(bars)), key=lambda i: -bars[i][2]):       # far first
         b = bars[idx]
         z, yc = max(b[0], 0.6), b[1]
@@ -89,15 +100,15 @@ def rows_for(t):
             if not (0 <= y < H): continue
             par = min(i, int(T) - 1 - i) & 1
             if idx in chosen:
-                redcov[y] = True; rpar[y] = par
+                redcov[y] = True; rpar[y] = par; redk[y] = red_swatch_for(z)
             elif prof[i]:
                 blue[y] = prof[i]; bpar[y] = par
-    return blue, redcov, bpar, rpar
+    return blue, redcov, bpar, rpar, redk
 
 def render(out, last, crt=False):
     v = p1.iv.Video(out, p1.W * 3, p1.H * 3)
     for f in range(0, last):
-        blue, redcov, bpar, rpar = rows_for(f)
+        blue, redcov, bpar, rpar, redk = rows_for(f)
         tint = redcov & (blue > 0)                        # a red bar over a blue bar
         redonly = redcov & (blue == 0)
         col = blue.copy()
@@ -121,7 +132,7 @@ def render(out, last, crt=False):
         rows = []
         for y in range(p1.H):
             if tint[y]:   rows.append(swatch_row("red", min(int(col[y]), len(rr.RAMP_L) - 1), int(bpar[y]), f))   # the blue bar's swatch, red ramp
-            elif redonly[y]: rows.append(red_row(int(rpar[y]), f))
+            elif redonly[y]: rows.append(swatch_row("red", int(redk[y]), int(rpar[y]), f))
             else:         rows.append(swatch_row("blue", int(col[y]), int(bpar[y]), f))
         img = p1.fb.C64RGB[np.array(rows)].astype(np.uint8)
         if crt: v.add(p1.lv.crt_look(img, 3))
