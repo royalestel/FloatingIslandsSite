@@ -132,7 +132,7 @@ def bars_all(t):
         d, yc, key = out[i][0], out[i][1], out[i][2]
         z = (1 - u) * d + u * z_t
         y = (1 - u) * yc + u * yc_t
-        new[i] = (z, y, z) + tuple(out[i][3:5]) + (len(tgt) - 1 - rank,)     # the floor index (nearest = 0), as part 2 numbers its bars
+        new[i] = (z, y, z) + (out[i][3], (1-u)*out[i][4] + u*1.0, len(tgt) - 1 - rank,)     # the floor index (nearest = 0), as part 2 numbers its bars
     return new
 
 def frame_list(t):
@@ -164,7 +164,7 @@ def main(path, a=0, b=None):
         for y0_, T_ in lst:
             T_ = int(T_)
             for i_ in range(T_):
-                if 0 <= y0_ + i_ < H: rpar[y0_ + i_] = min(i_, T_ - 1 - i_) & 1
+                if 0 <= y0_ + i_ < H: rpar[y0_ + i_] = (y0_ + i_) & 1 if f >= T_BLEND0 + BLEND_LEN else min(i_, T_ - 1 - i_) & 1
         g = dim(f)
         if g < 1.0:                                   # fade down the ramp (black stays black)
             u = (1.0 - g) / (1.0 - DIM[1][1])             # 0 = full bright, 1 = darkest

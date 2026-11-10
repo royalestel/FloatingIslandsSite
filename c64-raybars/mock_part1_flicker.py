@@ -114,7 +114,7 @@ def rows_for(t):
         for i in range(int(T)):
             y = y0 + i
             if not (0 <= y < H): continue
-            par = min(i, int(T) - 1 - i) & 1
+            par = y & 1 if t >= p1.T_BLEND0 + p1.BLEND_LEN else min(i, int(T) - 1 - i) & 1
             if idx in chosen:
                 redcov[y] = True; rpar[y] = par; redk[y] = red_swatch_for(z); redn[y] += 1
             elif prof[i]:
