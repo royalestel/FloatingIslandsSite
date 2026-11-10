@@ -220,9 +220,7 @@ def shake_offsets(t):
        260-380   pause (2 s)
        380-800   the split columns, each shaking on its own, from small, getting bigger
                  to a peak of about 6 lines, and dying away
-       800-920   a longer pause (2 s)
-       920-944   a short tiny shake (1 line)
-       944-1064  pause (2 s), then the waves."""
+       800-1064  pause (about 4 s), then the waves."""
     if t < 40:
         return quake(t, 0, 1.5 * math.sin(math.pi * t / 40)), [0] * SEGS
     if t < 160:
@@ -235,10 +233,6 @@ def shake_offsets(t):
         u = t - 380
         env = interp(u, SPLIT_KEYS)
         return 0, [quake(u, k + 1, env) for k in range(SEGS)]
-    if t < 920:
-        return 0, [0] * SEGS
-    if t < 944:
-        return quake(t, 0, 1.2 * math.sin(math.pi * (t - 920) / 24)), [0] * SEGS
     return 0, [0] * SEGS
 
 def shift_rows(a, o):
