@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """MOCK (python only): part 1a-1b with three extra bars that appear at 16 s (frame 960, where the music gets loud).
 They sit between the three circling bars (midpoints of each pair) and blink on/off three times (6 frames each) before they stay.
-At the loud beat at 18.975 s (frame 1138) every other bar of the circle (the three original ones, ring positions 0, 2, 4) turns into the
+From one second after the loud beat (frame 1198) every other bar of the circle (the three original ones, ring positions 0, 2, 4) turns into the
 flat dark red checkerboard swatch (red ramp swatch #4: C64 red, a black checkerboard that alternates by row and by frame) on EVERY row.
     python3 mock_part1_flicker.py out.mp4 [last_frame]"""
 import os, sys
@@ -9,7 +9,7 @@ os.environ.setdefault("SPLITS", "6")
 import part1 as p1
 
 T0, N_BLINK = 960, 3
-BEAT = 1138                             # 18.975 s: the loud beat; the red bars start here
+BEAT = 1198                             # 19.975 s: one second after the loud beat (18.975 s); the red bars start here
 RED_SWATCH = 4                          # red_ramp_saved swatch #4: flat red, black checkerboard alternating by row and frame                    # 16 s; three off/on blinks, one per two frames
 
 def extra_visible(t):
@@ -53,11 +53,18 @@ def red_row(par, f):
         row[((g >> (7 - x % 8)) & 1) == 1] = 0
     return row
 
+def red_on(t):
+    """red 2 frames, blue ramp 2, red 2, blue ramp 2, then red for good"""
+    u = t - BEAT
+    if u < 0: return False
+    if u < 8: return (u // 2) % 2 == 0
+    return True
+
 def rows_for(t):
     """tokens per row, which rows are red, each row's bar-relative parity"""
     bars = p1.bars_all(t)
     n_orig = 3
-    chosen = {0, 1, 2} if t >= BEAT else set()            # the original circling bars: every other bar of the ring
+    chosen = {0, 1, 2} if red_on(t) else set()            # the original circling bars: every other bar of the ring
     col = np.zeros(p1.H, int); red = np.zeros(p1.H, bool); rpar = np.arange(p1.H) & 1
     for idx in sorted(range(len(bars)), key=lambda i: -bars[i][2]):       # far first
         b = bars[idx]
