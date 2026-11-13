@@ -18,13 +18,14 @@ import preview_v10 as v10
 
 PLAT = os.environ.get("PLATFORM", "NTSC")
 NTSC = PLAT == "NTSC"
-RATE = 5 / 6 if NTSC else 1.0
+RATE = 1.0                                        # one film frame per displayed frame on both systems (NTSC: the 60 fps mock-up's timing, the one the music was timed to)
+OLDMOTION = bool(os.environ.get("OLDMOTION"))      # the earlier 1c/1d motion of this file; default: part1.py's own model (stack, pause, straight move to part 2's floor)
 H, PAD, LBW = 200, 63, 0x0500
 BUDGET = 3800 if NTSC else 6500
 PLAYCOST = 1650                  # cycles of the tune's play routine (max 1577) + the call: taken off the blank's budget when it is called
 plays = (lambda n: n != 0 and n % 6 != 0) if NTSC else (lambda n: n != 0)
-T_SPLIT = 1240                                   # film time where the routines end and the delta stream starts
-NN = int((p1.T_END - 1) / RATE) + 1
+T_SPLIT = 1240 if OLDMOTION else p1.T_STACK      # film time where the routines end (at most 3 bars until then) and the delta stream starts
+NN = int(((p1.T_END if OLDMOTION else p1.T_JOIN) - 1) / RATE) + 1
 NR = int(math.ceil(T_SPLIT / RATE))
 tau = lambda n: n * RATE
 
@@ -35,7 +36,7 @@ tau = lambda n: n * RATE
 #   * from SPREAD0 of the rotation on, every bar moves in a STRAIGHT LINE (centre line and thickness, linear in time) to its place on the
 #     final floor (1 blank line between bars).
 NEWB0, SHIFT, SPREAD0 = 1345, 6, 0.25
-p1.T_NEWB = [NEWB0, NEWB0 + 20, NEWB0 + 40]
+if OLDMOTION: p1.T_NEWB = [NEWB0, NEWB0 + 20, NEWB0 + 40]
 
 def rot_lin(t):
     return min(max((t - p1.T_ROT0) / float(p1.T_ROT1 - p1.T_ROT0), 0.0), 1.0)
@@ -63,7 +64,7 @@ def my_stack(t):
             yc -= 600 * (1 - p1.smooth((t - p1.T_TOPB) / (p1.NEW_LEN + 10)))
         out.append((d, yc, d, m, p))
     return out
-p1.stack = my_stack
+if OLDMOTION: p1.stack = my_stack
 
 _orig_bars_all = p1.bars_all
 def my_bars_all(t):
@@ -75,7 +76,7 @@ def my_bars_all(t):
         bars = my_stack(t)
         k = 1.0 - rot_p(t)
     return [(b[0], b[1] - SHIFT * k) + tuple(b[2:]) for b in bars]                  # (every bar moves up together)
-p1.bars_all = my_bars_all
+if OLDMOTION: p1.bars_all = my_bars_all
 
 def floor_state():
     """the final floor, nearest first: (centre line, base thickness); 1 blank line between the bars."""
@@ -154,7 +155,7 @@ def sticky_frame_list(t):
         out.append((b["y0"], b["T"])); kinds.append("full" if b["circ"] and t < p1.T_STACK else "prof")   # the circling bars keep the procedural shape until the stack
     _state["memo"][t] = out; _state["kinds"][t] = kinds
     return out
-p1.frame_list = sticky_frame_list
+if OLDMOTION: p1.frame_list = sticky_frame_list
 
 # ---- dim maps: buffer value b = level | centre<<5 | parity<<6  ->  swatch index (level' | parity<<5) --------------
 def dimmap(di):

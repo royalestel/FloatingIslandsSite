@@ -4,12 +4,12 @@ import os, pickle, math
 os.environ["SPLITS"] = "6"
 import numpy as np
 import part2 as p2, ghost_part4 as g4
-RATE = 5 / 6 if os.environ.get("PLATFORM", "NTSC") == "NTSC" else 1.0      # NTSC: frame n shows film frame round(n * 5/6)
+RATE = 1.0                                                                 # one film frame per displayed frame (the 60 fps mock-up's timing)
 segs_all, f = [], 0
 seq = p2.make_seq()
 for n_i, (A, segs, wave) in enumerate(seq):
-    pre = p2.SHAKE if n_i == 0 else 10
-    post = 10 if n_i < len(seq) - 1 else 60
+    pre = p2.SHAKE if n_i == 0 else 0                 # no pauses between the waves (as mock_p23_60.py)
+    post = 0 if n_i < len(seq) - 1 else 60
     for t in range(pre + wave + post):
         if n_i == 0 and t < p2.SHAKE:
             f += 1; continue

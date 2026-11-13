@@ -12,7 +12,7 @@ import part3 as p3, ghost_part4 as g4
 seq = [("3c", p3.SPEC_3C, p3.START, 30, (p3.NS - 1) * p3.STAG + p3.TILT, 20),
        ("3d", p3.SPEC_3D, p3.STATE_3C, 0, (p3.NS - 1) * p3.STAG + p3.TILT, 20),
        ("3e", p3.COLS_3E, p3.STATE_3D, 0, (p3.NS - 1) * p3.STAG + p3.TILT, 90)]
-RATE = 5 / 6                                                 # NTSC: frame n shows film frame round(n * 5/6)
+RATE = 1.0                                                   # one film frame per displayed frame (the 60 fps mock-up's timing)
 segs_all = []
 for name, cols, static, pre, L, post in seq:
     for t in range(pre + L + post):

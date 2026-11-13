@@ -23,7 +23,7 @@ gp = q2.gp
 H = 200
 C0 = 28                       # line 0 of a pattern at page offset C0: shifts -28..+28 never cross the page
 PLAT = os.environ.get("PLATFORM", "NTSC")
-RATE = 5 / 6 if PLAT == "NTSC" else 1.0           # NTSC: frame n shows film time n * 5/6 (60 Hz, the film keeps its length); PAL: 1:1
+RATE = 1.0                                        # one film frame per displayed frame (NTSC 60 Hz: the 60 fps mock-up's timing, the one the music was timed to)
 NF = int(math.ceil(q2.SHAKE / RATE))              # PAL 1064 / NTSC 1277 frames: the shakes, then the still floor for the waves
 
 def floor_lines():

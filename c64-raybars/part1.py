@@ -110,6 +110,7 @@ def stack(t):
 
 T_BLEND0 = T_STACK + 60                           # 1 s (60 frames) pause once the bars line up vertically, then they move straight (linearly) to part 2's starting floor
 BLEND_LEN = 90                                    # frames for that move (1.5 s)
+T_JOIN = T_BLEND0 + BLEND_LEN + 120               # part 1 ends here (the floor held for 2 s); part 2's earthquake follows
 def _target_floor():
     """part 2's starting floor (ghost_preview.NEWFLOOR), top to bottom: (centre line, thickness, z)"""
     out = []
