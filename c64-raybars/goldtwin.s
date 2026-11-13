@@ -38,7 +38,8 @@
 
         .setcpu "6502"
 
-ROWS      = 33          ; bar A display rows: 24 lines + 8 lines of slant + 1
+ROWS      = 57          ; bar A display rows: up to 48 lines (it swells in the fly-out) + 8 lines of slant + 1
+NROWS     = 33          ; bar A rows run normally (24 lines + 8 lines of slant + 1); the fly-out runs all ROWS
 ROWSB     = 56          ; bar B display rows: 48 lines + 8 lines of slant
 SEGS      = 5           ; horizontal segments per row
 SEGSIZE   = 8           ; bytes per segment: lda #c (2) sta $d020 (3) sta $d021 (3)
@@ -47,14 +48,13 @@ ROWSIZE   = SEGS*SEGSIZE + PADSIZE  ; 47 bytes, both bars
 BARH      = 24          ; gold lines
 BMAX      = 48          ; bar B's largest height
 PAD       = 8           ; black rows above and below the gold (>= max slant)
-COLLEN    = 2*PAD + BARH + 56   ; bar A column length: room for the bar to slide up out of the window (the rows shift along the column)
+COLLEN    = 2*PAD + BMAX + 2    ; bar A column length (the patch reads kb + ROWS - 1 <= 64)
 FLYAT     = 360         ; frames after the start: the fly-out to goldfly begins
-FLYT     = 128         ; frames of the fly-out (the light eases to the centre, bar A slides out through the top)
-FLYD     = 130         ; bar A's rise by the end of the fly-out: 130 * (f / FLYT)^2 lines
+FLYT     = 128         ; frames of the fly-out (the light eases to the centre; bar A swells toward the camera and near-clips)
+CEND     = 96          ; bar A's centre line when it is nearest the camera (above the light)
 FLYY     = 139         ; goldfly's light: CENTRE - 11 (goldfly.s SPRY)
 FLYX4    = 43          ; goldfly's light: SPRX 172 / 4
 FLYZ     = 80          ; ... in front of the bars
-YTOPMIN  = 52          ; bar A's top line never goes above the window (line 51): above it the rows shift along their column instead
 YBASE     = 140         ; raster line of bar A's top row when centred
 BARMID    = 16          ; bar A centre, in rows below its top row
 BTOP      = 231         ; raster line of bar B's first display row
@@ -112,7 +112,15 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 orbit:   .res 1         ; bar A bob angle
 fcnt:    .res 2         ; frames since the start (16 bit): the fly-out begins at FLYAT
 fo:      .res 1         ; fly-out frame (0 = not yet; FLYT = done)
-ksh:     .res 1         ; how far bar A's column starts were advanced to clip it at the window's top (bar B shares kb: it takes it back)
+ha:      .res 1         ; bar A's height in lines (24 .. 48 while it swells toward the camera)
+e2:      .res 1         ; fly-out: how near the camera it is, 0 .. 255 (eased squared)
+yc:      .res 1         ; bar A's centre line - 11 (the light's reference)
+clo_a:   .res 1         ; near-clip: bar A's rows clo_a .. chi_a-1 are black
+chi_a:   .res 1
+ss:      .res 1         ; source line of the row being built
+gcol:    .res 1         ; its gold colour
+slo:     .res 1         ; row map step (8.8)
+shi:     .res 1
 tw:      .res 1         ; frames of the hand-over so far (0 .. TRANS)
 wv:      .res 1         ; its weight 0 .. 255 (goldlight's -> goldtwin's)
 lxf:     .res 1         ; fraction of lxa: its step goes from 1 to 1/2 a frame during the hand-over
@@ -220,6 +228,17 @@ start:  sei
         iny
         cpy #(2*::SEGS*::COLLEN)&255
         bne @cpr
+        lda #BARH               ; bar A: 24 lines, source map = identity, no near-clip
+        sta ha
+        ldx #BARH-1
+@smap:  txa
+        sta srcmap,x
+        dex
+        bpl @smap
+        lda #255
+        sta clo_a
+        sta chi_a
+        lda #0
         ldx #BCOLSIZE-1                 ; and bar B's
 @colb:  sta bcol,x
         dex
@@ -253,6 +272,8 @@ main:   lda frame               ; bar A has been drawn: build the next
         lda #0
         sta frame
         jsr update
+        lda fo                  ; (no bar B in the fly-out)
+        bne main
 :       lda frameb              ; bar B has been drawn: build the next bar B
         beq :-
         lda #0
@@ -388,33 +409,109 @@ done:   rts
         .endrep
 @slant:
 
-        ldx fo                  ; fly-out: the bob fades out (bob * (255 - w) / 256) and the bar rises by exitab[fo]
-        beq @nofb
-        ldy orbit
-        lda lsin,y
-        cmp #$80
-        ror
-        sta bdd
+        ldx fo                  ; fly-out: bar A comes at the camera: it swells (nearest-neighbour rows, like bar B) while its centre goes to CEND, then near-clips
+        bne @fly
+        jmp @nofb
+@fly:
         lda wtab,x
-        eor #$ff
+        sta mmb
+        jsr umul                ; e2 = e * e / 256: eased in, accelerating
+        sta e2
+        sta mmb
+        lda #25
+        jsr umul                ; 25 * e2 / 256 = 0 .. 24
+        clc
+        adc #::BARH
+        sta ha                  ; 24 .. 48 lines
+        lda y0                  ; the centre the bob gives ...
+        clc
+        adc #::BARMID
+        sta yc
+        lda #::CEND             ; ... moves to CEND
+        sec
+        sbc yc
+        sta bdd
+        lda e2
         sta wv
         jsr blendmul
         clc
-        adc #::YBASE
-        ldx fo
+        adc yc
+        sta yc                  ; centre line now
+        lda ha
         sec
-        sbc exitab,x
-        sta y0
-@nofb:
+        sbc #::BARH
+        lsr
+        sta bdd                 ; half the swell
+        lda yc
+        sec
+        sbc #::BARMID
+        sec
+        sbc bdd
+        sta y0                  ; the block's top: the swollen bar stays centred on yc
+        lda yc
+        sec
+        sbc #11
+        sta yc                  ; (the light's reference: centre line - 11)
+        ; the row map for this height: output row j shows source line j * 24 / ha
+        ldx ha
+        lda nnsteplo,x
+        sta slo
+        lda nnstephi,x
+        sta shi
+        lda #0
+        sta acc
+        tay
+        ldx #0
+        clc
+@mp:    tya
+        sta srcmap,x
+        inx
+        lda acc
+        adc slo
+        sta acc
+        tya
+        adc shi
+        tay
+        cpx ha
+        bne @mp
+        ; the near-clip in the last three frames: rows around the middle go black (12, 20, 24 each side)
+        lda #255
+        sta clo_a
+        sta chi_a
+        ldx fo
+        cpx #::FLYT-2
+        bcc @nocut
+        lda #12
+        cpx #::FLYT-2
+        beq @cc
+        lda #20
+        cpx #::FLYT-1
+        beq @cc
+        lda #24
+@cc:    sta bdd
+        lda ha
+        lsr
+        sta acc
+        sec
+        sbc bdd
+        sta clo_a
+        lda acc
+        clc
+        adc bdd
+        sta chi_a
+@nocut: jmp @fbdone
+@nofb:  lda y0
+        clc
+        adc #::BARMID - 11
+        sta yc
+@fbdone:
         ; ---- 3. the light ---------------------------------------------------------
         ldy q
         lda orby,y
         sta ldy_                ; light - bar A centre, vertical: +-40
         lda orbz,y
         sta ldz                 ; light depth: +-40, + = in front
-        lda y0
-        clc
-        adc #::BARMID - 11      ; sprite centre row is 10, shown from Y+1
+        lda yc                  ; (the bar's centre line - 11: the sprite's centre row is 10, shown from Y+1)
         clc
         adc ldy_
         sta ly
@@ -475,29 +572,9 @@ done:   rts
         sta ldz
 @ldy:   lda ly                  ; the light relative to bar A's centre (the highlight's angle)
         sec
-        sbc y0
-        sec
-        sbc #::BARMID - 11
+        sbc yc
         sta ldy_
 @nofly:
-        ; ---- 3c. bar A above the window: its rows shift along their columns, so only the rows inside the window show
-        lda y0
-        cmp #::YTOPMIN
-        bcs @clampok
-        lda #::YTOPMIN
-        sec
-        sbc y0
-        sta bdd
-        sta ksh
-        .repeat ::SEGS, K
-        lda kb+K
-        clc
-        adc bdd
-        sta kb+K
-        .endrep
-        lda #::YTOPMIN
-        sta y0
-@clampok:
 common:
         ; ---- 4. the ball: pick its size, hide what is behind bar A -------------
         jsr drawball
@@ -544,14 +621,26 @@ common:
 evenrows:
 
         ; ---- 7. bar A's columns: gold + traced highlight per segment -------------
-        ldy #::BARH-1
-line:   ldx theta2,y
+        ldy ha
+        dey
+line:   cpy clo_a               ; near-clipped rows are black
+        bcc @keep
+        cpy chi_a
+        bcs @keep
+        lda #0
+        jmp dark2
+@keep:  ldx srcmap,y            ; the source line of this row
+        lda gold,x
+        sta gcol
+        lda theta2,x
+        tax
 spe_op = * + 1
         lda spectab,x           ; specular 0..8
         cmp #1
         bcc dark
         jmp lit
-dark:   lda gold,y              ; no highlight anywhere on this line
+dark:   lda gcol                ; no highlight anywhere on this line
+dark2:
         .repeat ::SEGS, K
         sta cols + (2*K)*::COLLEN + ::PAD,y
         sta cols + (2*K+1)*::COLLEN + ::PAD,y
@@ -566,13 +655,13 @@ lit:    sta sb
         cmp thr0+K
         lda #1                  ; white (flags from cmp kept)
         bcs :+
-        lda gold,y
+        lda gcol
 :       sta cols + (2*K)*::COLLEN + ::PAD,y
         lda sb
         cmp thr1+K
         lda #1
         bcs :+
-        lda gold,y
+        lda gcol
 :       sta cols + (2*K+1)*::COLLEN + ::PAD,y
         .endrep
         dey
@@ -583,10 +672,18 @@ lit:    sta sb
 patch:
         .repeat ::SEGS, K
         ldx kb+K
-          .repeat ::ROWS, RR
+          .repeat ::NROWS, RR
         lda cols + (2*K + (RR .mod 2))*::COLLEN + RR,x
         sta block + RR*::ROWSIZE + K*::SEGSIZE + 1
           .endrep
+        lda fo                  ; the rows beyond NROWS only run in the fly-out
+        bne :+
+        jmp .ident(.sprintf("pdone%d", K))
+:         .repeat ::ROWS - ::NROWS, R2
+        lda cols + (2*K + ((R2 + ::NROWS) .mod 2))*::COLLEN + R2 + ::NROWS,x
+        sta block + (R2 + ::NROWS)*::ROWSIZE + K*::SEGSIZE + 1
+          .endrep
+.ident(.sprintf("pdone%d", K)):
         .endrep
 
         ; ---- 9. shorten bar A's rows where the sprite steals cycles -----------
@@ -594,7 +691,7 @@ patch:
         sec
         sbc ly
         tax                     ; y0 - ly
-        .repeat ::ROWS, RR
+        .repeat ::NROWS, RR
         txa
         clc
         adc #RR
@@ -604,6 +701,35 @@ patch:
         lda #OP_BCC             ; sprite row: STEAL cycles shorter
 :       sta block + RR*::ROWSIZE + ::SEGS*::SEGSIZE
         .endrep
+        lda fo
+        bne :+
+        jmp @steald
+:       .repeat ::ROWS - ::NROWS, R2
+        txa
+        clc
+        adc #(R2 + ::NROWS)
+        cmp #21
+        lda #OP_BCS
+        bcs :+
+        lda #OP_BCC
+:       sta block + (R2 + ::NROWS)*::ROWSIZE + ::SEGS*::SEGSIZE
+        .endrep
+@steald:
+        ; ---- 10. the block's length: NROWS rows normally (a jmp to the end in row NROWS's first bytes), all ROWS in the fly-out ----
+        lda fo
+        bne @fullblk
+        lda #$4c                ; jmp blockend
+        sta block + ::NROWS*::ROWSIZE
+        lda #<blockend
+        sta block + ::NROWS*::ROWSIZE + 1
+        lda #>blockend
+        sta block + ::NROWS*::ROWSIZE + 2
+        rts
+@fullblk:
+        lda #$a9                ; lda #c (c is patched above)
+        sta block + ::NROWS*::ROWSIZE
+        lda #$8d                ; sta $d020
+        sta block + ::NROWS*::ROWSIZE + 2
         rts
 .endproc
 
@@ -706,7 +832,7 @@ front:  sta jstart
 row:    txa
         sec
         sbc jstart
-        cmp #24
+        cmp ha
         bcc hide
         lda (src),y
         sta (dst),y
@@ -736,17 +862,7 @@ nextrow:
 ;  updateb: bar B for the next frame
 ; =============================================================================
 .proc updateb
-        lda ksh                 ; bar B uses the slant (kb) too, without bar A's clipping shift
-        beq @nks
-        .repeat ::SEGS, K
-        lda kb+K
-        sec
-        sbc ksh
-        sta kb+K
-        .endrep
-        lda #0
-        sta ksh
-@nks:   inc bt
+        inc bt
         ldy bt
         lda bhtab,y
         sta bh
@@ -1065,13 +1181,22 @@ blockend:
         lda #0
         sta VIC_BORDER
         sta VIC_BG
+        lda fo                  ; the fly-out has no bar B: straight to the top of the next frame
+        bne @nob
         lda #<irqb1             ; next: bar B
         sta $fffe
         lda #>irqb1
         sta $ffff
         lda #BTOP - 2
         sta VIC_RASTER
-        asl VIC_IRQ
+        jmp @next
+@nob:   lda #<irqtop
+        sta $fffe
+        lda #>irqtop
+        sta $ffff
+        lda #DENLINE
+        sta VIC_RASTER
+@next:  asl VIC_IRQ
         inc frame               ; main loop: build the next sprite + bar A
         lda save_a
         ldx save_x
@@ -1180,6 +1305,7 @@ rowhi:  .repeat ROWSB, RR
 ; Bar A: 2 columns per segment (even / odd display rows), COLLEN entries
 ; each: PAD black, 24 gold-or-white, PAD black.
 cols:   .res 2*SEGS*COLLEN
+srcmap: .res BMAX               ; bar A: source line of each output row (identity until it swells)
 ; Bar B: one column: PAD black, up to 48 bar rows, black after.
 BCOLSIZE = PAD + ROWSB + 2
 bcol:   .res BCOLSIZE

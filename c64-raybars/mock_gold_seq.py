@@ -164,7 +164,7 @@ def main(out):
             print("goldtilt -> goldlight: bar centre %.1f -> %.1f raster lines (no glide: goldlight continues goldtilt's bob)" % (prev_end, centre(name, s0)))
 
         info.append((name, s0, d0))
-        n = {"goldtilt": 180, "goldlight": 360, "goldorbit": 360, "goldtwin": 360 + 128}.get(name, PART)   # goldtwin: 6 s hold + 128-frame fly-out          # goldtilt 3 s, goldlight 6 s, goldorbit 6 s, goldtwin 6 s, goldfly 3 s
+        n = {"goldtilt": 180, "goldlight": 360, "goldorbit": 360, "goldtwin": 360 + 128, "goldfly": 360}.get(name, PART)   # goldtwin: 6 s hold + 128-frame fly-out          # goldtilt 3 s, goldlight 6 s, goldorbit 6 s, goldtwin 6 s, goldfly 6 s
         for j in range(n):
             c = gold_canvas(*fr[s0 + j])
             frames.append(c)

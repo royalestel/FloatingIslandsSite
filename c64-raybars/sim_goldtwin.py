@@ -15,7 +15,7 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = 512
-ROWS, ROWSB, SEGS, SEGSIZE, ROWSIZE = 33, 56, 5, 8, 47
+ROWS, ROWSB, SEGS, SEGSIZE, ROWSIZE = 57, 56, 5, 8, 47
 BMAXROWS = 48
 SEGW, DENLINE, STEAL, BTOP = 80, 44, 4, 231
 TOP, BOTTOM = 50, 300
@@ -95,27 +95,38 @@ for kv in filter(None, os.environ.get("GOLD_INIT", "").split(",")):
     k, v = kv.split("="); mem[labels[k]] = int(v)
 call(labels["update"]); call(labels["updateb"])
 frames, worst = [], {"sprite": 0, "A": 0, "B": 0}
+pcA, pcS, pcB = [], [], []
 clear = True
 BSTART, BEND = BTOP - 2, BTOP + ROWSB + 1
+NROWS = 33
+FOA = labels["fo"]
 for f in range(FRAMES):
     y_cur = mem[Z["y0"]]
+    fo_cur = mem[FOA]                       # the frame just drawn: 33 rows and a bar B, or (fly-out) all rows and no bar B
     ca, cball = call(labels["update"], labels["ballready"])
-    cb, _ = call(labels["updateb"])
+    fo_new = mem[FOA]
+    cb = 0
+    if not fo_new: cb, _ = call(labels["updateb"])
     y = mem[Z["y0"]]
-    a_end = y_cur + ROWS + 2
-    blocked = [(BSTART, BEND), (312 + DENLINE, 312 + DENLINE + IRQTOP_LINES),
-               (312 + y - 2, 312 + y + ROWS + 2)]
+    rows_cur = ROWS if fo_cur else NROWS
+    rows_new = ROWS if fo_new else NROWS
+    a_end = y_cur + rows_cur + 2
+    blocked = ([(BSTART, BEND)] if not fo_cur else []) + [(312 + DENLINE, 312 + DENLINE + IRQTOP_LINES),
+               (312 + y - 2, 312 + y + rows_new + 2)]
     t_ball = advance(a_end, cball, blocked)
     t_a = advance(a_end, ca, blocked)
     t_b = advance(max(t_a, BEND), cb, blocked)
     for k, t, start, dl in (("sprite", t_ball, a_end, 312 + DENLINE),
                             ("A", t_a, a_end, 312 + y - 2),
-                            ("B", t_b, BEND, 312 + BTOP - 2)):
+                            ("B", t_b, BEND, 312 + BTOP - 2))[:3 if not fo_new else 2]:
         worst[k] = max(worst[k], 100 * (t - start) / (dl - start))
+        if k == "A": pcA.append(100 * (t - start) / (dl - start))
+        if k == "sprite": pcS.append(100 * (t - start) / (dl - start))
+        if k == "B": pcB.append(100 * (t - start) / (dl - start))
         ok &= t <= dl
     ly = mem[Z["ly"]]
     clear &= ly + 22 < BTOP - 2
-    ga = [[mem[block + r * ROWSIZE + k * SEGSIZE + 1] for k in range(SEGS)]
+    ga = [[mem[block + r * ROWSIZE + k * SEGSIZE + 1] if r < rows_new else 0 for k in range(SEGS)]
           for r in range(ROWS)]
     gb = [[mem[blockb + r * ROWSIZE + k * SEGSIZE + 1] for k in range(SEGS)]
           for r in range(ROWSB)]
@@ -130,6 +141,7 @@ for f in range(FRAMES):
 ok &= clear
 print(f"main loop: update {min(f[7] for f in frames)}-{max(f[7] for f in frames)}, "
       f"updateb {min(f[8] for f in frames)}-{max(f[8] for f in frames)} cycles")
+print("per phase (before / during the fly-out, frame 360): sprite %.0f%% / %.0f%%, A %.0f%% / %.0f%%, B %.0f%% / %.0f%%" % (max(pcS[:358]), max(pcS[358:] or [0]), max(pcA[:358]), max(pcA[358:] or [0]), max(pcB[:358]), max(pcB[358:] or [0])))
 print("worst use of each deadline window: " +
       ", ".join(f"{k} {v:.0f}%" for k, v in worst.items()))
 print("sprite never on bar B's lines:", clear)
