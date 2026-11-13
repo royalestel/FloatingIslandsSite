@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""MOCK (python only): the end of part 4 into the gold routines.
+
+  part 4 (the C64's own frames, /tmp/part4d_shown.pkl) until the wipe has swept the other bars away (frame 1075);
+  DESCENT  the nearest (blue) bar does not leave the screen: it glides down to goldtilt's bar (60 frames, its 26 lines become 24);
+  FADE     half a second (30 frames): every line of the bar fades from its blue swatch to its gold colour through flicker pairs of C64 colours
+           (a pair = two colours alternating by line and by frame, as our swatches do), each step the pair nearest the line's colour on the way,
+           with a penalty on the brightness difference of the two colours (less flicker);
+  then 3 s each (180 frames at 60 fps, one update a frame): goldtilt (from the frame where its bar is flat), goldlight (from the frame where the light
+  is at its leftmost and starts moving right: it sweeps in from the left), goldorbit, goldtwin, goldfly.  Where a routine's bar sits elsewhere than the
+  last one left it, the picture glides there over GLIDE frames.  The gold routines' frames come from their simulators (the real 6502 code, PAL timing).
+  The picture is the whole visible screen (384 x 240, raster lines 31..270): parts 1-4 only draw the 320 x 200 window, the gold routines the border too.
+    python3 mock_gold_seq.py out.mp4"""
+import os, sys, re, math, pickle
+os.environ["SPLITS"] = "6"
+import numpy as np
+from PIL import Image
+import flyby3d as fb, ideas_video as iv
+import mock_part4_wave as mw
+import vice_check_2c as v2
+import gold_frames as gf
+g4 = mw.ms.g4
+RGB = np.array(fb.C64RGB, dtype=float)
+W, H, R0 = 384, 240, 31                          # canvas: raster lines R0.., window row 0 = raster 51, x 32..351
+WX, WY = 32, 51 - R0
+P4_FROM, P4_TO = 880, 1076                      # part 4 frames shown (the wipe's sweep up ends at 1075)
+DESC, FADE, PART, GLIDE = 60, 30, 180, 30
+LAM = 0.6                                        # weight of the flicker (brightness difference of a pair)
+
+def gold_palette():
+    src = open("sim_goldtilt.py").read()
+    pal = eval(re.search(r"^PAL\s*=\s*(\[.*?\])", src, re.M | re.S).group(1))
+    return {((c >> 16) & 255, (c >> 8) & 255, c & 255): i for i, c in enumerate(pal)}
+GPAL = gold_palette()
+
+def to_index(a):
+    """RGB image from a gold simulator -> C64 colour indices"""
+    out = np.zeros(a.shape[:2], int)
+    for rgb, i in GPAL.items():
+        out[(a[:, :, 0] == rgb[0]) & (a[:, :, 1] == rgb[1]) & (a[:, :, 2] == rgb[2])] = i
+    return out
+
+def gold_canvas(top, a, dy=0):
+    idx = to_index(a)
+    if idx.shape[1] > W: x0 = (idx.shape[1] - W) // 2; idx = idx[:, x0:x0 + W]
+    c = np.zeros((H, W), int)
+    for r in range(idx.shape[0]):
+        y = top + r - R0 + dy
+        if 0 <= y < H: c[y] = idx[r]
+    return c
+
+def window_canvas(rows320):
+    c = np.zeros((H, W), int); c[WY:WY + 200, WX:WX + 320] = rows320; return c
+
+X = np.arange(320)
+def part4_rows(a):
+    img = np.zeros((200, 320), int)
+    for y in range(185):
+        row = np.zeros(320, int)
+        for k in range(6): row[v2.EDGES[k]:v2.EDGES[k + 1]] = a[y][k]
+        if a[y][6]: row[((a[y][6] >> (7 - X % 8)) & 1) == 1] = 0
+        img[y] = row
+    return img
+
+def token_row(tk, y, f):
+    line, flat = g4.fix_line([tk] * 6, y, f)
+    return g4.draw(line, y, f)
+
+luma = lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+PAIRS = [(a, b) for a in range(16) for b in range(a, 16)]
+PMEAN = np.array([(RGB[a] + RGB[b]) / 2 for a, b in PAIRS]); PFL = np.array([abs(luma(RGB[a]) - luma(RGB[b])) for a, b in PAIRS])
+
+def best_pair(target, prev=None):
+    cost = ((PMEAN - target) ** 2).sum(1) + LAM * PFL ** 2
+    if prev is not None: cost = cost - 40.0 * (np.arange(len(PAIRS)) == prev)      # a little hysteresis: keep the pair unless another is clearly better
+    return int(np.argmin(cost))
+
+def main(out):
+    shown = pickle.load(open("/tmp/part4d_shown.pkl", "rb"))
+    TOK = pickle.load(open("/tmp/p4d_tokens.pkl", "rb"))
+    frames = []
+    # 1. part 4 until the wipe has swept the others away
+    for t in range(P4_FROM, P4_TO): frames.append(window_canvas(part4_rows(shown[t])))
+    # the gold bar: goldtilt at its flat frame
+    tilt = gf.frames_of("goldtilt", 500); traw = pickle.load(open("/tmp/gold_goldtilt_500_raw.pkl", "rb"))
+    T0 = next(i for i, fr in enumerate(traw) if all(len(set(r)) == 1 for r in fr[1]))
+    gc = gold_canvas(*tilt[T0])
+    grows = [y for y in range(H) if gc[y].any()]
+    g_top, g_bot = grows[0], grows[-1]                                    # canvas rows of the gold bar (black lines inside it included)
+    gold = [int(gc[y, W // 2]) for y in range(g_top, g_bot + 1)]
+    NG = len(gold)
+    # 2. descent: the blue bar (its tokens at the end of the sweep) glides down to the gold bar's place, NG lines tall at the end
+    col = TOK[P4_TO - 1, 0]; brow = [y for y in range(200) if col[y]]
+    btok = [int(col[y]) for y in range(brow[0], brow[-1] + 1)]; NB = len(btok)
+    y_start, y_end = brow[0] + WY, g_top
+    ss = lambda u: u * u * (3 - 2 * u)
+    for j in range(DESC):
+        t = P4_TO + j; u = ss((j + 1) / DESC)
+        n = int(round(NB + (NG - NB) * u)); y0 = int(round(y_start + (y_end - y_start) * u))
+        rows = np.zeros((200, 320), int)
+        for i in range(n):
+            y = y0 + i - WY
+            if 0 <= y < 200: rows[y] = token_row(btok[min(NB - 1, int(i * NB / n))], y, t)
+        frames.append(window_canvas(rows))
+    # 3. fade, whole screen width: from each line's blue look (mean of its two frames, ghost pixels black) to its gold colour
+    t0 = P4_TO + DESC
+    start = []
+    for i in range(NG):
+        y = g_top + i - WY; tk = btok[min(NB - 1, int(i * NB / NG))]
+        m = np.zeros(3)
+        for f in (0, 1):
+            line, flat = g4.fix_line([tk] * 6, y, f)
+            gh = g4.ghost(line[0], y, f) if (not flat and not g4.is_black(line[0])) else 0
+            m += RGB[g4.colour(line[0], y, f)] * (1 - bin(gh).count("1") / 8.0)
+        start.append(m / 2)
+    prev = [None] * NG
+    for j in range(FADE):
+        t = t0 + j; u = (j + 1) / FADE
+        c = np.zeros((H, W), int)
+        for i in range(NG):
+            y = g_top + i
+            if j == FADE - 1: c[y] = gold[i]; continue
+            p = best_pair(start[i] * (1 - u) + RGB[gold[i]] * u, prev[i]); prev[i] = p
+            a, b = PAIRS[p]
+            c[y] = a if ((y + t) & 1) == 0 else b
+        frames.append(c)
+    # 4. the gold routines, 3 s each; a glide where a routine's bar starts elsewhere than the previous one ended
+    def bar_rows(c):
+        r = [y for y in range(H) if c[y, :W // 6].any() or c[y, W // 2].any()]
+        return (r[0] + r[-1]) / 2.0 if r else None
+    seq = []
+    seq.append(("goldtilt", tilt, T0))
+    light = gf.frames_of("goldlight", 900); lraw = pickle.load(open("/tmp/gold_goldlight_900_raw.pkl", "rb"))
+    lx = [fr[3] for fr in lraw]
+    L0 = next(i for i in range(1, 880) if lx[i] == min(lx) and lx[i + 1] > lx[i])
+    seq.append(("goldlight", light, L0))
+    orbit = gf.frames_of("goldorbit", 1200); oraw = pickle.load(open("/tmp/gold_goldorbit_1200_raw.pkl", "rb"))
+    le = lraw[L0 + PART - 1]
+    O0 = min(range(0, 1200 - 2 * PART), key=lambda i: abs(oraw[i][0] - le[0]) + 0.5 * abs(oraw[i][3] - le[3]) + 0.5 * abs(oraw[i][2] - le[2]))
+    seq.append(("goldorbit", orbit, O0))
+    twin = gf.frames_of("goldtwin", 1200)
+    seq.append(("goldtwin", twin, O0 + PART))                            # bar A and the light move exactly as in goldorbit: the frame count carries on
+    fly = gf.frames_of("goldfly", 600)
+    seq.append(("goldfly", fly, 100))
+    RAW = {"goldtilt": traw, "goldlight": lraw, "goldorbit": oraw}
+    def centre(name, i):
+        """raster line of the middle of the (first) bar, from the speedcode colours the simulator recorded"""
+        fr = RAW[name][i]; grid = fr[1]
+        rows = [r for r, row in enumerate(grid) if any(row)]
+        return fr[0] + (rows[0] + rows[-1]) / 2.0
+    prev_end = None; info = []
+    for name, fr, s0 in seq:
+        d0 = 0
+        if prev_end is not None and name in ("goldlight", "goldorbit"):                 # (goldtwin carries goldorbit's frame count on; goldfly is a cut)
+            d0 = int(round(prev_end - centre(name, s0)))
+        info.append((name, s0, d0))
+        for j in range(PART):
+            dy = int(round(d0 * (1 - ss(min(1.0, j / GLIDE))))) if d0 else 0
+            frames.append(gold_canvas(*fr[s0 + j], dy=dy))
+        prev_end = centre(name, s0 + PART - 1) if name in RAW else None
+    print("segments: part 4 %d-%d, descent %d, fade %d; " % (P4_FROM, P4_TO - 1, DESC, FADE) + ", ".join(f"{n} from frame {s} (glide {d} lines)" for n, s, d in info))
+    v = iv.Video(out, W * 3, H * 3, fps=60)
+    for c in frames:
+        rgb = RGB[c].astype(np.uint8)
+        v.add(Image.fromarray(np.repeat(np.repeat(rgb, 3, axis=0), 3, axis=1)))
+    v.close(); print("wrote", out, len(frames), "frames = %.1f s" % (len(frames) / 60.0))
+
+if __name__ == "__main__":
+    main(sys.argv[1])
