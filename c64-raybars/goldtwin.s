@@ -49,6 +49,7 @@ BARH      = 24          ; gold lines
 BMAX      = 48          ; bar B's largest height
 PAD       = 8           ; black rows above and below the gold (>= max slant)
 COLLEN    = 2*PAD + BMAX + 2    ; bar A column length (the patch reads kb + ROWS - 1 <= 64)
+BFLYEND  = 220         ; bar B's approach ends here (t 220: gone); in the fly-out it runs at half speed, so it stops here
 FLYAT     = 360         ; frames after the start: the fly-out to goldfly begins
 FLYT     = 128         ; frames of the fly-out (the light eases to the centre; bar A swells toward the camera and near-clips)
 CEND     = 96          ; bar A's centre line when it is nearest the camera (above the light)
@@ -112,6 +113,7 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 orbit:   .res 1         ; bar A bob angle
 fcnt:    .res 2         ; frames since the start (16 bit): the fly-out begins at FLYAT
 fo:      .res 1         ; fly-out frame (0 = not yet; FLYT = done)
+bslow:   .res 1         ; fly-out: bar B's phase advances on every other frame (it moves slower than bar A)
 ha:      .res 1         ; bar A's height in lines (24 .. 48 while it swells toward the camera)
 e2:      .res 1         ; fly-out: how near the camera it is, 0 .. 255 (eased squared)
 yc:      .res 1         ; bar A's centre line - 11 (the light's reference)
@@ -619,7 +621,11 @@ common:
 evenrows:
 
         ; ---- 7. bar A's columns: gold + traced highlight per segment -------------
-        ldy ha
+        lda fo                  ; bar A is gone once the fly-out is done: its block is skipped entirely
+        cmp #::FLYT
+        bcc :+
+        jmp goneblk
+:       ldy ha
         dey
 line:   cpy clo_a               ; near-clipped rows are black
         bcc @keep
@@ -728,6 +734,14 @@ patch:
         sta block + ::NROWS*::ROWSIZE
         lda #$8d                ; sta $d020
         sta block + ::NROWS*::ROWSIZE + 2
+        rts
+goneblk:                        ; the fly-out is over for bar A: row 0 jumps straight to the end of the block
+        lda #$4c                ; jmp blockend
+        sta block
+        lda #<blockend
+        sta block + 1
+        lda #>blockend
+        sta block + 2
         rts
 .endproc
 
@@ -860,8 +874,19 @@ nextrow:
 ;  updateb: bar B for the next frame
 ; =============================================================================
 .proc updateb
+        lda fo
+        beq @adv                ; hold: bar B's phase advances every frame
+        lda bslow               ; fly-out: every other frame, and only up to its last approach frame
+        eor #1
+        sta bslow
+        bne @stay
+        lda bt
+        cmp #::BFLYEND
+        bcs @stay
         inc bt
-        ldy bt
+@stay:  jmp @go
+@adv:   inc bt
+@go:    ldy bt
         lda bhtab,y
         sta bh
         lda blevtab,y           ; brightness level 0..3 ...

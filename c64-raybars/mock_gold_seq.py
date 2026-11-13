@@ -147,7 +147,7 @@ def main(out):
     seq.append(("goldlight", light, L0))
     orb = gf.frames_of("goldorbit", 420, init=ORBIT_INIT)
     seq.append(("goldorbit", orb, 0))
-    twin = gf.frames_of("goldtwin", 490, init=TWIN_INIT)
+    twin = gf.frames_of("goldtwin", 600, init=TWIN_INIT)
     seq.append(("goldtwin", twin, 0))
     fly = gf.frames_of("goldfly", 600)
     seq.append(("goldfly", fly, 0))                          # goldfly's own start: just the light, the bars leave it one after another
@@ -164,7 +164,7 @@ def main(out):
             print("goldtilt -> goldlight: bar centre %.1f -> %.1f raster lines (no glide: goldlight continues goldtilt's bob)" % (prev_end, centre(name, s0)))
 
         info.append((name, s0, d0))
-        n = {"goldtilt": 180, "goldlight": 360, "goldorbit": 360, "goldtwin": 360 + 128, "goldfly": 360}.get(name, PART)   # goldtwin: 6 s hold + 128-frame fly-out          # goldtilt 3 s, goldlight 6 s, goldorbit 6 s, goldtwin 6 s, goldfly 6 s
+        n = {"goldtilt": 180, "goldlight": 360, "goldorbit": 360, "goldtwin": 360 + 240, "goldfly": 360}.get(name, PART)   # goldtwin: 6 s hold + 128-frame fly-out          # goldtilt 3 s, goldlight 6 s, goldorbit 6 s, goldtwin 6 s, goldfly 6 s
         for j in range(n):
             c = gold_canvas(*fr[s0 + j])
             frames.append(c)

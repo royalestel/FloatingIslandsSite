@@ -103,6 +103,7 @@ pcA, pcS, pcB = [], [], []
 clear = True
 BSTART, BEND = BTOP - 2, BTOP + ROWSB + 1
 NROWS = 33
+FLYT_ = 128
 FOA = labels["fo"]
 for f in range(FRAMES):
     y_cur = mem[Z["y0"]]
@@ -111,8 +112,10 @@ for f in range(FRAMES):
     fo_new = mem[FOA]
     cb, _ = call(labels["updateb"])
     y = mem[Z["y0"]]
-    rows_cur = ROWS if fo_cur else NROWS
-    rows_new = ROWS if fo_new else NROWS
+    def arows(fo_):                         # bar A's rows: 33, then 57 while it swells, then none (gone)
+        return 0 if fo_ >= FLYT_ else (ROWS if fo_ else NROWS)
+    rows_cur = arows(fo_cur)
+    rows_new = arows(fo_new)
     a_end = y_cur + rows_cur + 2
     blocked = [(BSTART, BEND)] + [(312 + DENLINE, 312 + DENLINE + IRQTOP_LINES),
                (312 + y - 2, 312 + y + rows_new + 2)]
