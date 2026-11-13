@@ -59,6 +59,7 @@ bank:    .res 1
 nruns:   .res 1
 nt:      .res 1
 nt1:     .res 1                 ; the stage-2 target line (nt + 1)
+mc:      .res 1                 ; the music play-call counter
 pset:    .res 1                 ; the page set of the next frame (0/1); toggles unless the record says hold
 tgl:     .res 1                 ; 1 = this record toggles the set (bit 7 of F clear)
 nf:      .res 1                 ; F: the first active line of the frame shown after this blank (0 = from row 0)
@@ -77,11 +78,6 @@ save_y:  .res 1
 
 .segment "CODE"
 start:  sei
-        lda #0                  ; silence the SID (parts 2-3 play the tune; this part's pages overwrite it)
-        sta $d404
-        sta $d40b
-        sta $d412
-        sta $d418
         lda #$7f
         sta CIA1_ICR
         sta CIA2_ICR
@@ -109,6 +105,7 @@ start:  sei
         lda #0                  ; the set of frame 0 (blank x patches the set of frame x + 1)
         sta pset
         sta fch
+        sta mc
         lda #<$8000
         sta sp
         lda #>$8000
@@ -411,10 +408,24 @@ rend:
         sta IDLE
         jmp blockend
 
+; the tune's play routine (Alpha.sid stays resident at $1000-$2A33 from part 1; this part's pages sit above it at $2B00): 5 calls in 6 frames
+; (NTSC: the tune was written for 50 Hz).  A call costs 280-1540 cycles; the generator takes each blank's real cost off the update's budget.
+MUSIC_PLAY = $1003
+musicplay:
+        inc mc
+        lda mc
+        cmp #6
+        bne @go
+        lda #0
+        sta mc
+        rts
+@go:    jmp MUSIC_PLAY
+
 blockend:
         lda #$0b                ; DEN low: no badlines in the next frame (the update raises it in lines 49-50, or the stable IRQ does when F = 0)
         sta VIC_CTRL1
         sei                     ; (if the second sync interrupt ever misses, the I flag is still clear here)
+        jsr musicplay
         lda #0
         sta $d01a               ; no raster IRQ source while the update runs ($01 = $37: the vector would come from ROM)
         jsr update

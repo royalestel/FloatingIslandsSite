@@ -7,7 +7,7 @@ os.environ["SPLITS"] = "6"
 import numpy as np
 import mock_part4_seq as ms
 g4 = ms.g4
-HOLD = (270, 730)
+HOLD = tuple(int(v) for v in os.environ.get("HOLDRANGE", "270,730").split(","))
 frames, idle = [], []
 for t in range(ms.T_END):
     f = t - 1 if (HOLD[0] < t < HOLD[1] and t % 2 == 1) else t          # held: the even frame's picture and colours

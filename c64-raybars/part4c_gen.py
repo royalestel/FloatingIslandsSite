@@ -58,7 +58,7 @@ def runs_between(a, b, parity):
                 y += 1
     return out
 
-HOLD = (270, 730) if os.environ.get("HOLD2") else None     # busy stretch: held frames (picture and flicker) in pairs (HS+2k, HS+2k+1)
+HOLD = tuple(int(v) for v in os.environ.get("HOLDRANGE", "270,730").split(",")) if os.environ.get("HOLD2") else None     # busy stretch: held frames (picture and flicker) in pairs (HS+2k, HS+2k+1)
 
 def page_sets(N):
     """the set (0/1) each frame is shown from: alternate, except the odd frame of a held pair keeps its partner's set"""
@@ -68,8 +68,14 @@ def page_sets(N):
         S[t] = S[t - 1] if held else S[t - 1] ^ 1
     return S
 
+MC = None                    # per-blank cost of the tune's play call (the tune keeps playing in this part); None: the MUSIC_COST reserve
+
 def main():
+    global MC
     img = load(); N = len(img)
+    if not os.environ.get("NOTUNE"):
+        import tunecost
+        MC = tunecost.part4_costs(N)
     assert N % 2 == 0
     S = page_sets(N)
     NOTOG = [S[x] == S[x - 1] for x in range(N)]           # blanks[x] precedes frame x: hold = frame x keeps frame x-1's set
@@ -84,7 +90,7 @@ def main():
         t1 = x % N; t2 = (x + 1) % N
         cand = [(r, 0) for r in runs_between(state[S[t1]], img[t1], S[t1])] + [(r, 1) for r in runs_between(state[S[t2]], img[t2], S[t2])]
         Fx = min(ws.F_of(img[t1]), 127)                           # bit 7 of the record's F = hold                                        # the first active line of the frame shown after this blank
-        a_cap, b_cap = ws.budgets(Fx)                                # group A: before line 49; group B: after the DEN write, until line 49 + Fx
+        a_cap, b_cap = ws.budgets(Fx, None if MC is None else MC[min(x, len(MC) - 1)])                                # group A: before line 49; group B: after the DEN write, until line 49 + Fx
         A, B, ua, ub = [], [], 0, 0
         for pri in (0, 1):
             for r, _ in sorted([c for c in cand if c[1] == pri], key=lambda c: -len(c[0][2])):

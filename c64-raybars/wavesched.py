@@ -11,9 +11,11 @@ def first_line(img_t):
 def F_of(img_t):
     f = first_line(img_t)
     return f if f >= 3 else 0
-def budgets(F):
-    if os.environ.get("NOOPT1"): return (A_BUDGET, 0)
-    return (A_BUDGET, 65 * F - 650) if F else (A_BUDGET, 0)
+def budgets(F, music=None):
+    """(group A, group B) cycles; music = this blank's own play cost (default: the MUSIC_COST reserve)"""
+    a = A_BUDGET if music is None else 3600 - music
+    if os.environ.get("NOOPT1"): return (a, 0)
+    return (a, 65 * F - 650) if F else (a, 0)
 def record(F, A, B):
     """[F][nA][runs A][nB][runs B]; a run = [page][line][len] bytes"""
     out = bytearray([F, len(A)])

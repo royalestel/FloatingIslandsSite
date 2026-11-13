@@ -182,3 +182,12 @@ after each run (`pkill -x`, never `pkill -f`).
 * `python3 mk_cart_all.py routine_ntsc.crt`: whole routine, 3 stream banks for part 1.  VICE 6567, whole chain, 51 screenshots against the models: part 1 19/19 exact (six bars, red, floor),
   earthquake 5/9 exact (see above), part 2 waves 6/7, part 3 4/5 (stale lines by design), part 4 10/11 (one shot matched no frame: probably
   taken mid-frame).  Total 5,102 frames = 85 s.
+
+## Part 4 keeps the tune playing (NTSC)
+* `part4c.s` now has part 3's music hooks (`mc`, `musicplay` before `update` in the blank, no SID silencing); `part4c.cfg` = part 3's (the pages are stored at $1000 in the image and
+  run at $2B00, above the tune); `mk_cart_all.py` lists part4c in SKIP_TUNE (the loader leaves $1000-$2AFF alone).  The wrap to part 1 re-inits the tune.
+* `part4c_gen.py` budgets each blank with the tune's real play cost (`tunecost.py`: the tune on the 6502 simulator through the calls of the whole routine, the dearest call within +-3
+  calls of the blank; `wavesched.budgets(F, music)`); `NOTUNE=1` = no tune (the old numbers).  `HOLDRANGE=a,b` (part4h_dump.py, part4c_gen.py) sets the held stretch (default 270,730).
+* Cost of the music in part 4: stale frames 224 -> 674 of 1116 (lines of a frame that show the previous frame; mean 87 lines in those frames, frames 100-900); holding a
+  wider stretch (down to 100-900) does not help (506 frames), the picture simply changes more than 1 blank per pair can carry.  VICE: 11 of 12 part 4 shots exact (the 12th has
+  stale lines by design), the SID registers change throughout part 4.  Real fixes: the delayed-copy design (`mock_part4_wave.py`) or a cheaper copy engine.
