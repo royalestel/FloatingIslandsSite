@@ -4,7 +4,7 @@ import os, struct, subprocess, sys
 def run(cmd):
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode: sys.exit(" ".join(cmd) + "\n" + r.stdout + r.stderr)
-SKIP_TUNE = ("part2c", "part2w", "part3c", "part4c")     # parts that keep the tune ($1000-$2A33) resident and put their tables at $2B00
+SKIP_TUNE = ("part2c", "part2w", "part3c", "part4c", "part4d")     # parts that keep the tune ($1000-$2A33) resident and put their tables at $2B00
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "routine_all.crt"
     parts = sys.argv[2:] or ["part1r", "part2c", "part2w", "part3c", "part4c"]

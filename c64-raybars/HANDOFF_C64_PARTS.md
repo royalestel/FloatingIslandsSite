@@ -198,3 +198,16 @@ after each run (`pkill -x`, never `pkill -f`).
   assumed 81 per run), the new one 12.5 x bytes + 123 per run (per-run overhead went UP by 10: the second copy's operands are patched too).  Unrolling 4x would not pay (more patching).
 * The generator's cost model is now fitted (`C_BYTE`, `C_RUN` env override).  With the TRUE costs of both engines and the tune in the budget: plain loop 761 stale frames of 1116, unrolled 591
   (median stale lines 55 -> 11).  Without the tune: 224.  VICE: 11 of 12 part 4 shots exact, the 12th one stale line; the SID changes throughout.
+
+## Part 4 as DELAYED COPIES (prototype `part4d`, NTSC) -- built but NOT the default part 4
+* `part4d_gen.py` (the design of `mock_part4_wave.py`: two movement sources A / B, the six columns show them delayed by 16 k frames), `part4d.s` / `part4d.cfg` (part4c's raster loop and `doruns`),
+  `sim_part4d.py`, `part4d_video.py`.  Build the cartridge with it: `python3 mk_cart_all.py out.crt part1r part2c part2w part3c part4d` (then rebuild the default so cartparts.inc / cartboot_all.bin
+  match again; the prototype cartridge `routine_ntsc_p4d.crt` contains the tune and is ignored).
+* A source frame is ONE page of colour bytes (rows 54..184); the engine copies the newest page of each source into a ring slot (two rings of 66 slots, RAM $2B00-$B3FF; identical pages share a slot) and
+  each record patches the loop's 7 page operands (the 6 column pages, the idle byte page): [F][hi x 7][nA][runs][nB][runs].  The idle byte pages (zero page, Ge, Go) must lie BELOW $8000
+  (`update` reads row F's idle byte with the ROM window mapped).  Busy frames: ghost swatches off (every token flat); uniform frames (from 926: the rest, the hold and the wipe): ghost swatches as the
+  mock draws them, colour page C and idle page G per frame parity, changed rows copied (the first ones preloaded in the 30 blanks before 926).
+* Result: 1,226 frames, 0 frames over budget with the tune (worst runs 4,181 cycles, worst update 4,580 cycles in the sim), NO stale lines; the stream is 245 KB (part 4c: 327 KB).  The sim equals the
+  generator on all 1,225 frames; VICE 6567: 16 of 17 part 4 shots exact (the 17th is the hand-over instant), the SID changes throughout.
+* Differences from the mock (`mock_part4_wave.py`): the busy stretch has no ghost swatches where all six columns agree (4,907 rows in 887 frames, at most 25 a frame, 5.5 on average): they show the flat swatch.
+  The look is the DELAYED one (not `mock_part4_seq.py`'s six independent columns).  The part is 1,226 frames (part 4c: 1,116).
