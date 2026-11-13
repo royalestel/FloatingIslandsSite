@@ -49,6 +49,7 @@ BARH      = 24          ; gold lines
 BMAX      = 48          ; bar B's largest height
 PAD       = 8           ; black rows above and below the gold (>= max slant)
 COLLEN    = 2*PAD + BMAX + 2    ; bar A column length (the patch reads kb + ROWS - 1 <= 64)
+AGONE    = FLYT - 10   ; bar A is gone from this fly-out frame on (10 frames before FLYT: before it gets too thick)
 BFLYEND  = 220         ; bar B's approach ends here (t 220: gone); in the fly-out it runs at half speed, so it stops here
 FLYAT     = 360         ; frames after the start: the fly-out to goldfly begins
 FLYT     = 128         ; frames of the fly-out (the light eases to the centre; bar A swells toward the camera and near-clips)
@@ -622,7 +623,7 @@ evenrows:
 
         ; ---- 7. bar A's columns: gold + traced highlight per segment -------------
         lda fo                  ; bar A is gone once the fly-out is done: its block is skipped entirely
-        cmp #::FLYT
+        cmp #::AGONE
         bcc :+
         jmp goneblk
 :       ldy ha

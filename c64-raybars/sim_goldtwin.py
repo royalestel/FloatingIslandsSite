@@ -113,7 +113,7 @@ for f in range(FRAMES):
     cb, _ = call(labels["updateb"])
     y = mem[Z["y0"]]
     def arows(fo_):                         # bar A's rows: 33, then 57 while it swells, then none (gone)
-        return 0 if fo_ >= FLYT_ else (ROWS if fo_ else NROWS)
+        return 0 if fo_ >= FLYT_ - 10 else (ROWS if fo_ else NROWS)
     rows_cur = arows(fo_cur)
     rows_new = arows(fo_new)
     a_end = y_cur + rows_cur + 2
