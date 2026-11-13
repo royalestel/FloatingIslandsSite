@@ -27,16 +27,18 @@ RATE = 1.0                                        # one film frame per displayed
 NF = int(math.ceil(q2.SHAKE / RATE))              # PAL 1064 / NTSC 1277 frames: the shakes, then the still floor for the waves
 
 def floor_lines():
-    """swatch index and in-bar parity of every line of the still floor."""
-    tok, par = [0] * H, [0] * H
-    for y0, T in reversed(gp.STR):                     # far first
-        for i, k in enumerate(gp.PROF[T]):
-            if k and 0 <= y0 + i < H:
-                tok[y0 + i] = k; par[y0 + i] = i & 1
-    return tok, par
+    """the still floor's token on every line, as part2.py's model draws it (the floor the waves start from = the floor part 1 ends on)."""
+    seg = q2.make_seq()[0][1](-1)
+    assert all(len({int(seg[k, y]) for k in range(q2.SEGS)}) == 1 for y in range(H))
+    tok = [int(seg[0, y]) for y in range(H)]
+    assert all(t < q2.RED for t in tok)
+    return tok
 
 def patterns():
-    tok, par = floor_lines()
+    """colour bytes by SCREEN-row parity (pattern line n = screen line n at shift 0) and frame parity fp; the engine takes page
+    fp EOR (shift & 1) for a shifted column (exact for every swatch whose row flip equals its frame flip: all but 3)."""
+    tok = floor_lines()
+    g2 = q2.gp2
     pat = {}
     for fp in (0, 1):
         col_g, col_f, gh = [], [], []
@@ -44,10 +46,9 @@ def patterns():
             k = tok[y]
             if not k:
                 col_g.append(0); col_f.append(0); gh.append(0); continue
-            lad = gp.LAD[k]
-            col_g.append(v10.colour(lad, par[y], fp)); gh.append(v10.ghost(lad, par[y], fp))
-            kf = k if not v10.ghost(lad, par[y], fp) else min(gp.FLAT, key=lambda j: abs(gp.RAMP_L[j] - gp.RAMP_L[k]))
-            col_f.append(v10.colour(gp.LAD[kf], par[y], fp))
+            col_g.append(q2.colour(k, y, fp)); gh.append(q2.ghost(k, y, fp))
+            kf = k if not q2.ghost(k, y, fp) else min(g2.FLAT, key=lambda j: abs(gp.RAMP_L[j] - g2.light(k)))     # as part2.fix_line
+            col_f.append(q2.colour(kf, y, fp))
         pat[("g", fp)], pat[("f", fp)], pat[("h", fp)] = col_g, col_f, gh
     pat[("z", 0)] = [0] * H
     return pat

@@ -152,3 +152,22 @@ after each run (`pkill -x`, never `pkill -f`).
 * Part 1 no longer silences the SID at its end.  Test carts: `python3 mk_cart_all.py /tmp/t2w.crt tunepart part2w` (tunepart.s loads + inits the tune, then chains);
   `CRT=/tmp/t2w.crt python3 vice_check_2w.py ...`.  The loader gap between parts (~5 frames) pauses the tune.
 * VICE 6567: 2c, 2w, 3c pixel exact; chained audio: music plays from part 1 through part 3 (~86 s), silent in part 4, restarts with the loop.
+
+## NTSC cartridge at the mock-up's timing (60 film frames a second)
+* The owner timed the animation to the music in the python mock-ups (one film frame per 1/60 s).  The NTSC parts now show ONE FILM FRAME PER FRAME
+  (`RATE = 1.0` in `part1r_gen.py`, `part2c_gen.py`, `part2_dump.py`, `part3_dump.py`; part 4 already did).  The tune still plays 5 frames in 6.
+* The SID branch (`claude/c64-raybars-ntsc-sid`) is merged in: this branch had its python side but not its 6502 sources (the loader expected the
+  tune-resident layout the part sources did not have).
+* Part 1 (`part1r_gen.py`): follows `part1.py`'s own model (the stack, a 1 s pause, the straight 1.5 s move to part 2's floor, a 2 s hold; ends at
+  `part1.T_JOIN` = 1910); routines until `T_STACK` (1640), the delta stream after.  `OLDMOTION=1` = the earlier motion.  NOT on the C64: the mock-up's
+  three extra bars, the red bars and their transparency (`mock_part1_flicker.py`), and the bar-relative row parity.
+  `sim_part1r.py 1908`: all frames equal the model (the last update jumps to the loader).  Run the generator AFTER a build when part1r.s changed
+  (it reads `codeend` from part1r.lbl for the arrays' addresses).
+* Part 2 earthquake (`part2c`): 860 frames (the last tremor is gone, the waves start 1 s after the quake); the floor patterns are part2.py's still
+  floor by SCREEN-row parity; a column's page = frame parity EOR its shift's parity (part2c.s).  Whole-floor quakes are pixel exact; while the
+  columns differ the engine uses flat swatches on every line (the model keeps ghost swatches where a line's columns agree): ~93-97 % of pixels.
+* Part 2 waves: no pauses between the waves (732 frames); part 3: 484; part 4: 1116 (its stream was regenerated: the committed one did not match
+  `mock_part4_seq.py` any more).  Wave streams built with `MUSIC_COST=1700`.
+* `python3 mk_cart_all.py routine_ntsc.crt`: 49 16K banks, 820 KB.  VICE 6567, whole chain, 51 screenshots against the models: part 1 19/19 exact,
+  earthquake 5/9 exact (see above), part 2 waves 6/7, part 3 4/5 (stale lines by design), part 4 10/11 (one shot matched no frame: probably
+  taken mid-frame).  Total 5,102 frames = 85 s.

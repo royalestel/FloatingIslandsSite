@@ -219,11 +219,12 @@ u_m:    lda #0                  ; mode: every column the same?
         lda #1
 u_mode: sta mode
 u_apply:
-        lda fcl                 ; the frame parity picks the patterns' page
+        lda mode                ; the patterns' page: frame parity EOR the shift's parity (a swatch's colour follows the SCREEN row's
+        beq u_flat              ; parity, as part2.py draws it: a pattern moved by an odd number of lines takes the other page)
+        lda fcl
+        eor dv
         and #1
         tax
-        lda mode
-        beq u_flat
         lda pghi,x              ; ghost swatches + the idle byte pattern
         sta rP0 + 2
         sta rP1 + 2
@@ -243,13 +244,15 @@ u_apply:
         lda (t1),y              ; line 0's idle byte, now (nothing writes $3fff before the first line)
         sta IDLE
         jmp u_lo
-u_flat: lda pfhi,x
-        sta rP0 + 2
-        sta rP1 + 2
-        sta rP2 + 2
-        sta rP3 + 2
-        sta rP4 + 2
-        sta rP5 + 2
+u_flat:
+        .repeat 6, K
+        lda fcl
+        eor dv + K
+        and #1
+        tax
+        lda pfhi,x
+        sta .ident(.sprintf("rP%d", K)) + 2
+        .endrepeat
         lda #>pat_z0
         sta rG + 2
         lda #C0
