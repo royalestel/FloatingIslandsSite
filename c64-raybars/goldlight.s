@@ -43,6 +43,7 @@ BARH      = 24          ; gold lines
 PAD       = 6           ; black rows above and below the gold
 YBASE     = 135         ; raster line of the bar's top row when centred (goldtilt's: the bar moves on from it without a jump)
 YOFFMAX   = 9           ; ... and settles this many lines lower over 16 * YOFFMAX frames: the light sprite needs the room above the bar's highest point
+HSLACK   = 80          ; frames over which the highlight's falloff with distance from the light grows in
 LYMIN     = 52          ; the light sprite is only seen inside the display window (from line 51): it never rises above this
 LZ        = 100         ; light depth in front of the bar
 LYREST    = 56          ; light sprite top, this many lines above the bar
@@ -77,6 +78,8 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 ; =============================================================================
 .segment "ZEROPAGE"
 orbit:   .res 1         ; vertical bob angle
+hup:     .res 1         ; frames of the highlight's hand-over so far (up to HSLACK)
+hsl:     .res 1         ; slack: the light's reach shrinks from everywhere (goldtilt's even highlight) to its own
 gsz:     .res 1         ; frames of the light's grow-in so far (up to GROWN)
 ycnt:    .res 1         ; frames since the start (up to 16 * YOFFMAX): the bob's slow settling
 tilt:    .res 1         ; see-saw angle
@@ -226,6 +229,15 @@ done:   rts
         bcs @grown
         inc gsz
 @grown:
+        ldy hup                 ; the highlight: from goldtilt's even one to the light's own, as the light comes in
+        lda #::HSLACK
+        sec
+        sbc hup
+        sta hsl
+        cpy #::HSLACK
+        bcs @hdone
+        inc hup
+@hdone:
         lda lya
         clc
         adc #3                  ; and bobs a little
@@ -285,7 +297,10 @@ done:   rts
         sbc y0
         sec
         sbc #10
-        sta dy                  ; about -77..-55
+        clc
+        ldy hsl
+        adc hdytab,y            ; + what is left of the angle difference to goldtilt's highlight
+        sta dy                  ; about -77..-55 (+ the hand-over)
         lda #::LZ
         sta dz
         jsr atan2
@@ -307,6 +322,10 @@ done:   rts
         bcs :+
         eor #$ff
         adc #1                  ; carry clear: negate
+:       sec
+        sbc hsl                 ; within the slack the light's distance does not count yet
+        bcs :+
+        lda #0
 :       lsr
         lsr
         lsr                     ; drop

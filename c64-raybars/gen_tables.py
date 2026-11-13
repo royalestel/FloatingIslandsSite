@@ -253,6 +253,11 @@ for i, R_ in enumerate(GROW_R):
 outg.append("growptr:")
 ptrs = [f"GROWBASE/64+{i}" for i in range(len(GROW_R)) for _ in range(GROW_HOLD)] + ["SPRITE/64"]
 outg.append("        .byte " + ",".join(ptrs))
+# highlight hand-over from goldtilt: its angle (dy 60 at goldtilt's last frame) against goldlight's (-74): the difference is eased out over HSLACK frames
+HSLACK, HDY = 80, 134
+outg.append("hdytab:                         ; by the slack left (0 .. HSLACK): what is added to the highlight's dy")
+sm = lambda u: u * u * (3 - 2 * u)
+outg.append("        .byte " + ",".join(str(int(round(HDY * sm(h / HSLACK))) & 255) for h in range(HSLACK + 1)))
 with open(os.path.join(here, "light.inc"), "w") as f:
     f.write("\n".join(out) + "\n")
 print("wrote light.inc")
