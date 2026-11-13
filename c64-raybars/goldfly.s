@@ -114,6 +114,7 @@ sidx:    .res 1                 ; schedule entry being shown
 sbase:   .res 1                 ; schedule half being shown
 curvec:  .res 2                 ; loop entry of the next bar
 lp:      .res 2                 ; its slot's loops (nextbar patches them)
+wt:      .res NSLOT             ; per slot: frames still to wait before its flight starts (the bars leave the light one after another)
 st:      .res NSLOT             ; per slot: flight time
 spal:    .res NSLOT             ;           palette
 stilt:   .res NSLOT             ;           tilt (staircase)
@@ -213,7 +214,9 @@ start:  sei
         lda #$80
         sta tlast
         ldx #NSLOT-1            ; stagger the bars along their flight
-@stg:   lda stagger,x
+@stg:   lda stagger,x           ; (all bars start their flight at time 0, one after another: the screen starts with just the light)
+        sta wt,x
+        lda #0
         sta st,x
         jsr respawn             ; (marks its pads stale: full first build)
         dex
@@ -465,7 +468,11 @@ slot:   stx s
 .proc doslot
         ; ---- fly; respawn at the end of the flight -------------------------
         ldx s
-        inc st,x
+        lda wt,x
+        beq @go
+        dec wt,x                ; not started yet
+        jmp hidden
+@go:    inc st,x
         lda st,x
         cmp #FLYD
         bcc alive

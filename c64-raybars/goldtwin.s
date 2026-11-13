@@ -112,6 +112,7 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 orbit:   .res 1         ; bar A bob angle
 fcnt:    .res 2         ; frames since the start (16 bit): the fly-out begins at FLYAT
 fo:      .res 1         ; fly-out frame (0 = not yet; FLYT = done)
+ksh:     .res 1         ; how far bar A's column starts were advanced to clip it at the window's top (bar B shares kb: it takes it back)
 tw:      .res 1         ; frames of the hand-over so far (0 .. TRANS)
 wv:      .res 1         ; its weight 0 .. 255 (goldlight's -> goldtwin's)
 lxf:     .res 1         ; fraction of lxa: its step goes from 1 to 1/2 a frame during the hand-over
@@ -487,6 +488,7 @@ done:   rts
         sec
         sbc y0
         sta bdd
+        sta ksh
         .repeat ::SEGS, K
         lda kb+K
         clc
@@ -734,7 +736,17 @@ nextrow:
 ;  updateb: bar B for the next frame
 ; =============================================================================
 .proc updateb
-        inc bt
+        lda ksh                 ; bar B uses the slant (kb) too, without bar A's clipping shift
+        beq @nks
+        .repeat ::SEGS, K
+        lda kb+K
+        sec
+        sbc ksh
+        sta kb+K
+        .endrep
+        lda #0
+        sta ksh
+@nks:   inc bt
         ldy bt
         lda bhtab,y
         sta bh
