@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """MOCK (python only): part 4 (mock_part4_wave: the delayed copies) with every SPLIT moving up and down as a whole, each at its own rate.
-  amplitude AMP lines (16: up to 16 up and 16 down), a sine per split (own period and phase), whole lines (on the C64: the low byte of the column's page operand);
+  amplitude AMP lines (16: up to 16 up and 16 down), a sine per split (own period and phase; two splits that are not adjacent, FAST, cycle faster at their peak), whole lines (on the C64: the low byte of the column's page operand);
   eased IN from the moment the split's bars are all moving, eased OUT so that it is back at rest when the matchups are done; each split keeps its own delay.
   Rows below 184 are cut (the C64 loop ends there).     python3 mock_part4_shift.py out.mp4 [last_frame]"""
 import os, sys, math, pickle
@@ -20,8 +20,22 @@ def envelope(k, t):
     d = mw.D[k]
     return ss((t - (IN0 + d)) / IN_LEN) * (1.0 - ss((t - (OUT_END + d - OUT_LEN)) / OUT_LEN))
 
+FAST = (1, 4)                                              # two splits that are not next to each other cycle FAST_X times faster at their peak (full 16 lines) ...
+FAST_X = 2.0                                               # ... their rate rises and falls with the same ease as their amplitude
+
+def _phase_table():
+    tab = []
+    for k in range(6):
+        p, arr = PHASE[k], []
+        for t in range(mw.T_END + 2):
+            arr.append(p)
+            p += 2 * math.pi / PERIOD[k] * (1.0 + ((FAST_X - 1.0) * envelope(k, t) if k in FAST else 0.0))
+        tab.append(arr)
+    return tab
+PH = _phase_table()
+
 def shift(k, t):
-    return int(round(AMP * envelope(k, t) * math.sin(2 * math.pi * t / PERIOD[k] + PHASE[k])))
+    return int(round(AMP * envelope(k, t) * math.sin(PH[k][t])))
 
 def frame_tokens(TOK, t):
     out = np.zeros((6, 200), int)
