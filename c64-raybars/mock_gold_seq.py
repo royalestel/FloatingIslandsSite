@@ -2,8 +2,9 @@
 """MOCK (python only): the end of part 4 into the gold routines.
 
   part 4 (the C64's own frames, /tmp/part4d_shown.pkl) until the wipe has swept the other bars away (frame 1075);
-  DESCENT  the nearest (blue) bar does not leave the screen: it glides down to goldtilt's bar (60 frames, its 26 lines become 24);
-  FADE     half a second (30 frames): every line of the bar fades from its blue swatch to its gold colour through flicker pairs of C64 colours
+  MOVE     the nearest (blue) bar does not leave the screen: it eases into goldtilt's own bobbing movement over MOVE frames (position and speed match at the
+           hand-over), 26 lines become 24 and it widens to the full screen, and AT THE SAME TIME
+  FADE     half a second (30 frames, in the middle of the move): every line of the bar fades from its blue swatch to its gold colour through flicker pairs of C64 colours
            (a pair = two colours alternating by line and by frame, as our swatches do), each step the pair nearest the line's colour on the way,
            with a penalty on the brightness difference of the two colours (less flicker);
   then 3 s each (180 frames at 60 fps, one update a frame): goldtilt (from the frame where its bar is flat), goldlight (from the frame where the light
@@ -24,7 +25,7 @@ RGB = np.array(fb.C64RGB, dtype=float)
 W, H, R0 = 384, 240, 31                          # canvas: raster lines R0.., window row 0 = raster 51, x 32..351
 WX, WY = 32, 51 - R0
 P4_FROM, P4_TO = 880, 1076                      # part 4 frames shown (the wipe's sweep up ends at 1075)
-DESC, FADE, PART, GLIDE = 60, 30, 180, 30
+MOVE, FADE, PART, GLIDE = 90, 30, 180, 30
 LAM = 0.6                                        # weight of the flicker (brightness difference of a pair)
 
 def gold_palette():
@@ -89,21 +90,15 @@ def main(out):
     g_top, g_bot = grows[0], grows[-1]                                    # canvas rows of the gold bar (black lines inside it included)
     gold = [int(gc[y, W // 2]) for y in range(g_top, g_bot + 1)]
     NG = len(gold)
-    # 2. descent: the blue bar (its tokens at the end of the sweep) glides down to the gold bar's place, NG lines tall at the end
+    # 2. the blue bar joins goldtilt's own movement: it follows the bar's bobbing (goldtilt's y over the MOVE frames before its flat frame T0) plus an offset from
+    #    where the wipe left it that is eased out (smoothstep: position AND speed match at the hand-over); at the same time it narrows from 26 to 24 lines, widens
+    #    from the 320-pixel window to the full screen, and its colours FADE (FADE frames in the middle of the move) from the blue swatches to gold.
     col = TOK[P4_TO - 1, 0]; brow = [y for y in range(200) if col[y]]
     btok = [int(col[y]) for y in range(brow[0], brow[-1] + 1)]; NB = len(btok)
-    y_start, y_end = brow[0] + WY, g_top
+    y_start = brow[0] + WY
     ss = lambda u: u * u * (3 - 2 * u)
-    for j in range(DESC):
-        t = P4_TO + j; u = ss((j + 1) / DESC)
-        n = int(round(NB + (NG - NB) * u)); y0 = int(round(y_start + (y_end - y_start) * u))
-        rows = np.zeros((200, 320), int)
-        for i in range(n):
-            y = y0 + i - WY
-            if 0 <= y < 200: rows[y] = token_row(btok[min(NB - 1, int(i * NB / n))], y, t)
-        frames.append(window_canvas(rows))
-    # 3. fade, whole screen width: from each line's blue look (mean of its two frames, ghost pixels black) to its gold colour
-    t0 = P4_TO + DESC
+    ytraj = [traw[T0 - MOVE + j][0] - traw[T0][0] for j in range(MOVE)]          # goldtilt's block position relative to its position at T0, frame T0 - MOVE + j
+    t0 = P4_TO
     start = []
     for i in range(NG):
         y = g_top + i - WY; tk = btok[min(NB - 1, int(i * NB / NG))]
@@ -114,15 +109,25 @@ def main(out):
             m += RGB[g4.colour(line[0], y, f)] * (1 - bin(gh).count("1") / 8.0)
         start.append(m / 2)
     prev = [None] * NG
-    for j in range(FADE):
-        t = t0 + j; u = (j + 1) / FADE
+    J0 = (MOVE - FADE) // 2
+    for j in range(MOVE):
+        t = t0 + j; u = ss((j + 1) / MOVE)
+        n = max(NG, int(round(NB + (NG - NB) * u)))
+        top = (g_top + ytraj[j]) + (y_start - (g_top + ytraj[0])) * (1.0 - u)       # gold's y plus the eased-out offset (equal to gold's y at the end)
+        y0 = int(round(top)); fade = ss(min(1.0, max(0.0, (j - J0) / float(FADE))))
+        half = int(round(32 * u)); xa, xb = WX - half, WX + 320 + half
         c = np.zeros((H, W), int)
-        for i in range(NG):
-            y = g_top + i
-            if j == FADE - 1: c[y] = gold[i]; continue
-            p = best_pair(start[i] * (1 - u) + RGB[gold[i]] * u, prev[i]); prev[i] = p
-            a, b = PAIRS[p]
-            c[y] = a if ((y + t) & 1) == 0 else b
+        for i in range(n):
+            y = y0 + i
+            if not 0 <= y < H: continue
+            gi = min(NG - 1, int(i * NG / n))
+            if fade <= 0.0:
+                row = token_row(btok[min(NB - 1, int(i * NB / n))], y - WY, t)
+                c[y, WX:WX + 320] = row; c[y, xa:WX] = row[0]; c[y, WX + 320:xb] = row[-1]
+            elif fade >= 1.0: c[y, xa:xb] = gold[gi]
+            else:
+                p = best_pair(start[gi] * (1 - fade) + RGB[gold[gi]] * fade, prev[gi]); prev[gi] = p
+                a, b = PAIRS[p]; c[y, xa:xb] = a if ((y + t) & 1) == 0 else b
         frames.append(c)
     # 4. the gold routines, 3 s each; a glide where a routine's bar starts elsewhere than the previous one ended
     def bar_rows(c):
@@ -158,7 +163,7 @@ def main(out):
             dy = int(round(d0 * (1 - ss(min(1.0, j / GLIDE))))) if d0 else 0
             frames.append(gold_canvas(*fr[s0 + j], dy=dy))
         prev_end = centre(name, s0 + PART - 1) if name in RAW else None
-    print("segments: part 4 %d-%d, descent %d, fade %d; " % (P4_FROM, P4_TO - 1, DESC, FADE) + ", ".join(f"{n} from frame {s} (glide {d} lines)" for n, s, d in info))
+    print("segments: part 4 %d-%d, move+fade %d (fade %d); " % (P4_FROM, P4_TO - 1, MOVE, FADE) + ", ".join(f"{n} from frame {s} (glide {d} lines)" for n, s, d in info))
     v = iv.Video(out, W * 3, H * 3, fps=60)
     for c in frames:
         rgb = RGB[c].astype(np.uint8)
