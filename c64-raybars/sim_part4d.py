@@ -32,24 +32,26 @@ last = int(sys.argv[1]) if len(sys.argv) > 1 else len(shown) - 1
 zp = lambda n, v: list.__setitem__(mem, lab[n], v)
 list.__setitem__(mem, 1, 0x35)
 zp("fcl", 0); zp("fch", 0); zp("sp", 0x00); zp("sp", 0x00); list.__setitem__(mem, lab["sp"] + 1, 0x80); zp("bank", 1 + IMG)
-for a in range(0x2B00, 0x2C00): list.__setitem__(mem, a, 0)               # (start zeroes the zero page)
+ZH = int(open("part4d.inc").read().split("ZERO_HI = $")[1].split()[0], 16)
+NPG = int(open("part4d.inc").read().split("RING_PAGES = ")[1].split()[0])
+C0 = int(open("part4d.inc").read().split("C0 = ")[1].split()[0])
+for a in range(ZH * 256, (ZH + 1 + NPG) * 256): list.__setitem__(mem, a, 0xA5)      # RAM garbage ...
+cc = call(lab["clearpages"], 2000000)                                           # ... and start's margin clear
+print(f"clearpages: {cc} cycles ({cc / 17095:.1f} frames)")
 bad, worst = 0, (0, 0); tot = 0
 for t in range(last + 1):
     c = call(lab["update"])
     worst = max(worst, (c, t)); tot += c
     F = list.__getitem__(mem, lab["nf"])
     hi = [list.__getitem__(mem, lab[f"rP{k}"] + 2) for k in range(6)] + [list.__getitem__(mem, lab["rG"] + 2)]
+    lo = [list.__getitem__(mem, lab[f"rP{k}"] + 1) for k in range(6)]
+    assert all(l + 184 <= 255 for l in lo), lo
     got = np.zeros((200, 7), np.uint8)
     for y in range(F, 185):
-        for k in range(6): got[y, k] = list.__getitem__(mem, (hi[k] << 8) + y)
-        got[y, 6] = list.__getitem__(mem, (hi[6] << 8) + y + 1) if y < 184 else 0       # (the idle byte of row y is read in row y - 1: lda page+1,x)
-    exp = shown[t].copy()
-    # the idle byte row y is written during row y-1 from page[y]; compare the idle byte of rows F..184 (row F's comes from update itself)
-    gi = np.zeros(200, np.uint8)
-    for y in range(F, 185): gi[y] = list.__getitem__(mem, (hi[6] << 8) + y)
-    got[:, 6] = gi
-    if F != int(np.where(exp.any(axis=1))[0][0]) if exp.any() else False: pass
+        for k in range(6): got[y, k] = list.__getitem__(mem, (hi[k] << 8) + lo[k] + y)
+        got[y, 6] = list.__getitem__(mem, (hi[6] << 8) + C0 + y)         # the idle byte of row y (written during row y - 1; row F's by update)
+    exp = shown[t]
     if not (got[F:185] == exp[F:185]).all():
         bad += 1
-        if bad < 4: print("frame", t, "F", F, "differs at rows", [y for y in range(F, 185) if (got[y] != exp[y]).any()][:10], "hi", hi)
+        if bad < 4: print("frame", t, "F", F, "differs at rows", [y for y in range(F, 185) if (got[y] != exp[y]).any()][:10], "hi", hi, "lo", lo)
 print(f"{last + 1} frames, {bad} differ; worst update {worst[0]} cycles (frame {worst[1]}), mean {tot // (last + 1)}")

@@ -7,7 +7,7 @@ def run(cmd):
 SKIP_TUNE = ("part2c", "part2w", "part3c", "part4c", "part4d")     # parts that keep the tune ($1000-$2A33) resident and put their tables at $2B00
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "routine_all.crt"
-    parts = sys.argv[2:] or ["part1r", "part2c", "part2w", "part3c", "part4c"]
+    parts = sys.argv[2:] or ["part1r", "part2c", "part2w", "part3c", "part4d"]      # part4d: part 4 as delayed copies (part4c = the change-stream version)
     chips, bank, table = [], 1, []
     def chip(b, addr, data):
         chips.append(b"CHIP" + struct.pack(">IHHHH", 0x2010, 2, b, addr, 0x2000) + data)

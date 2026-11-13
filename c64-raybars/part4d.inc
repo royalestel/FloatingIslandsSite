@@ -5,3 +5,5 @@ NBANKS = 15
 ZERO_HI = $2b
 RING_HI0 = $2c
 RING_PAGES = 136
+C0 = 16
+R0 = 54

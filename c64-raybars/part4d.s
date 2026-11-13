@@ -6,7 +6,8 @@
 ;  The raster loop is part4c's (200 lines, 65 cycles each, X = the line, 6 column reads `lda page,x / sta $d021` and the next line's idle byte).
 ;  Every frame's record [F][hi of the 6 column pages][hi of the idle page][nA][runs A][nB][runs B] patches the loop's 7 page operands: the columns
 ;  read pages of a RING (two sources, each column a different frame of its source), `doruns` copies the newest source pages into ring slots.
-;  Nothing is shifted or compared on the 6502: the generator decides which slot every column reads, frame by frame.
+;  Nothing is compared on the 6502: the generator decides which slot every column reads, frame by frame.  A column is moved up and down as a whole by
+;  the LOW byte of its page operand (page row r sits at offset C0 + r, zero margins: C0 - shift + line never crosses a page).
 ; =============================================================================
 
         .setcpu "6502"
@@ -114,17 +115,40 @@ start:  sei
         lda #$01
         sta VIC_IRQEN
         sta VIC_IRQ
-        lda #0                  ; the all-zero page: the idle byte page of the busy frames (RAM is not cleared)
-        tax
-@z:     sta ZERO_HI * 256,x
-        inx
-        bne @z
-        jsr update              ; frame 0
+        jsr clearpages
+jsr update              ; frame 0
         cli
 @idle:  .repeat 100
         nop                     ; 2-cycle ops only (a 3-cycle jmp adds a third jitter state to the first IRQ)
         .endrep
         jmp @idle
+
+; clear the zero page (the idle byte page of the busy frames) and the margins of every ring / uniform page: RAM is not cleared and the copies only write
+; rows R0..184 (page offsets C0 + R0 .. C0 + 184); a shifted column reads the margins.
+clearpages:
+        ldx #ZERO_HI
+        stx @z0 + 2
+        ldy #0
+        tya
+@z0:    sta $ff00,y
+        iny
+        bne @z0
+@pg:    inx
+        cpx #ZERO_HI + 1 + RING_PAGES
+        beq @done
+        stx @z1 + 2
+        stx @z2 + 2
+        ldy #C0 + R0 - 1        ; above the rows: offsets 0 .. C0 + R0 - 1
+@z1:    sta $ff00,y
+        dey
+        bpl @z1
+        ldy #255                ; below the rows: C0 + 185 .. 255
+@z2:    sta $ff00,y
+        dey
+        cpy #C0 + 184
+        bne @z2
+        beq @pg
+@done:  rts
 
 nmi:    rti
 
@@ -152,7 +176,7 @@ nmi:    rti
         inc sp
         bne @f0
         inc sp+1
-@f0:    ldy #0                  ; the loop's 7 page operands (high bytes): the 6 columns' pages and the idle byte page
+@f0:    ldy #0                  ; the loop's 7 page operands (high bytes): the 6 columns' pages and the idle byte page; then the 6 columns' low bytes (the shift)
         lda (sp),y
         sta rP0 + 2
         iny
@@ -175,11 +199,29 @@ nmi:    rti
         sta rG + 2
         sta @i0 + 2
         iny
+        lda (sp),y
+        sta rP0 + 1
+        iny
+        lda (sp),y
+        sta rP1 + 1
+        iny
+        lda (sp),y
+        sta rP2 + 1
+        iny
+        lda (sp),y
+        sta rP3 + 1
+        iny
+        lda (sp),y
+        sta rP4 + 1
+        iny
+        lda (sp),y
+        sta rP5 + 1
+        iny
         lda (sp),y              ; nA
         sta nruns
         clc
         lda sp
-        adc #8
+        adc #14
         sta sp
         bcc @f1
         inc sp+1
@@ -203,8 +245,10 @@ nmi:    rti
 @done:
         lda nf                  ; the loop starts at row F (the rows above are black anyway)
         sta rows + 1
+        clc
+        adc #C0
         sta @i0 + 1
-@i0:    lda $ff00 + LINE0       ; (the first line's idle byte; the loop writes the NEXT line's after each line)
+@i0:    lda $ff00 + C0          ; (the first line's idle byte; the loop writes the NEXT line's after each line)
         sta IDLE
         inc fcl
         bne @c
@@ -386,7 +430,7 @@ rP4:    lda $ff00,x
         sta VIC_BG
 rP5:    lda $ff00,x
         sta VIC_BG
-rG:     lda $ff00 + 1,x   ; the NEXT line's idle byte, written in the right border
+rG:     lda $ff00 + C0 + 1,x   ; the NEXT line's idle byte, written in the right border
         sta IDLE
         nop                     ; NTSC: 65 cycles a line
         inx
