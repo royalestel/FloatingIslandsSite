@@ -83,7 +83,10 @@ def main(out):
     # 1. part 4 until the wipe has swept the others away
     for t in range(P4_FROM, P4_TO): frames.append(window_canvas(part4_rows(shown[t])))
     # the gold bar: goldtilt at its flat frame
-    tilt = gf.frames_of("goldtilt", 500); traw = pickle.load(open("/tmp/gold_goldtilt_500_raw.pkl", "rb"))
+    # goldtilt runs from phases chosen for this hand-over: the bob's orbit counter 204 (frame 0 shows 206: the bar near the top of its bob, about to descend, where the
+    # blue bar joins it), tilt phase so that frame 90 (= T0) is flat; goldlight then continues the same bob and tilt from goldtilt's last frame
+    TILT_INIT, LIGHT_INIT = "orbit=204,tilt=164", "orbit=218,tilt=178,lxa=196,lya=0"
+    tilt = gf.frames_of("goldtilt", 270, init=TILT_INIT); traw = gf.raw_of("goldtilt", 270, TILT_INIT)
     T0 = next(i for i, fr in enumerate(traw) if all(len(set(r)) == 1 for r in fr[1]))
     gc = gold_canvas(*tilt[T0])
     grows = [y for y in range(H) if gc[y].any()]
@@ -135,9 +138,8 @@ def main(out):
         return (r[0] + r[-1]) / 2.0 if r else None
     seq = []
     seq.append(("goldtilt", tilt, T0))
-    light = gf.frames_of("goldlight", 900); lraw = pickle.load(open("/tmp/gold_goldlight_900_raw.pkl", "rb"))
-    lx = [fr[3] for fr in lraw]
-    L0 = next(i for i in range(1, 880) if lx[i] == min(lx) and lx[i + 1] > lx[i])
+    light = gf.frames_of("goldlight", 500, init=LIGHT_INIT); lraw = gf.raw_of("goldlight", 500, LIGHT_INIT)
+    L0 = 0                                                                   # (frame 0: the light at the left edge, moving right)
     seq.append(("goldlight", light, L0))
     orbit = gf.frames_of("goldorbit", 1200); oraw = pickle.load(open("/tmp/gold_goldorbit_1200_raw.pkl", "rb"))
     le = lraw[L0 + PART - 1]
@@ -156,7 +158,9 @@ def main(out):
     prev_end = None; info = []
     for name, fr, s0 in seq:
         d0 = 0
-        if prev_end is not None and name in ("goldlight", "goldorbit"):                 # (goldtwin carries goldorbit's frame count on; goldfly is a cut)
+        if prev_end is not None and name == "goldlight":
+            print("goldtilt -> goldlight: bar centre %.1f -> %.1f raster lines (no glide: goldlight continues goldtilt's bob)" % (prev_end, centre(name, s0)))
+        if prev_end is not None and name == "goldorbit":                         # (goldtwin carries goldorbit's frame count on; goldfly is a cut)
             d0 = int(round(prev_end - centre(name, s0)))
         info.append((name, s0, d0))
         for j in range(PART):

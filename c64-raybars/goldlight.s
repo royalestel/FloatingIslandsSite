@@ -41,7 +41,9 @@ SEGSIZE   = 8           ; bytes per segment: lda #c (2) sta $d020 (3) sta $d021 
 ROWSIZE   = SEGS*SEGSIZE + 7    ; + bit $ea (2) + 5 nops = 47 bytes
 BARH      = 24          ; gold lines
 PAD       = 6           ; black rows above and below the gold
-YBASE     = 170         ; raster line of the bar's top row when centred
+YBASE     = 135         ; raster line of the bar's top row when centred (goldtilt's: the bar moves on from it without a jump)
+YOFFMAX   = 9           ; ... and settles this many lines lower over 16 * YOFFMAX frames: the light sprite needs the room above the bar's highest point
+LYMIN     = 52          ; the light sprite is only seen inside the display window (from line 51): it never rises above this
 LZ        = 100         ; light depth in front of the bar
 LYREST    = 56          ; light sprite top, this many lines above the bar
 DENLINE   = 44          ; top IRQ: clear DEN before raster line $30
@@ -73,6 +75,7 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 ; =============================================================================
 .segment "ZEROPAGE"
 orbit:   .res 1         ; vertical bob angle
+ycnt:    .res 1         ; frames since the start (up to 16 * YOFFMAX): the bob's slow settling
 tilt:    .res 1         ; see-saw angle
 lxa:     .res 1         ; light sweep angle
 lya:     .res 1         ; light bob angle
@@ -210,10 +213,23 @@ done:   rts
 
         ; ---- 2. the bar ---------------------------------------------------------
         ldy orbit
-        lda lsin,y              ; +-44 lines
+        lda ysin,y              ; +-64 lines: goldtilt's bob (same table, same centre, one step a frame)
         clc
         adc #::YBASE
         sta y0
+        lda ycnt                ; + 0 .. YOFFMAX lines, one more every 16 frames
+        lsr
+        lsr
+        lsr
+        lsr
+        clc
+        adc y0
+        sta y0
+        lda ycnt
+        cmp #16 * ::YOFFMAX
+        bcs @yo
+        inc ycnt
+@yo:
         ldy tilt
         .repeat ::SEGS, K
         lda .ident(.sprintf("lkbase%d", K)),y
@@ -227,7 +243,10 @@ done:   rts
         sbc #::LYREST
         clc
         adc lyofftab,y          ; +-11
-        sta ly
+        cmp #::LYMIN
+        bcs @lyok
+        lda #::LYMIN            ; the bar is high: the light stays at the top of the window, just above it
+@lyok:  sta ly
         sta VIC_SPR0Y
         ldy lxa
         lda lx4tab,y

@@ -64,6 +64,9 @@ def run_update():
         mpu.step()
     return mpu.processorCycles - c
 
+# initial phases, e.g. GOLD_INIT="orbit=178,tilt=178,lxa=196" (the hand-over from goldtilt: its last frame's phase - 1; frame 0 is the second update)
+for kv in filter(None, os.environ.get("GOLD_INIT", "").split(",")):
+    k, v = kv.split("="); mem[labels[k]] = int(v)
 run_update()
 frames, worst, clear = [], 0, True
 for f in range(FRAMES):

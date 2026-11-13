@@ -163,6 +163,11 @@ python3 sim_goldlight.py     # needs -g -Ln goldlight.lbl; renders preview_goldl
   `32 + 80k`; adjust `HTUNE` and that constant if the highlight looks
   offset from the ball.
 
+* **The bar's bob is goldtilt's** (`ysin`, centre `YBASE` = 135, +-64 lines, one step a frame), so the two programs can hand a moving bar over without a jump:
+  `orbit` and `tilt` keep their phases (`GOLD_INIT="orbit=..,tilt=.."` sets them in the simulators).  The bob settles `YOFFMAX` = 9 lines lower over 144 frames
+  (the light sprite needs the room above the bar's highest point, and it must never share a line with the bar), and the light never rises above `LYMIN` (line 52,
+  the top of what a sprite shows through the window): when the bar is high the light stays at the top, just above it.
+
 ## GOLDORBIT: the light orbits the bar
 
 `goldorbit.s` sends the light around the bar. It rises in front, slips

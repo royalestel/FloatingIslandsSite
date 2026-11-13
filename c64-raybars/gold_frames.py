@@ -3,8 +3,15 @@
     frames_of(name, n) -> list of (TOP, numpy array H x W of RGB)   (raster lines TOP.. ; PAL programs, one frame = one update())"""
 import os, re, sys, pickle, numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
-def frames_of(name, n, cache=True):
-    p = f"/tmp/gold_{name}_{n}.pkl"
+def _tag(init): return ("_" + re.sub(r"[^0-9a-z]", "", init.replace("=", "").replace(",", ""))) if init else ""
+def raw_of(name, n, init=""):
+    """the simulator's own per-frame records (goldtilt: (y, grid, cycles); goldlight: (y, grid, ly, lx, cycles); ...) of a frames_of run"""
+    return pickle.load(open(f"/tmp/gold_{name}_{n}{_tag(init)}_raw.pkl", "rb"))
+def frames_of(name, n, cache=True, init=""):
+    """init: "orbit=204,tilt=164" initial zero-page phases (goldtilt, goldlight)"""
+    tag = _tag(init)
+    p = f"/tmp/gold_{name}_{n}{tag}.pkl"
+    os.environ["GOLD_INIT"] = init
     if cache and os.path.exists(p): return pickle.load(open(p, "rb"))
     src = open(os.path.join(HERE, f"sim_{name}.py")).read()
     src = re.sub(r"^FRAMES\s*=\s*[^\n]*", f"FRAMES = {n}", src, count=1, flags=re.M) if name != "goldfly" else src
