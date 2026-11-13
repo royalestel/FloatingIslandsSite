@@ -258,6 +258,11 @@ HSLACK, HDY = 80, 134
 outg.append("hdytab:                         ; by the slack left (0 .. HSLACK): what is added to the highlight's dy")
 sm = lambda u: u * u * (3 - 2 * u)
 outg.append("        .byte " + ",".join(str(int(round(HDY * sm(h / HSLACK))) & 255) for h in range(HSLACK + 1)))
+TWIN_TRANS = 128
+out.append("wtab:                           ; the hand-over weight 0 .. 255 per frame (smoothstep), goldorbit and goldtwin")
+wt = [int(round(255 * (lambda u: u * u * (3 - 2 * u))(t / TWIN_TRANS))) for t in range(TWIN_TRANS + 1)]
+for i in range(0, len(wt), 16):
+    out.append("        .byte " + ",".join(f"${b:02x}" for b in wt[i:i + 16]))
 with open(os.path.join(here, "light.inc"), "w") as f:
     f.write("\n".join(out) + "\n")
 print("wrote light.inc")
@@ -310,6 +315,8 @@ for t in range(256):
     if t < 218:
         z = 6 - 5 * t / 217
         h, c = int(round(48 / z)), 0
+        if t < 24:
+            h = min(h, 1 + t // 3)      # bar B grows in from a line instead of popping in at 8 lines
     elif t < 220:
         z, h, c = 1, 48, (16, 24)[t - 218]
     else:
@@ -351,12 +358,6 @@ for k in range(5):
     out.append(f"tkps{k}:")
     for i in range(0, 256, 16):
         out.append("        .byte " + ",".join(f"${b:02x}" for b in col[i:i + 16]))
-# the weight of the hand-over from goldlight, 0 .. 255 over TWIN_TRANS frames (smoothstep)
-TWIN_TRANS = 128
-out.append("wtab:")
-wt = [int(round(255 * (lambda u: u * u * (3 - 2 * u))(t / TWIN_TRANS))) for t in range(TWIN_TRANS + 1)]
-for i in range(0, len(wt), 16):
-    out.append("        .byte " + ",".join(f"${b:02x}" for b in wt[i:i + 16]))
 with open(os.path.join(here, "twin.inc"), "w") as f:
     f.write("\n".join(out) + "\n")
 print("wrote twin.inc")

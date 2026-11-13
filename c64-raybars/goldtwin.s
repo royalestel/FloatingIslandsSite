@@ -286,127 +286,6 @@ done:   rts
 ;  update: the sprite and bar A for the next frame
 ; =============================================================================
 .proc update
-        lda tw                  ; the hand-over from goldlight first (TRANS frames), then the original code
-        cmp #TRANS
-        bcc blend
-        jmp steady
-blend:
-        ; ---------------- hand-over: everything blends from goldlight's value (w = 0) to goldtwin's (w = 255) -------------------------
-        inc fcount
-        inc orbit
-        inc tilt
-        inc q
-        lda lya                 ; goldlight's light bob
-        clc
-        adc #3
-        sta lya
-        ldy tw
-        lda wtab,y
-        sta wv
-        inc tw
-        lda wv                  ; the sideways drift: lxa advances (255 - w/2)/256 a frame, from 1 to 1/2
-        lsr
-        eor #$ff
-        clc
-        adc lxf
-        sta lxf
-        bcc :+
-        inc lxa
-:       ; -- bar A: goldlight's bob (+-64 about 142) and goldtwin's (+-22 about 140)
-        ldy orbit
-        lda ysin,y
-        clc
-        adc #::YA_BASE
-        sta bya
-        lda lsin,y
-        cmp #$80
-        ror                     ; +-22
-        clc
-        adc #::YBASE
-        sec
-        sbc bya                 ; goldtwin's - goldlight's (-88 .. 84)
-        sta bdd
-        jsr blendmul               ; A = bdd * w / 256
-        clc
-        adc bya
-        sta y0
-        ; -- the slant: ps = ysin[tilt] * (1 + w)  (+-64 -> +-127), the tables turn it into each segment's start index
-        ldy tilt
-        lda ysin,y
-        sta bdd
-        jsr blendmul
-        clc
-        adc bdd
-        tay
-        .repeat ::SEGS, K
-        lda .ident(.sprintf("tkps%d", K)),y
-        sta kb+K
-        .endrep
-        ; -- the light: goldlight's place (above the bar, bobbing) and the orbit's, blended
-        ldy lya
-        lda y0
-        clc
-        adc #<(2 - ::LYREST)    ; (goldlight's y0 is goldtwin's + 2)
-        clc
-        adc lyofftab,y          ; +-11
-        cmp #::LYMIN
-        bcs :+
-        lda #::LYMIN
-:       sta bya                 ; goldlight's sprite Y
-        ldy q
-        lda y0
-        clc
-        adc #::BARMID - 11
-        clc
-        adc orby,y
-        sec
-        sbc bya                 ; the orbit's - goldlight's
-        sta bdd
-        jsr blendmul
-        clc
-        adc bya
-        sta ly
-        sec                     ; light - bar A centre, vertical (what the orbit gives directly in steady state)
-        sbc y0
-        sec
-        sbc #::BARMID - 11
-        sta ldy_
-        ldy q                   ; light depth: orbit's z plus what is left of goldlight's 100 in front
-        lda #::DZ0
-        sec
-        sbc orbz,y              ; 60 .. 140 (unsigned)
-        sta bdd
-        lda wv
-        eor #$ff                ; 255 - w
-        sta mmb
-        lda bdd
-        jsr umul
-        ldy q
-        clc
-        adc orbz,y
-        sta ldz
-        ldy lxa
-        lda lx4tab,y
-        sta lx4
-        ldy q                   ; the ball: the orbit's size, but at first still the full ball (the floor falls from 7 to 0 over 112 frames)
-        lda orbsize,y
-        sta sz
-        lda tw
-        lsr
-        lsr
-        lsr
-        lsr
-        sta bdd
-        lda #7
-        sec
-        sbc bdd
-        bcs :+
-        lda #0
-:       cmp sz
-        bcc :+                  ; floor < size: keep the size
-        sta sz
-:       jmp common
-steady:
         ; ---- 1. animate ------------------------------------------------------
         inc fcount
         inc orbit               ; bar A bobs up and down
@@ -428,11 +307,47 @@ steady:
         clc
         adc #::YBASE
         sta y0
+        lda tw                  ; the hand-over from goldorbit (TRANS frames): bar A comes 2 lines lower, steepening its slant
+        cmp #TRANS
+        bcs @nohand
+        tay
+        lda wtab,y
+        sta wv
+        inc tw
+        eor #$ff                ; 255 - w
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr                     ; 0..3
+        clc
+        adc #1
+        lsr                     ; 0, 1, 1, 2
+        sta bdd
+        lda y0
+        sec
+        sbc bdd                 ; goldorbit's bar is drawn 2 lines higher for the same y0 (its slant sits 2 rows higher in the block)
+        sta y0
+        ldy tilt                ; slant: ps = ysin[tilt] * (1 + w): goldorbit's (+-64) -> goldtwin's (+-127)
+        lda ysin,y
+        sta bdd
+        jsr blendmul
+        clc
+        adc bdd
+        tay
+        .repeat ::SEGS, K
+        lda .ident(.sprintf("tkps%d", K)),y
+        sta kb+K
+        .endrep
+        jmp @slant
+@nohand:
         ldy tilt
         .repeat ::SEGS, K
         lda .ident(.sprintf("tkbase%d", K)),y
         sta kb+K
         .endrep
+@slant:
 
         ; ---- 3. the light ---------------------------------------------------------
         ldy q

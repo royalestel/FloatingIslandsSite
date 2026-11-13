@@ -933,3 +933,9 @@ goldlight's slant is half goldtwin's), the light's place (goldlight's: above the
 (the full ball first, the floor falls from 7 to 0 over 112 frames) and the sideways drift (1 -> 1/2 step a frame, 8-bit fraction `lxf`); then the original code runs.  The blend costs about 900 cycles a frame
 for 128 frames (`blendmul` = bdd * w / 256 in 208 cycles).  `GOLD_INIT="orbit=90,tilt=26,lxa=45,lya=250,q=254,bt=254"` starts the simulator from goldlight's last frame (the light's orbit at the top, bar B far away).
 
+
+### Gold sequence (mock, python only): goldtilt 3 s → goldlight 6 s → goldorbit 6 s → goldtwin 6 s → goldfly 3 s
+- goldlight: the highlight starts as goldtilt's (even along the bar, same angle: `hdytab` eases the angle difference, `HSLACK`=80 frames shrinks the "slack" so the falloff with distance from the light grows in).
+- goldorbit: a 128-frame hand-over from goldlight (`tw`, `wtab`): bar bob ±64 → ±22, the light's place, depth, size and drift blend into the orbit's.  Phases: `GOLD_INIT="orbit=90,tilt=26,lxa=45,lya=250,q=254"`.
+- goldtwin: continues goldorbit's state (`orbit=194,tilt=130,lxa=0,lxf=255,q=102,tw=0,bt=254`); a 128-frame hand-over steepens the slant (`tkps`) and moves bar A 2 lines (its block has 2 more pad rows); bar B grows in from one line (no pop).
+- `python3 mock_gold_seq.py out.mp4` renders the whole thing (sims need `cl65 ... -Ln goldX.lbl -o goldX.prg goldX.s` first).
