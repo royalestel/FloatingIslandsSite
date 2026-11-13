@@ -50,7 +50,8 @@ BMAX      = 48          ; bar B's largest height
 PAD       = 8           ; black rows above and below the gold (>= max slant)
 COLLEN    = 2*PAD + BMAX + 2    ; bar A column length (the patch reads kb + ROWS - 1 <= 64)
 AGONE    = FLYT - 10   ; bar A is gone from this fly-out frame on (10 frames before FLYT: before it gets too thick)
-BFLYEND  = 220         ; bar B's approach ends here (t 220: gone); in the fly-out it runs at half speed, so it stops here
+FLYL     = 240         ; frames of the fly-out for the light (it eases in over all of them); bar A is gone long before (AGONE)
+BPAUSE   = 180         ; bar B waits this long (frames) once it is gone (t 220) before its next approach starts: 3 s
 FLYAT     = 360         ; frames after the start: the fly-out to goldfly begins
 FLYT     = 128         ; frames of the fly-out (the light eases to the centre; bar A swells toward the camera and near-clips)
 CEND     = 96          ; bar A's centre line when it is nearest the camera (above the light)
@@ -114,7 +115,7 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 orbit:   .res 1         ; bar A bob angle
 fcnt:    .res 2         ; frames since the start (16 bit): the fly-out begins at FLYAT
 fo:      .res 1         ; fly-out frame (0 = not yet; FLYT = done)
-bslow:   .res 1         ; fly-out: bar B's phase advances on every other frame (it moves slower than bar A)
+bpause:  .res 1         ; frames bar B has waited so far at t 220 (up to BPAUSE)
 ha:      .res 1         ; bar A's height in lines (24 .. 48 while it swells toward the camera)
 e2:      .res 1         ; fly-out: how near the camera it is, 0 .. 255 (eased squared)
 yc:      .res 1         ; bar A's centre line - 11 (the light's reference)
@@ -334,7 +335,7 @@ done:   rts
         inc fcnt+1
 :       lda fo
         beq @trig
-        cmp #::FLYT
+        cmp #::FLYL
         bcs @flyd
         inc fo
         jmp @flyd
@@ -413,8 +414,12 @@ done:   rts
         ldx fo                  ; fly-out: bar A comes at the camera: it swells (nearest-neighbour rows, like bar B) while its centre goes to CEND, then near-clips
         bne @fly
         jmp @nofb
-@fly:
-        lda wtab,x
+@fly:   cpx #::AGONE            ; bar A is gone from AGONE on: only its centre line stays (the light's reference)
+        bcc @swell
+        lda #::CEND - 11
+        sta yc
+        jmp @fbdone
+@swell: lda wtab,x
         sta mmb
         jsr umul                ; e2 = e * e / 256: eased in, accelerating
         sta e2
@@ -526,7 +531,7 @@ done:   rts
         ; ---- 3b. fly-out: the light eases to goldfly's place (centre, full size, in front) ----
         ldx fo
         beq @nofly
-        cpx #::FLYT
+        cpx #::FLYL
         bcc @blend
         lda #::FLYY             ; the last frame: exactly there
         sta ly
@@ -537,7 +542,7 @@ done:   rts
         lda #::FLYZ
         sta ldz
         jmp @ldy
-@blend: lda wtab,x
+@blend: lda lw,x
         sta wv
         lda #::FLYY
         sec
@@ -875,18 +880,18 @@ nextrow:
 ;  updateb: bar B for the next frame
 ; =============================================================================
 .proc updateb
-        lda fo
-        beq @adv                ; hold: bar B's phase advances every frame
-        lda bslow               ; fly-out: every other frame, and only up to its last approach frame
-        eor #1
-        sta bslow
-        bne @stay
-        lda bt
-        cmp #::BFLYEND
-        bcs @stay
-        inc bt
-@stay:  jmp @go
+        lda bt                  ; bar B's phase: every frame, but it waits BPAUSE frames at t 220 (gone) before the next approach
+        cmp #220
+        bne @adv
+        lda bpause
+        cmp #::BPAUSE
+        bcs @adv
+        inc bpause
+        jmp @go
 @adv:   inc bt
+        bne @go
+        lda #0
+        sta bpause              ; (wrapped: the next cycle waits again)
 @go:    ldy bt
         lda bhtab,y
         sta bh
