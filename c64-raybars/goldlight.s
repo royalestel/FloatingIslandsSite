@@ -49,6 +49,8 @@ LYREST    = 56          ; light sprite top, this many lines above the bar
 DENLINE   = 44          ; top IRQ: clear DEN before raster line $30
 HTUNE     = 0           ; extra NOPs to line the first split up with hblank
 SPRITE    = $3f00       ; ball sprite data (outside the $1000 char ROM image)
+GROWBASE  = $3d40       ; the 7 small sprites of the grow-in (448 bytes, 64-byte blocks below the full ball)
+GROWN     = 21          ; frames of the grow-in (3 per stage)
 SPRPTR    = $07f8       ; sprite 0 pointer (screen at $0400)
 
 VIC_SPR0X  = $d000
@@ -75,6 +77,7 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 ; =============================================================================
 .segment "ZEROPAGE"
 orbit:   .res 1         ; vertical bob angle
+gsz:     .res 1         ; frames of the light's grow-in so far (up to GROWN)
 ycnt:    .res 1         ; frames since the start (up to 16 * YOFFMAX): the bob's slow settling
 tilt:    .res 1         ; see-saw angle
 lxa:     .res 1         ; light sweep angle
@@ -138,7 +141,17 @@ start:  sei
         sta SPRITE,x
         dex
         bpl @spr
-        lda #<(SPRITE/64)
+        ldx #0                  ; the 7 small balls of the grow-in
+@g0:    lda grow,x
+        sta GROWBASE,x
+        inx
+        bne @g0
+        ldx #191
+@g1:    lda grow+256,x
+        sta GROWBASE+256,x
+        dex
+        bpl @g1
+        lda growptr             ; stage 0: a small yellow dot
         sta SPRPTR
         lda #1
         sta VIC_SPREN
@@ -206,6 +219,13 @@ done:   rts
         inc orbit               ; bar bobs up and down
         inc tilt                ; and rocks
         inc lxa                 ; light sweeps back and forth
+        ldy gsz                 ; the light grows in: a small yellow dot to the full ball over GROWN frames
+        lda growptr,y
+        sta SPRPTR
+        cpy #GROWN
+        bcs @grown
+        inc gsz
+@grown:
         lda lya
         clc
         adc #3                  ; and bobs a little
@@ -466,4 +486,4 @@ gold:   .byte 9,8,12,7,7,0,9,8,15,7,7,1,7,1,7,0,0,0,9,12,10,12,8,9
 ; 2 columns per segment (even / odd display rows), 36 entries each:
 ; 6 black, 24 gold-or-white, 6 black.
 cols:   .res 2*SEGS*(2*PAD+BARH)
-        .assert * <= SPRITE, error, "program overlaps the sprite data"
+        .assert * <= GROWBASE, error, "program overlaps the sprite data"

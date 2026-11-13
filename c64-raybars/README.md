@@ -168,6 +168,9 @@ python3 sim_goldlight.py     # needs -g -Ln goldlight.lbl; renders preview_goldl
   (the light sprite needs the room above the bar's highest point, and it must never share a line with the bar), and the light never rises above `LYMIN` (line 52,
   the top of what a sprite shows through the window): when the bar is high the light stays at the top, just above it.
 
+* **The light grows in.** For the first 21 frames (3 per stage) the ball is one of 7 small sprites, a plain yellow dot growing to a ball with a white core and an
+  orange rim (`grow` in light.inc, copied to `GROWBASE` = $3D40 at the start; `growptr` gives the sprite pointer by frame), then the full ball (block $FC).
+
 ## GOLDORBIT: the light orbits the bar
 
 `goldorbit.s` sends the light around the bar. It rises in front, slips

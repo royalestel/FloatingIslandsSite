@@ -81,7 +81,9 @@ for f in range(FRAMES):
     clear &= ly + 22 < y - 2
     grid = [[mem[block + r * ROWSIZE + k * SEGSIZE + 1] for k in range(SEGS)]
             for r in range(ROWS)]
-    frames.append((y, grid, ly, lx, cyc))
+    p = mem[0x07F8]                  # the sprite pointer update() set: a stage of the grow-in or the full ball (block $FC)
+    spr = ball if p == SPRITE // 64 else mem[labels["grow"] + (p - labels["growptr"] * 0 - 0xF5) * 64:][:63]
+    frames.append((y, grid, ly, lx, cyc, spr))
 ok &= clear
 print(f"update(): {min(fr[4] for fr in frames)}-{max(fr[4] for fr in frames)} "
       f"cycles, worst {worst:.0f}% of the time before the top IRQ")
@@ -91,7 +93,8 @@ print("sprite never shares a line with the bar:", clear)
 W, H, SCALE = SEGS * SEGW, BOTTOM - TOP, 2
 MC = {1: RGB[8], 2: RGB[7], 3: RGB[1]}  # %01 orange, %10 yellow, %11 white
 
-def render(y, grid, ly, lx):
+def render(y, grid, ly, lx, spr=None):
+    ball_ = ball if spr is None else spr
     im = Image.new("RGB", (W, H))
     px = im.load()
     for r, row in enumerate(grid):
@@ -103,7 +106,7 @@ def render(y, grid, ly, lx):
     # sprite x -> canvas: segment 0 starts at sprite x -8
     for sy in range(21):
         yy = ly + 1 + sy - TOP
-        bits = (ball[sy * 3] << 16) | (ball[sy * 3 + 1] << 8) | ball[sy * 3 + 2]
+        bits = (ball_[sy * 3] << 16) | (ball_[sy * 3 + 1] << 8) | ball_[sy * 3 + 2]
         for cx in range(12):
             v = (bits >> (22 - 2 * cx)) & 3
             if v and 0 <= yy < H:
@@ -113,12 +116,12 @@ def render(y, grid, ly, lx):
                         px[xx, yy] = MC[v]
     return im.resize((W * SCALE, H * SCALE), Image.NEAREST)
 
-imgs = [render(*fr[:4]) for fr in frames[::2]]
+imgs = [render(*fr[:4], spr=fr[5]) for fr in frames[::2]]
 imgs[0].save(os.path.join(HERE, "preview_goldlight.gif"), save_all=True,
              append_images=imgs[1:], duration=40, loop=0)
 sheet = Image.new("RGB", (W * SCALE * 3, H * SCALE))
 for i, n in enumerate((20, 100, 200)):
-    sheet.paste(render(*frames[n][:4]), (i * W * SCALE, 0))
+    sheet.paste(render(*frames[n][:4], spr=frames[n][5]), (i * W * SCALE, 0))
 sheet.save(os.path.join(HERE, "preview_goldlight.png"))
 print("wrote preview_goldlight.gif, preview_goldlight.png")
 sys.exit(0 if ok else 1)

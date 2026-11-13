@@ -26,7 +26,7 @@ def frames_of(name, n, cache=True, init=""):
     nargs = {"goldtilt": 2, "goldlight": 4, "goldorbit": 5, "goldtwin": 6, "goldfly": 1}[name]
     out = []
     for fr in frames:
-        im = render(*fr[:nargs]) if nargs > 1 else render(fr)
+        im = (render(*fr[:4], spr=fr[5]) if name == "goldlight" else render(*fr[:nargs])) if nargs > 1 else render(fr)
         a = np.array(im)[::SCALE, ::SCALE]
         out.append((TOP, a))
     try: pickle.dump([tuple(fr) for fr in frames], open(p.replace(".pkl", "_raw.pkl"), "wb"))

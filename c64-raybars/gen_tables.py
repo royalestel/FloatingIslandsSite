@@ -229,6 +229,30 @@ out.append("ball:")
 for i in range(0, 63, 3):
     out.append("        .byte " + ",".join(f"%{b:08b}" for b in rows[i:i + 3]))
 out.append("        .byte 0")
+# the light GROWS IN: 7 small stages, then the full ball above.  A yellow dot first (%10 only), then the white core and the orange rim come in.
+GROW_R = [1.5, 2.5, 3.5, 5.0, 6.5, 8.0, 9.5]
+GROW_W = [0.0, 0.0, 0.0, 0.2, 0.3, 0.38, 0.43]          # white core, as a fraction of the radius
+GROW_Y = [1.0, 1.0, 1.0, 0.9, 0.85, 0.8, 0.78]          # yellow out to this fraction, then the orange rim
+GROW_HOLD = 3                                           # frames per stage: 7 * 3 = 21 frames, then the full ball (sprite block $FC)
+out.append("grow:")
+for i, R_ in enumerate(GROW_R):
+    rows = []
+    for y in range(21):
+        bits = 0
+        for cx in range(12):
+            dx, dy = (cx * 2 + 1) - 12, (y + 0.5) - 10.5
+            r = math.hypot(dx, dy)
+            v = 3 if r < GROW_W[i] * R_ else 2 if r < GROW_Y[i] * R_ else 1 if r < R_ else 0
+            bits = (bits << 2) | v
+        rows += [(bits >> 16) & 255, (bits >> 8) & 255, bits & 255]
+    out.append(f"        ; radius {R_}")
+    for j in range(0, 63, 21):
+        out.append("        .byte " + ",".join(f"%{b:08b}" for b in rows[j:j + 21]))
+    out.append("        .byte 0")
+# sprite pointer by frames since the start (growbase = the block of stage 0, in 64-byte units; the full ball is the block at SPRITE)
+out.append("growptr:")
+ptrs = [f"GROWBASE/64+{i}" for i in range(len(GROW_R)) for _ in range(GROW_HOLD)] + ["SPRITE/64"]
+out.append("        .byte " + ",".join(ptrs))
 with open(os.path.join(here, "light.inc"), "w") as f:
     f.write("\n".join(out) + "\n")
 print("wrote light.inc")
