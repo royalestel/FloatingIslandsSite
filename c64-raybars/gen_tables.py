@@ -263,6 +263,25 @@ out.append("wtab:                           ; the hand-over weight 0 .. 255 per 
 wt = [int(round(255 * (lambda u: u * u * (3 - 2 * u))(t / TWIN_TRANS))) for t in range(TWIN_TRANS + 1)]
 for i in range(0, len(wt), 16):
     out.append("        .byte " + ",".join(f"${b:02x}" for b in wt[i:i + 16]))
+# goldtwin's fly-out, bar A: it recedes (smaller, a little further back, toward the light's vanishing line), then flies at the camera and up out of
+# the top of the window: its centre line rises fast (accelerating) while it swells late (u^8), so only a thin part is ever drawn inside the window.
+# actr[fo] = its centre line (the bob's fades into it over the first 32 frames), aht[fo] = its height in lines, fo = 0 .. AGONE.
+AGONE_, R1_, C_BOB_, C_REC_, C_OUT_ = 118, 40, 156, 150, 30
+ss_ = lambda u: u * u * (3 - 2 * u)
+actr, aht = [], []
+for fo in range(AGONE_ + 1):
+    if fo <= R1_:
+        s = ss_(fo / R1_); c, h = C_BOB_ + (C_REC_ - C_BOB_) * s, 24 - 8 * s
+    else:
+        u = (fo - R1_) / (AGONE_ - R1_); c, h = C_REC_ + (C_OUT_ - C_REC_) * u * u, 16 + 32 * u ** 8
+    actr.append(int(round(c))); aht.append(int(round(h)))
+    y0_ = actr[-1] - 16 - (aht[-1] - 24) // 2
+    vis = aht[-1] if y0_ >= 52 else max(0, actr[-1] + aht[-1] // 2 - 52)
+    assert y0_ >= 1 and vis <= 24, (fo, y0_, vis)
+for nm_, d_ in (("actr", actr), ("aht", aht)):
+    out.append(nm_ + ":                           ; goldtwin's fly-out: bar A's centre line / height by fly-out frame")
+    for i in range(0, len(d_), 16):
+        out.append("        .byte " + ",".join(str(b) for b in d_[i:i + 16]))
 out.append("lw:                             ; goldtwin's fly-out: the light's easing weight 0 .. 255 over FLYL frames (smootherstep)")
 FLYL_ = 296
 lw = [int(round(255 * (lambda u: u * u * u * (u * (u * 6 - 15) + 10))(f / FLYL_))) for f in range(FLYL_ + 1)]

@@ -38,7 +38,7 @@
 
         .setcpu "6502"
 
-ROWS      = 57          ; bar A display rows: up to 48 lines (it swells in the fly-out) + 8 lines of slant + 1
+ROWS      = 33          ; bar A display rows: 24 lines + 8 lines of slant + 1 (in the fly-out the bar is at most this thick inside the window)
 NROWS     = 33          ; bar A rows run normally (24 lines + 8 lines of slant + 1); the fly-out runs all ROWS
 ROWSB     = 56          ; bar B display rows: 48 lines + 8 lines of slant
 SEGS      = 5           ; horizontal segments per row
@@ -48,7 +48,8 @@ ROWSIZE   = SEGS*SEGSIZE + PADSIZE  ; 47 bytes, both bars
 BARH      = 24          ; gold lines
 BMAX      = 48          ; bar B's largest height
 PAD       = 8           ; black rows above and below the gold (>= max slant)
-COLLEN    = 2*PAD + BMAX + 2    ; bar A column length (the patch reads kb + ROWS - 1 <= 64)
+COLLEN    = 96          ; bar A column length: the clipped bar's rows slide along it (kb + shift up to 60, + ROWS - 1)
+YTOPMIN   = 52          ; bar A's block never starts above the window (line 51)
 AGONE    = FLYT - 10   ; bar A is gone from this fly-out frame on (10 frames before FLYT: before it gets too thick)
 FLYL     = 296         ; frames of the fly-out: the light eases in over all of them; bar B's near-clip ends exactly here (its second approach starts BPAUSE frames late); goldfly starts after
 HANDOFF  = 30          ; goldfly's first bar (a thin dim line by the light) is drawn by bar A's block this many frames before goldfly starts (handoff.inc)
@@ -117,6 +118,9 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 orbit:   .res 1         ; bar A bob angle
 fcnt:    .res 2         ; frames since the start (16 bit): the fly-out begins at FLYAT
 fo:      .res 1         ; fly-out frame (0 = not yet; FLYT = done)
+hmap:    .res 1         ; the height srcmap is built for (and the rows last built)
+o0:      .res 1         ; bar A's first row to build (the rows above the window are not built)
+ksh:     .res 1         ; how far bar A's column starts were advanced to clip it (bar B shares kb: it takes it back)
 fo2:     .res 1         ; fly-out frames after fo has reached 255 (0 .. FLYL - 255)
 racnt:   .res 1         ; replay: rows of this frame's bar
 rcnt:    .res 1         ; ... counted down
@@ -239,6 +243,7 @@ start:  sei
         bne @cpr
         lda #BARH               ; bar A: 24 lines, source map = identity, no near-clip
         sta ha
+        sta hmap
         ldx #BARH-1
 @smap:  txa
         sta srcmap,x
@@ -424,52 +429,93 @@ done:   rts
         ldx fo                  ; fly-out: bar A comes at the camera: it swells (nearest-neighbour rows, like bar B) while its centre goes to CEND, then near-clips
         bne @fly
         jmp @nofb
-@fly:   cpx #::AGONE            ; bar A is gone from AGONE on: only its centre line stays (the light's reference)
+@fly:   cpx #::AGONE            ; bar A is gone from AGONE on: only a centre line stays (the light's reference)
         bcc @swell
-        lda #::CEND - 11
+        lda #30 - 11
         sta yc
         jmp @fbdone
-@swell: lda wtab,x
-        sta mmb
-        jsr umul                ; e2 = e * e / 256: eased in, accelerating
-        sta e2
-        sta mmb
-        lda #25
-        jsr umul                ; 25 * e2 / 256 = 0 .. 24
-        clc
-        adc #::BARH
-        sta ha                  ; 24 .. 48 lines
-        lda y0                  ; the centre the bob gives ...
+@swell: lda aht,x               ; fly-out, bar A: recedes (smaller, a bit further back), then flies at the camera and up out of the window
+        sta ha                  ; (tables aht / actr: its height and centre line)
+        lda y0                  ; the bob's centre fades into the table's over the first 32 frames
         clc
         adc #::BARMID
         sta yc
-        lda #::CEND             ; ... moves to CEND
+        cpx #32
+        bcs @wfull
+        txa
+        asl
+        asl
+        tay
+        lda wtab,y
+        sta wv
+        lda actr,x
         sec
         sbc yc
         sta bdd
-        lda e2
-        sta wv
         jsr blendmul
         clc
         adc yc
-        sta yc                  ; centre line now
-        lda ha
+        sta yc
+        jmp @cset
+@wfull: lda actr,x
+        sta yc
+@cset:  lda ha                  ; the block's top: y0 = centre - BARMID - (ha - 24) / 2
         sec
         sbc #::BARH
-        lsr
-        sta bdd                 ; half the swell
+        cmp #$80
+        ror
+        sta bdd
         lda yc
         sec
         sbc #::BARMID
         sec
         sbc bdd
-        sta y0                  ; the block's top: the swollen bar stays centred on yc
+        sta y0
         lda yc
         sec
         sbc #11
         sta yc                  ; (the light's reference: centre line - 11)
-        ; the row map for this height: output row j shows source line j * 24 / ha
-        ldx ha
+        ; above the window: the block starts at its top and the rows slide along their columns (kb + shift); rows above the block are not built
+        lda #0
+        sta o0
+        lda y0
+        cmp #::YTOPMIN
+        bcs @noclip
+        lda #::YTOPMIN
+        sec
+        sbc y0
+        sta bdd
+        sta ksh
+        .repeat ::SEGS, K
+        lda kb+K
+        clc
+        adc bdd
+        sta kb+K
+        .endrep
+        lda bdd
+        sec
+        sbc #::PAD
+        bcs :+
+        lda #0
+:       sta o0
+        lda #::YTOPMIN
+        sta y0
+@noclip:
+        ; the row map for this height: output row j shows source line j * 24 / ha (only when the height changed)
+        lda hmap
+        cmp ha
+        beq @mapok
+        bcc @grow               ; (the bar got lower: its old bottom rows go black)
+        ldy hmap
+        lda #0
+@cl:    dey
+        .repeat ::SEGS, K
+        sta cols + (2*K)*::COLLEN + ::PAD,y
+        sta cols + (2*K+1)*::COLLEN + ::PAD,y
+        .endrep
+        cpy ha
+        bne @cl
+@grow:  ldx ha
         lda nnsteplo,x
         sta slo
         lda nnstephi,x
@@ -490,32 +536,9 @@ done:   rts
         tay
         cpx ha
         bne @mp
-        ; the near-clip in the last three frames: rows around the middle go black (12, 20, 24 each side)
-        lda #255
-        sta clo_a
-        sta chi_a
-        ldx fo
-        cpx #::FLYT-2
-        bcc @nocut
-        lda #12
-        cpx #::FLYT-2
-        beq @cc
-        lda #20
-        cpx #::FLYT-1
-        beq @cc
-        lda #24
-@cc:    sta bdd
         lda ha
-        lsr
-        sta acc
-        sec
-        sbc bdd
-        sta clo_a
-        lda acc
-        clc
-        adc bdd
-        sta chi_a
-@nocut: jmp @fbdone
+        sta hmap
+@mapok: jmp @fbdone
 @nofb:  lda y0
         clc
         adc #::BARMID - 11
@@ -675,6 +698,8 @@ dark2:
         .endrep
         dey
         bmi :+
+        cpy o0
+        bcc :+                  ; (the rows above the window are not built)
         jmp line
 :       jmp patch
 lit:    sta sb
@@ -694,6 +719,8 @@ lit:    sta sb
         .endrep
         dey
         bmi patch
+        cpy o0
+        bcc patch
         jmp line
 
         ; ---- 8. patch bar A's 145 colours -------------------------------------
@@ -704,14 +731,7 @@ patch:
         lda cols + (2*K + (RR .mod 2))*::COLLEN + RR,x
         sta block + RR*::ROWSIZE + K*::SEGSIZE + 1
           .endrep
-        lda fo                  ; the rows beyond NROWS only run in the fly-out
-        bne :+
-        jmp .ident(.sprintf("pdone%d", K))
-:         .repeat ::ROWS - ::NROWS, R2
-        lda cols + (2*K + ((R2 + ::NROWS) .mod 2))*::COLLEN + R2 + ::NROWS,x
-        sta block + (R2 + ::NROWS)*::ROWSIZE + K*::SEGSIZE + 1
-          .endrep
-.ident(.sprintf("pdone%d", K)):
+        ; (ROWS = NROWS: no rows beyond)
         .endrep
 
         ; ---- 9. shorten bar A's rows where the sprite steals cycles -----------
@@ -729,39 +749,7 @@ steal9: lda y0
         lda #OP_BCC             ; sprite row: STEAL cycles shorter
 :       sta block + RR*::ROWSIZE + ::SEGS*::SEGSIZE
         .endrep
-        lda fo
-        cmp #::AGONE            ; (gone / replaying: only the first rows are used)
-        bcc :+
-        rts
-:       lda fo
-        bne :+
-        jmp @steald
-:       .repeat ::ROWS - ::NROWS, R2
-        txa
-        clc
-        adc #(R2 + ::NROWS)
-        cmp #21
-        lda #OP_BCS
-        bcs :+
-        lda #OP_BCC
-:       sta block + (R2 + ::NROWS)*::ROWSIZE + ::SEGS*::SEGSIZE
-        .endrep
 @steald:
-        ; ---- 10. the block's length: NROWS rows normally (a jmp to the end in row NROWS's first bytes), all ROWS in the fly-out ----
-        lda fo
-        bne @fullblk
-        lda #$4c                ; jmp blockend
-        sta block + ::NROWS*::ROWSIZE
-        lda #<blockend
-        sta block + ::NROWS*::ROWSIZE + 1
-        lda #>blockend
-        sta block + ::NROWS*::ROWSIZE + 2
-        rts
-@fullblk:
-        lda #$a9                ; lda #c (c is patched above)
-        sta block + ::NROWS*::ROWSIZE
-        lda #$8d                ; sta $d020
-        sta block + ::NROWS*::ROWSIZE + 2
         rts
 goneblk:                        ; bar A is gone: row 0 jumps straight to the end of the block, until the replay of goldfly's first bar starts
         lda fo
@@ -969,6 +957,17 @@ nextrow:
 ;  updateb: bar B for the next frame
 ; =============================================================================
 .proc updateb
+        lda ksh                 ; bar B uses the slant (kb) too, without bar A's clipping shift
+        beq @nks
+        .repeat ::SEGS, K
+        lda kb+K
+        sec
+        sbc ksh
+        sta kb+K
+        .endrep
+        lda #0
+        sta ksh
+@nks:
         lda bt                  ; bar B's phase: every frame, but it waits BPAUSE frames at t 220 (gone) before the next approach
         cmp #220
         bne @adv

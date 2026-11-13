@@ -15,7 +15,7 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = 512
-ROWS, ROWSB, SEGS, SEGSIZE, ROWSIZE = 57, 56, 5, 8, 47
+ROWS, ROWSB, SEGS, SEGSIZE, ROWSIZE = 33, 56, 5, 8, 47
 BMAXROWS = 48
 SEGW, DENLINE, STEAL, BTOP = 80, 44, 4, 231
 TOP, BOTTOM = 50, 300
