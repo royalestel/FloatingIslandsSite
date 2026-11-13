@@ -3,143 +3,140 @@
 rt0:
         lda #1
         sta 1217,x
-        lda #3
         sta 1218,x
-        lda #4
+        lda #3
         sta 1219,x
-        lda #6
+        lda #5
         sta 1220,x
-        lda #8
+        lda #6
         sta 1221,x
-        lda #9
+        lda #8
         sta 1222,x
-        lda #11
+        lda #10
         sta 1223,x
-        lda #13
+        lda #12
         sta 1224,x
-        lda #15
+        lda #14
         sta 1225,x
         lda #16
         sta 1226,x
         lda #18
         sta 1227,x
-        lda #20
+        lda #19
         sta 1228,x
         lda #53
         sta 1229,x
         lda #55
         sta 1230,x
+        lda #119
         sta 1231,x
-        lda #53
+        lda #117
         sta 1232,x
-        lda #20
+        lda #83
         sta 1233,x
-        lda #18
+        lda #82
         sta 1234,x
-        lda #16
+        lda #80
         sta 1235,x
-        lda #15
+        lda #78
         sta 1236,x
-        lda #13
+        lda #76
         sta 1237,x
-        lda #11
+        lda #74
         sta 1238,x
-        lda #9
+        lda #72
         sta 1239,x
-        lda #8
+        lda #70
         sta 1240,x
-        lda #6
+        lda #69
         sta 1241,x
-        lda #4
+        lda #67
         sta 1242,x
-        lda #3
+        lda #65
         sta 1243,x
-        lda #1
         sta 1244,x
         rts
 .segment "ROUTA"
 rt1:
         lda #65
         sta 1217,x
-        lda #67
         sta 1218,x
-        lda #68
+        lda #67
         sta 1219,x
-        lda #70
+        lda #69
         sta 1220,x
-        lda #72
+        lda #70
         sta 1221,x
-        lda #73
+        lda #72
         sta 1222,x
-        lda #75
+        lda #74
         sta 1223,x
-        lda #77
+        lda #76
         sta 1224,x
-        lda #79
+        lda #78
         sta 1225,x
         lda #80
         sta 1226,x
         lda #82
         sta 1227,x
-        lda #84
+        lda #83
         sta 1228,x
         lda #117
         sta 1229,x
         lda #119
         sta 1230,x
+        lda #55
         sta 1231,x
-        lda #117
+        lda #53
         sta 1232,x
-        lda #84
+        lda #19
         sta 1233,x
-        lda #82
+        lda #18
         sta 1234,x
-        lda #80
+        lda #16
         sta 1235,x
-        lda #79
+        lda #14
         sta 1236,x
-        lda #77
+        lda #12
         sta 1237,x
-        lda #75
+        lda #10
         sta 1238,x
-        lda #73
+        lda #8
         sta 1239,x
-        lda #72
+        lda #6
         sta 1240,x
-        lda #70
+        lda #5
         sta 1241,x
-        lda #68
+        lda #3
         sta 1242,x
-        lda #67
+        lda #1
         sta 1243,x
-        lda #65
         sta 1244,x
         rts
 .segment "ROUTA"
 rt2:
         lda #65
         sta 1217,x
-        lda #67
         sta 1218,x
-        lda #68
+        lda #67
         sta 1219,x
-        lda #70
+        lda #69
         sta 1220,x
-        lda #72
+        lda #70
         sta 1221,x
-        lda #73
+        lda #72
         sta 1222,x
-        lda #75
+        lda #74
         sta 1223,x
-        lda #77
+        lda #76
         sta 1224,x
-        lda #79
+        lda #78
         sta 1225,x
         lda #80
         sta 1226,x
         lda #82
         sta 1227,x
-        lda #84
+        lda #83
         sta 1228,x
         lda #117
         sta 1229,x
@@ -147,44 +144,42 @@ rt2:
         sta 1230,x
         lda #117
         sta 1231,x
-        lda #116
+        lda #115
         sta 1232,x
         lda #82
         sta 1233,x
         lda #80
         sta 1234,x
-        lda #79
+        lda #78
         sta 1235,x
-        lda #77
+        lda #76
         sta 1236,x
-        lda #75
+        lda #74
         sta 1237,x
-        lda #73
-        sta 1238,x
         lda #72
-        sta 1239,x
+        sta 1238,x
         lda #70
+        sta 1239,x
+        lda #69
         sta 1240,x
-        lda #68
-        sta 1241,x
         lda #67
-        sta 1242,x
+        sta 1241,x
         lda #65
+        sta 1242,x
         sta 1243,x
         rts
 .segment "ROUTA"
 rt3:
         lda #65
         sta 1217,x
-        lda #67
         sta 1218,x
-        lda #68
+        lda #67
         sta 1219,x
-        lda #70
+        lda #69
         sta 1220,x
-        lda #71
+        lda #70
         sta 1221,x
-        lda #73
+        lda #72
         sta 1222,x
         lda #74
         sta 1223,x
@@ -192,13 +187,12 @@ rt3:
         sta 1224,x
         lda #78
         sta 1225,x
-        lda #79
+        lda #80
         sta 1226,x
-        lda #81
         sta 1227,x
         lda #82
         sta 1228,x
-        lda #84
+        lda #83
         sta 1229,x
         lda #117
         sta 1230,x
@@ -206,13 +200,12 @@ rt3:
         sta 1231,x
         lda #117
         sta 1232,x
-        lda #116
+        lda #115
         sta 1233,x
         lda #82
         sta 1234,x
-        lda #81
+        lda #80
         sta 1235,x
-        lda #79
         sta 1236,x
         lda #78
         sta 1237,x
@@ -220,44 +213,42 @@ rt3:
         sta 1238,x
         lda #74
         sta 1239,x
-        lda #73
+        lda #72
         sta 1240,x
-        lda #71
-        sta 1241,x
         lda #70
+        sta 1241,x
+        lda #69
         sta 1242,x
-        lda #68
-        sta 1243,x
         lda #67
-        sta 1244,x
+        sta 1243,x
         lda #65
+        sta 1244,x
         sta 1245,x
         rts
 .segment "ROUTA"
 rt4:
         lda #1
         sta 1217,x
-        lda #3
         sta 1218,x
-        lda #4
+        lda #3
         sta 1219,x
-        lda #6
+        lda #5
         sta 1220,x
-        lda #8
+        lda #6
         sta 1221,x
-        lda #9
+        lda #8
         sta 1222,x
-        lda #11
+        lda #10
         sta 1223,x
-        lda #13
+        lda #12
         sta 1224,x
-        lda #15
+        lda #14
         sta 1225,x
         lda #16
         sta 1226,x
         lda #18
         sta 1227,x
-        lda #20
+        lda #19
         sta 1228,x
         lda #53
         sta 1229,x
@@ -265,44 +256,42 @@ rt4:
         sta 1230,x
         lda #53
         sta 1231,x
-        lda #52
+        lda #51
         sta 1232,x
         lda #18
         sta 1233,x
         lda #16
         sta 1234,x
-        lda #15
+        lda #14
         sta 1235,x
-        lda #13
+        lda #12
         sta 1236,x
-        lda #11
+        lda #10
         sta 1237,x
-        lda #9
-        sta 1238,x
         lda #8
-        sta 1239,x
+        sta 1238,x
         lda #6
+        sta 1239,x
+        lda #5
         sta 1240,x
-        lda #4
-        sta 1241,x
         lda #3
-        sta 1242,x
+        sta 1241,x
         lda #1
+        sta 1242,x
         sta 1243,x
         rts
 .segment "ROUTA"
 rt5:
         lda #1
         sta 1217,x
-        lda #3
         sta 1218,x
-        lda #4
+        lda #3
         sta 1219,x
-        lda #6
+        lda #5
         sta 1220,x
-        lda #7
+        lda #6
         sta 1221,x
-        lda #9
+        lda #8
         sta 1222,x
         lda #10
         sta 1223,x
@@ -310,13 +299,12 @@ rt5:
         sta 1224,x
         lda #14
         sta 1225,x
-        lda #15
+        lda #16
         sta 1226,x
-        lda #17
         sta 1227,x
         lda #18
         sta 1228,x
-        lda #20
+        lda #19
         sta 1229,x
         lda #53
         sta 1230,x
@@ -324,13 +312,12 @@ rt5:
         sta 1231,x
         lda #53
         sta 1232,x
-        lda #52
+        lda #51
         sta 1233,x
         lda #18
         sta 1234,x
-        lda #17
+        lda #16
         sta 1235,x
-        lda #15
         sta 1236,x
         lda #14
         sta 1237,x
@@ -338,17 +325,16 @@ rt5:
         sta 1238,x
         lda #10
         sta 1239,x
-        lda #9
+        lda #8
         sta 1240,x
-        lda #7
-        sta 1241,x
         lda #6
+        sta 1241,x
+        lda #5
         sta 1242,x
-        lda #4
-        sta 1243,x
         lda #3
-        sta 1244,x
+        sta 1243,x
         lda #1
+        sta 1244,x
         sta 1245,x
         rts
 .segment "ROUTA"
@@ -371,7 +357,7 @@ rt6:
         sta 1224,x
         lda #80
         sta 1225,x
-        lda #81
+        lda #82
         sta 1226,x
         lda #83
         sta 1227,x
@@ -379,30 +365,31 @@ rt6:
         sta 1228,x
         lda #119
         sta 1229,x
+        lda #55
         sta 1230,x
-        lda #117
+        lda #53
         sta 1231,x
-        lda #83
+        lda #19
         sta 1232,x
-        lda #81
+        lda #18
         sta 1233,x
-        lda #80
+        lda #16
         sta 1234,x
-        lda #78
+        lda #14
         sta 1235,x
-        lda #76
+        lda #12
         sta 1236,x
-        lda #74
+        lda #10
         sta 1237,x
-        lda #72
+        lda #8
         sta 1238,x
-        lda #70
+        lda #6
         sta 1239,x
-        lda #69
+        lda #5
         sta 1240,x
-        lda #67
+        lda #3
         sta 1241,x
-        lda #65
+        lda #1
         sta 1242,x
         rts
 .segment "ROUTA"
@@ -425,7 +412,7 @@ rt7:
         sta 1224,x
         lda #16
         sta 1225,x
-        lda #17
+        lda #18
         sta 1226,x
         lda #19
         sta 1227,x
@@ -433,30 +420,31 @@ rt7:
         sta 1228,x
         lda #55
         sta 1229,x
+        lda #119
         sta 1230,x
-        lda #53
+        lda #117
         sta 1231,x
-        lda #19
+        lda #83
         sta 1232,x
-        lda #17
+        lda #82
         sta 1233,x
-        lda #16
+        lda #80
         sta 1234,x
-        lda #14
+        lda #78
         sta 1235,x
-        lda #12
+        lda #76
         sta 1236,x
-        lda #10
+        lda #74
         sta 1237,x
-        lda #8
+        lda #72
         sta 1238,x
-        lda #6
+        lda #70
         sta 1239,x
-        lda #5
+        lda #69
         sta 1240,x
-        lda #3
+        lda #67
         sta 1241,x
-        lda #1
+        lda #65
         sta 1242,x
         rts
 .segment "ROUTA"
@@ -479,7 +467,7 @@ rt8:
         sta 1224,x
         lda #16
         sta 1225,x
-        lda #17
+        lda #18
         sta 1226,x
         lda #19
         sta 1227,x
@@ -491,7 +479,7 @@ rt8:
         sta 1230,x
         lda #51
         sta 1231,x
-        lda #17
+        lda #18
         sta 1232,x
         lda #16
         sta 1233,x
@@ -532,7 +520,7 @@ rt9:
         sta 1224,x
         lda #80
         sta 1225,x
-        lda #81
+        lda #82
         sta 1226,x
         lda #83
         sta 1227,x
@@ -544,7 +532,7 @@ rt9:
         sta 1230,x
         lda #115
         sta 1231,x
-        lda #81
+        lda #82
         sta 1232,x
         lda #80
         sta 1233,x
@@ -569,124 +557,118 @@ rt9:
 rt10:
         lda #1
         sta 1217,x
-        lda #3
         sta 1218,x
-        lda #4
+        lda #3
         sta 1219,x
-        lda #6
+        lda #5
         sta 1220,x
-        lda #7
+        lda #6
         sta 1221,x
-        lda #9
+        lda #8
         sta 1222,x
         lda #10
         sta 1223,x
         lda #12
         sta 1224,x
-        lda #14
         sta 1225,x
-        lda #15
+        lda #14
         sta 1226,x
-        lda #17
+        lda #16
         sta 1227,x
         lda #18
         sta 1228,x
-        lda #20
+        lda #19
         sta 1229,x
         lda #53
         sta 1230,x
         lda #55
         sta 1231,x
+        lda #119
         sta 1232,x
-        lda #53
+        lda #117
         sta 1233,x
-        lda #20
+        lda #83
         sta 1234,x
-        lda #18
+        lda #82
         sta 1235,x
-        lda #17
+        lda #80
         sta 1236,x
-        lda #15
+        lda #78
         sta 1237,x
-        lda #14
+        lda #76
         sta 1238,x
-        lda #12
         sta 1239,x
-        lda #10
+        lda #74
         sta 1240,x
-        lda #9
+        lda #72
         sta 1241,x
-        lda #7
+        lda #70
         sta 1242,x
-        lda #6
+        lda #69
         sta 1243,x
-        lda #4
+        lda #67
         sta 1244,x
-        lda #3
+        lda #65
         sta 1245,x
-        lda #1
         sta 1246,x
         rts
 .segment "ROUTA"
 rt11:
         lda #65
         sta 1217,x
-        lda #67
         sta 1218,x
-        lda #68
+        lda #67
         sta 1219,x
-        lda #70
+        lda #69
         sta 1220,x
-        lda #71
+        lda #70
         sta 1221,x
-        lda #73
+        lda #72
         sta 1222,x
         lda #74
         sta 1223,x
         lda #76
         sta 1224,x
-        lda #78
         sta 1225,x
-        lda #79
+        lda #78
         sta 1226,x
-        lda #81
+        lda #80
         sta 1227,x
         lda #82
         sta 1228,x
-        lda #84
+        lda #83
         sta 1229,x
         lda #117
         sta 1230,x
         lda #119
         sta 1231,x
+        lda #55
         sta 1232,x
-        lda #117
+        lda #53
         sta 1233,x
-        lda #84
+        lda #19
         sta 1234,x
-        lda #82
+        lda #18
         sta 1235,x
-        lda #81
+        lda #16
         sta 1236,x
-        lda #79
+        lda #14
         sta 1237,x
-        lda #78
+        lda #12
         sta 1238,x
-        lda #76
         sta 1239,x
-        lda #74
+        lda #10
         sta 1240,x
-        lda #73
+        lda #8
         sta 1241,x
-        lda #71
+        lda #6
         sta 1242,x
-        lda #70
+        lda #5
         sta 1243,x
-        lda #68
+        lda #3
         sta 1244,x
-        lda #67
+        lda #1
         sta 1245,x
-        lda #65
         sta 1246,x
         rts
 .segment "ROUTA"
@@ -715,28 +697,29 @@ rt12:
         sta 1227,x
         lda #119
         sta 1228,x
+        lda #55
         sta 1229,x
-        lda #117
+        lda #53
         sta 1230,x
-        lda #83
+        lda #19
         sta 1231,x
-        lda #81
+        lda #17
         sta 1232,x
-        lda #79
+        lda #15
         sta 1233,x
-        lda #77
+        lda #13
         sta 1234,x
-        lda #75
+        lda #11
         sta 1235,x
-        lda #73
+        lda #9
         sta 1236,x
-        lda #71
+        lda #7
         sta 1237,x
-        lda #69
+        lda #5
         sta 1238,x
-        lda #67
+        lda #3
         sta 1239,x
-        lda #65
+        lda #1
         sta 1240,x
         rts
 .segment "ROUTA"
@@ -765,224 +748,210 @@ rt13:
         sta 1227,x
         lda #55
         sta 1228,x
+        lda #119
         sta 1229,x
-        lda #53
+        lda #117
         sta 1230,x
-        lda #19
+        lda #83
         sta 1231,x
-        lda #17
+        lda #81
         sta 1232,x
-        lda #15
+        lda #79
         sta 1233,x
-        lda #13
+        lda #77
         sta 1234,x
-        lda #11
+        lda #75
         sta 1235,x
-        lda #9
+        lda #73
         sta 1236,x
-        lda #7
+        lda #71
         sta 1237,x
-        lda #5
+        lda #69
         sta 1238,x
-        lda #3
+        lda #67
         sta 1239,x
-        lda #1
+        lda #65
         sta 1240,x
         rts
 .segment "ROUTA"
 rt14:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #68
+        lda #67
         sta 1219,x
         lda #69
         sta 1220,x
-        lda #71
+        lda #70
         sta 1221,x
         lda #72
         sta 1222,x
         lda #74
         sta 1223,x
-        lda #75
         sta 1224,x
-        lda #77
+        lda #76
         sta 1225,x
         lda #78
         sta 1226,x
         lda #80
         sta 1227,x
-        lda #81
+        lda #82
         sta 1228,x
         lda #83
         sta 1229,x
-        lda #84
         sta 1230,x
-        lda #118
+        lda #117
         sta 1231,x
         lda #119
         sta 1232,x
-        lda #118
+        lda #117
         sta 1233,x
-        lda #116
+        lda #115
         sta 1234,x
         lda #83
         sta 1235,x
-        lda #81
+        lda #82
         sta 1236,x
         lda #80
         sta 1237,x
         lda #78
         sta 1238,x
-        lda #77
+        lda #76
         sta 1239,x
-        lda #75
-        sta 1240,x
         lda #74
+        sta 1240,x
         sta 1241,x
         lda #72
         sta 1242,x
-        lda #71
+        lda #70
         sta 1243,x
         lda #69
         sta 1244,x
-        lda #68
+        lda #67
         sta 1245,x
-        lda #66
-        sta 1246,x
         lda #65
+        sta 1246,x
         sta 1247,x
         rts
 .segment "ROUTA"
 rt15:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #4
+        lda #3
         sta 1219,x
         lda #5
         sta 1220,x
-        lda #7
+        lda #6
         sta 1221,x
         lda #8
         sta 1222,x
         lda #10
         sta 1223,x
-        lda #11
         sta 1224,x
-        lda #13
+        lda #12
         sta 1225,x
         lda #14
         sta 1226,x
         lda #16
         sta 1227,x
-        lda #17
+        lda #18
         sta 1228,x
         lda #19
         sta 1229,x
-        lda #20
         sta 1230,x
-        lda #54
+        lda #53
         sta 1231,x
         lda #55
         sta 1232,x
-        lda #54
+        lda #53
         sta 1233,x
-        lda #52
+        lda #51
         sta 1234,x
         lda #19
         sta 1235,x
-        lda #17
+        lda #18
         sta 1236,x
         lda #16
         sta 1237,x
         lda #14
         sta 1238,x
-        lda #13
+        lda #12
         sta 1239,x
-        lda #11
-        sta 1240,x
         lda #10
+        sta 1240,x
         sta 1241,x
         lda #8
         sta 1242,x
-        lda #7
+        lda #6
         sta 1243,x
         lda #5
         sta 1244,x
-        lda #4
+        lda #3
         sta 1245,x
-        lda #2
-        sta 1246,x
         lda #1
+        sta 1246,x
         sta 1247,x
         rts
 .segment "ROUTA"
 rt16:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #4
+        lda #3
         sta 1219,x
         lda #5
         sta 1220,x
-        lda #7
+        lda #6
         sta 1221,x
         lda #8
         sta 1222,x
-        lda #10
         sta 1223,x
-        lda #11
+        lda #10
         sta 1224,x
-        lda #13
+        lda #12
         sta 1225,x
         lda #14
         sta 1226,x
         lda #16
         sta 1227,x
-        lda #17
         sta 1228,x
-        lda #19
+        lda #18
         sta 1229,x
-        lda #20
+        lda #19
         sta 1230,x
-        lda #54
+        lda #53
         sta 1231,x
         lda #55
         sta 1232,x
+        lda #119
         sta 1233,x
-        lda #54
+        lda #117
         sta 1234,x
-        lda #20
+        lda #83
         sta 1235,x
-        lda #19
+        lda #82
         sta 1236,x
-        lda #17
+        lda #80
         sta 1237,x
-        lda #16
         sta 1238,x
-        lda #14
+        lda #78
         sta 1239,x
-        lda #13
+        lda #76
         sta 1240,x
-        lda #11
+        lda #74
         sta 1241,x
-        lda #10
+        lda #72
         sta 1242,x
-        lda #8
         sta 1243,x
-        lda #7
+        lda #70
         sta 1244,x
-        lda #5
+        lda #69
         sta 1245,x
-        lda #4
+        lda #67
         sta 1246,x
-        lda #2
+        lda #65
         sta 1247,x
-        lda #1
         sta 1248,x
         rts
 .segment "ROUTA"
@@ -1087,91 +1056,83 @@ rt18:
 rt19:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #68
+        lda #67
         sta 1219,x
         lda #69
         sta 1220,x
-        lda #71
+        lda #70
         sta 1221,x
         lda #72
         sta 1222,x
-        lda #74
         sta 1223,x
-        lda #75
+        lda #74
         sta 1224,x
-        lda #77
+        lda #76
         sta 1225,x
         lda #78
         sta 1226,x
         lda #80
         sta 1227,x
-        lda #81
         sta 1228,x
-        lda #83
+        lda #82
         sta 1229,x
-        lda #84
+        lda #83
         sta 1230,x
-        lda #118
+        lda #117
         sta 1231,x
         lda #119
         sta 1232,x
+        lda #55
         sta 1233,x
-        lda #118
+        lda #53
         sta 1234,x
-        lda #84
+        lda #19
         sta 1235,x
-        lda #83
+        lda #18
         sta 1236,x
-        lda #81
+        lda #16
         sta 1237,x
-        lda #80
         sta 1238,x
-        lda #78
+        lda #14
         sta 1239,x
-        lda #77
+        lda #12
         sta 1240,x
-        lda #75
+        lda #10
         sta 1241,x
-        lda #74
+        lda #8
         sta 1242,x
-        lda #72
         sta 1243,x
-        lda #71
+        lda #6
         sta 1244,x
-        lda #69
+        lda #5
         sta 1245,x
-        lda #68
+        lda #3
         sta 1246,x
-        lda #66
+        lda #1
         sta 1247,x
-        lda #65
         sta 1248,x
         rts
 .segment "ROUTA"
 rt20:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #4
+        lda #3
         sta 1219,x
         lda #5
         sta 1220,x
-        lda #7
+        lda #6
         sta 1221,x
-        lda #8
         sta 1222,x
-        lda #9
+        lda #8
         sta 1223,x
-        lda #11
+        lda #10
         sta 1224,x
         lda #12
         sta 1225,x
-        lda #13
+        lda #14
         sta 1226,x
-        lda #15
         sta 1227,x
         lda #16
         sta 1228,x
@@ -1179,15 +1140,14 @@ rt20:
         sta 1229,x
         lda #19
         sta 1230,x
-        lda #20
+        lda #21
         sta 1231,x
-        lda #54
+        lda #53
         sta 1232,x
         lda #55
         sta 1233,x
-        lda #54
+        lda #53
         sta 1234,x
-        lda #52
         sta 1235,x
         lda #19
         sta 1236,x
@@ -1195,52 +1155,46 @@ rt20:
         sta 1237,x
         lda #16
         sta 1238,x
-        lda #15
+        lda #14
         sta 1239,x
-        lda #13
         sta 1240,x
         lda #12
         sta 1241,x
-        lda #11
+        lda #10
         sta 1242,x
-        lda #9
-        sta 1243,x
         lda #8
+        sta 1243,x
+        lda #6
         sta 1244,x
-        lda #7
         sta 1245,x
         lda #5
         sta 1246,x
-        lda #4
+        lda #3
         sta 1247,x
-        lda #2
-        sta 1248,x
         lda #1
+        sta 1248,x
         sta 1249,x
         rts
 .segment "ROUTA"
 rt21:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #68
+        lda #67
         sta 1219,x
         lda #69
         sta 1220,x
-        lda #71
+        lda #70
         sta 1221,x
-        lda #72
         sta 1222,x
-        lda #73
+        lda #72
         sta 1223,x
-        lda #75
+        lda #74
         sta 1224,x
         lda #76
         sta 1225,x
-        lda #77
+        lda #78
         sta 1226,x
-        lda #79
         sta 1227,x
         lda #80
         sta 1228,x
@@ -1248,15 +1202,14 @@ rt21:
         sta 1229,x
         lda #83
         sta 1230,x
-        lda #84
+        lda #85
         sta 1231,x
-        lda #118
+        lda #117
         sta 1232,x
         lda #119
         sta 1233,x
-        lda #118
+        lda #117
         sta 1234,x
-        lda #116
         sta 1235,x
         lda #83
         sta 1236,x
@@ -1264,170 +1217,151 @@ rt21:
         sta 1237,x
         lda #80
         sta 1238,x
-        lda #79
+        lda #78
         sta 1239,x
-        lda #77
         sta 1240,x
         lda #76
         sta 1241,x
-        lda #75
+        lda #74
         sta 1242,x
-        lda #73
-        sta 1243,x
         lda #72
+        sta 1243,x
+        lda #70
         sta 1244,x
-        lda #71
         sta 1245,x
         lda #69
         sta 1246,x
-        lda #68
+        lda #67
         sta 1247,x
-        lda #66
-        sta 1248,x
         lda #65
+        sta 1248,x
         sta 1249,x
         rts
 .segment "ROUTA"
 rt22:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #68
+        lda #67
         sta 1219,x
         lda #69
         sta 1220,x
-        lda #71
+        lda #70
         sta 1221,x
-        lda #72
         sta 1222,x
-        lda #73
+        lda #72
         sta 1223,x
-        lda #75
+        lda #74
         sta 1224,x
         lda #76
         sta 1225,x
-        lda #77
         sta 1226,x
-        lda #79
+        lda #78
         sta 1227,x
         lda #80
         sta 1228,x
         lda #82
         sta 1229,x
-        lda #83
         sta 1230,x
-        lda #84
+        lda #83
         sta 1231,x
-        lda #118
+        lda #117
         sta 1232,x
         lda #119
         sta 1233,x
+        lda #55
         sta 1234,x
-        lda #118
+        lda #53
         sta 1235,x
-        lda #84
+        lda #19
         sta 1236,x
-        lda #83
+        lda #18
         sta 1237,x
-        lda #82
         sta 1238,x
-        lda #80
+        lda #16
         sta 1239,x
-        lda #79
+        lda #14
         sta 1240,x
-        lda #77
+        lda #12
         sta 1241,x
-        lda #76
         sta 1242,x
-        lda #75
+        lda #10
         sta 1243,x
-        lda #73
+        lda #8
         sta 1244,x
-        lda #72
+        lda #6
         sta 1245,x
-        lda #71
         sta 1246,x
-        lda #69
+        lda #5
         sta 1247,x
-        lda #68
+        lda #3
         sta 1248,x
-        lda #66
+        lda #1
         sta 1249,x
-        lda #65
         sta 1250,x
         rts
 .segment "ROUTA"
 rt23:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #68
+        lda #67
         sta 1219,x
         lda #69
         sta 1220,x
-        lda #70
         sta 1221,x
-        lda #71
+        lda #70
         sta 1222,x
-        lda #73
+        lda #72
         sta 1223,x
         lda #74
         sta 1224,x
-        lda #75
         sta 1225,x
-        lda #77
+        lda #76
         sta 1226,x
         lda #78
         sta 1227,x
-        lda #79
+        lda #80
         sta 1228,x
-        lda #81
         sta 1229,x
         lda #82
         sta 1230,x
         lda #83
         sta 1231,x
-        lda #84
+        lda #85
         sta 1232,x
-        lda #118
+        lda #117
         sta 1233,x
         lda #119
         sta 1234,x
-        lda #118
+        lda #117
         sta 1235,x
-        lda #116
         sta 1236,x
         lda #83
         sta 1237,x
         lda #82
         sta 1238,x
-        lda #81
+        lda #80
         sta 1239,x
-        lda #79
         sta 1240,x
         lda #78
         sta 1241,x
-        lda #77
+        lda #76
         sta 1242,x
-        lda #75
-        sta 1243,x
         lda #74
+        sta 1243,x
         sta 1244,x
-        lda #73
+        lda #72
         sta 1245,x
-        lda #71
-        sta 1246,x
         lda #70
-        sta 1247,x
+        sta 1246,x
         lda #69
+        sta 1247,x
         sta 1248,x
-        lda #68
+        lda #67
         sta 1249,x
-        lda #66
-        sta 1250,x
         lda #65
+        sta 1250,x
         sta 1251,x
         rts
 .segment "ROUTA"
@@ -1454,26 +1388,27 @@ rt24:
         sta 1226,x
         lda #55
         sta 1227,x
+        lda #119
         sta 1228,x
-        lda #53
+        lda #117
         sta 1229,x
-        lda #19
+        lda #83
         sta 1230,x
-        lda #16
+        lda #80
         sta 1231,x
-        lda #14
+        lda #78
         sta 1232,x
-        lda #12
+        lda #76
         sta 1233,x
-        lda #10
+        lda #74
         sta 1234,x
-        lda #8
+        lda #72
         sta 1235,x
-        lda #5
+        lda #69
         sta 1236,x
-        lda #3
+        lda #67
         sta 1237,x
-        lda #1
+        lda #65
         sta 1238,x
         rts
 .segment "ROUTA"
@@ -1500,495 +1435,426 @@ rt25:
         sta 1226,x
         lda #119
         sta 1227,x
+        lda #55
         sta 1228,x
-        lda #117
+        lda #53
         sta 1229,x
-        lda #83
+        lda #19
         sta 1230,x
-        lda #80
+        lda #16
         sta 1231,x
-        lda #78
+        lda #14
         sta 1232,x
-        lda #76
+        lda #12
         sta 1233,x
-        lda #74
+        lda #10
         sta 1234,x
-        lda #72
+        lda #8
         sta 1235,x
-        lda #69
+        lda #5
         sta 1236,x
-        lda #67
+        lda #3
         sta 1237,x
-        lda #65
+        lda #1
         sta 1238,x
         rts
 .segment "ROUTA"
 rt26:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #68
+        lda #67
         sta 1219,x
         lda #69
         sta 1220,x
-        lda #70
         sta 1221,x
-        lda #71
+        lda #70
         sta 1222,x
-        lda #73
+        lda #72
         sta 1223,x
         lda #74
         sta 1224,x
-        lda #75
         sta 1225,x
-        lda #77
+        lda #76
         sta 1226,x
         lda #78
         sta 1227,x
-        lda #79
         sta 1228,x
-        lda #81
+        lda #80
         sta 1229,x
         lda #82
         sta 1230,x
         lda #83
         sta 1231,x
-        lda #84
         sta 1232,x
-        lda #118
+        lda #117
         sta 1233,x
         lda #119
         sta 1234,x
+        lda #55
         sta 1235,x
-        lda #118
+        lda #53
         sta 1236,x
-        lda #84
+        lda #19
         sta 1237,x
-        lda #83
         sta 1238,x
-        lda #82
+        lda #18
         sta 1239,x
-        lda #81
+        lda #16
         sta 1240,x
-        lda #79
+        lda #14
         sta 1241,x
-        lda #78
         sta 1242,x
-        lda #77
+        lda #12
         sta 1243,x
-        lda #75
+        lda #10
         sta 1244,x
-        lda #74
         sta 1245,x
-        lda #73
+        lda #8
         sta 1246,x
-        lda #71
+        lda #6
         sta 1247,x
-        lda #70
+        lda #5
         sta 1248,x
-        lda #69
         sta 1249,x
-        lda #68
+        lda #3
         sta 1250,x
-        lda #66
+        lda #1
         sta 1251,x
-        lda #65
         sta 1252,x
         rts
 .segment "ROUTA"
 rt27:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
         lda #5
         sta 1220,x
-        lda #6
         sta 1221,x
-        lda #7
+        lda #6
         sta 1222,x
         lda #8
         sta 1223,x
-        lda #10
         sta 1224,x
-        lda #11
+        lda #10
         sta 1225,x
         lda #12
         sta 1226,x
-        lda #13
-        sta 1227,x
         lda #14
+        sta 1227,x
         sta 1228,x
         lda #16
         sta 1229,x
-        lda #17
-        sta 1230,x
         lda #18
+        sta 1230,x
         sta 1231,x
         lda #19
         sta 1232,x
         lda #21
         sta 1233,x
-        lda #54
+        lda #53
         sta 1234,x
         lda #55
         sta 1235,x
-        lda #54
-        sta 1236,x
         lda #53
+        sta 1236,x
         sta 1237,x
         lda #19
         sta 1238,x
         lda #18
         sta 1239,x
-        lda #17
         sta 1240,x
         lda #16
         sta 1241,x
         lda #14
         sta 1242,x
-        lda #13
         sta 1243,x
         lda #12
         sta 1244,x
-        lda #11
-        sta 1245,x
         lda #10
-        sta 1246,x
+        sta 1245,x
         lda #8
+        sta 1246,x
         sta 1247,x
-        lda #7
-        sta 1248,x
         lda #6
-        sta 1249,x
+        sta 1248,x
         lda #5
+        sta 1249,x
         sta 1250,x
         lda #3
         sta 1251,x
-        lda #2
-        sta 1252,x
         lda #1
+        sta 1252,x
         sta 1253,x
         rts
 .segment "ROUTA"
 rt28:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
         lda #5
         sta 1220,x
-        lda #6
         sta 1221,x
-        lda #7
+        lda #6
         sta 1222,x
         lda #8
         sta 1223,x
-        lda #10
         sta 1224,x
-        lda #11
+        lda #10
         sta 1225,x
         lda #12
         sta 1226,x
-        lda #13
         sta 1227,x
         lda #14
         sta 1228,x
         lda #16
         sta 1229,x
-        lda #17
         sta 1230,x
         lda #18
         sta 1231,x
         lda #19
         sta 1232,x
-        lda #21
         sta 1233,x
-        lda #54
+        lda #53
         sta 1234,x
         lda #55
         sta 1235,x
+        lda #119
         sta 1236,x
-        lda #54
+        lda #117
         sta 1237,x
-        lda #21
+        lda #83
         sta 1238,x
-        lda #19
         sta 1239,x
-        lda #18
+        lda #82
         sta 1240,x
-        lda #17
+        lda #80
         sta 1241,x
-        lda #16
         sta 1242,x
-        lda #14
+        lda #78
         sta 1243,x
-        lda #13
+        lda #76
         sta 1244,x
-        lda #12
         sta 1245,x
-        lda #11
+        lda #74
         sta 1246,x
-        lda #10
+        lda #72
         sta 1247,x
-        lda #8
         sta 1248,x
-        lda #7
+        lda #70
         sta 1249,x
-        lda #6
+        lda #69
         sta 1250,x
-        lda #5
         sta 1251,x
-        lda #3
+        lda #67
         sta 1252,x
-        lda #2
+        lda #65
         sta 1253,x
-        lda #1
         sta 1254,x
         rts
 .segment "ROUTA"
 rt29:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
         lda #69
         sta 1220,x
-        lda #70
         sta 1221,x
-        lda #71
+        lda #70
         sta 1222,x
         lda #72
         sta 1223,x
-        lda #74
         sta 1224,x
-        lda #75
+        lda #74
         sta 1225,x
         lda #76
         sta 1226,x
-        lda #77
         sta 1227,x
         lda #78
         sta 1228,x
         lda #80
         sta 1229,x
-        lda #81
         sta 1230,x
         lda #82
         sta 1231,x
         lda #83
         sta 1232,x
-        lda #85
         sta 1233,x
-        lda #118
+        lda #117
         sta 1234,x
         lda #119
         sta 1235,x
+        lda #55
         sta 1236,x
-        lda #118
+        lda #53
         sta 1237,x
-        lda #85
+        lda #19
         sta 1238,x
-        lda #83
         sta 1239,x
-        lda #82
+        lda #18
         sta 1240,x
-        lda #81
+        lda #16
         sta 1241,x
-        lda #80
         sta 1242,x
-        lda #78
+        lda #14
         sta 1243,x
-        lda #77
+        lda #12
         sta 1244,x
-        lda #76
         sta 1245,x
-        lda #75
+        lda #10
         sta 1246,x
-        lda #74
+        lda #8
         sta 1247,x
-        lda #72
         sta 1248,x
-        lda #71
+        lda #6
         sta 1249,x
-        lda #70
+        lda #5
         sta 1250,x
-        lda #69
         sta 1251,x
-        lda #67
+        lda #3
         sta 1252,x
-        lda #66
+        lda #1
         sta 1253,x
-        lda #65
         sta 1254,x
         rts
 .segment "ROUTA"
 rt30:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
+        lda #5
         sta 1220,x
-        lda #6
         sta 1221,x
-        lda #7
+        lda #6
         sta 1222,x
         lda #8
         sta 1223,x
-        lda #9
         sta 1224,x
         lda #10
         sta 1225,x
-        lda #11
+        lda #12
         sta 1226,x
-        lda #13
         sta 1227,x
         lda #14
         sta 1228,x
-        lda #15
-        sta 1229,x
         lda #16
+        sta 1229,x
         sta 1230,x
-        lda #17
-        sta 1231,x
         lda #18
+        sta 1231,x
+        lda #19
         sta 1232,x
-        lda #20
         sta 1233,x
         lda #21
         sta 1234,x
-        lda #54
-        sta 1235,x
         lda #55
+        sta 1235,x
         sta 1236,x
-        lda #54
         sta 1237,x
         lda #53
         sta 1238,x
-        lda #20
+        lda #19
         sta 1239,x
-        lda #18
         sta 1240,x
-        lda #17
+        lda #18
         sta 1241,x
         lda #16
         sta 1242,x
-        lda #15
         sta 1243,x
         lda #14
         sta 1244,x
-        lda #13
+        lda #12
         sta 1245,x
-        lda #11
         sta 1246,x
         lda #10
         sta 1247,x
-        lda #9
-        sta 1248,x
         lda #8
+        sta 1248,x
         sta 1249,x
-        lda #7
-        sta 1250,x
         lda #6
+        sta 1250,x
+        lda #5
         sta 1251,x
-        lda #4
         sta 1252,x
         lda #3
         sta 1253,x
-        lda #2
-        sta 1254,x
         lda #1
+        sta 1254,x
         sta 1255,x
         rts
 .segment "ROUTA"
 rt31:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
+        lda #69
         sta 1220,x
-        lda #70
         sta 1221,x
-        lda #71
+        lda #70
         sta 1222,x
         lda #72
         sta 1223,x
-        lda #73
         sta 1224,x
         lda #74
         sta 1225,x
-        lda #75
+        lda #76
         sta 1226,x
-        lda #77
         sta 1227,x
         lda #78
         sta 1228,x
-        lda #79
-        sta 1229,x
         lda #80
+        sta 1229,x
         sta 1230,x
-        lda #81
-        sta 1231,x
         lda #82
+        sta 1231,x
+        lda #83
         sta 1232,x
-        lda #84
         sta 1233,x
         lda #85
         sta 1234,x
-        lda #118
-        sta 1235,x
         lda #119
+        sta 1235,x
         sta 1236,x
-        lda #118
         sta 1237,x
         lda #117
         sta 1238,x
-        lda #84
+        lda #83
         sta 1239,x
-        lda #82
         sta 1240,x
-        lda #81
+        lda #82
         sta 1241,x
         lda #80
         sta 1242,x
-        lda #79
         sta 1243,x
         lda #78
         sta 1244,x
-        lda #77
+        lda #76
         sta 1245,x
-        lda #75
         sta 1246,x
         lda #74
         sta 1247,x
-        lda #73
-        sta 1248,x
         lda #72
+        sta 1248,x
         sta 1249,x
-        lda #71
-        sta 1250,x
         lda #70
+        sta 1250,x
+        lda #69
         sta 1251,x
-        lda #68
         sta 1252,x
         lda #67
         sta 1253,x
-        lda #66
-        sta 1254,x
         lda #65
+        sta 1254,x
         sta 1255,x
         rts
 .segment "ROUTA"
@@ -2040,82 +1906,71 @@ rt32:
 rt33:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
-        lda #6
+        lda #5
         sta 1221,x
-        lda #7
+        lda #6
         sta 1222,x
-        lda #8
         sta 1223,x
-        lda #9
+        lda #8
         sta 1224,x
         lda #10
         sta 1225,x
-        lda #11
         sta 1226,x
-        lda #13
+        lda #12
         sta 1227,x
         lda #14
         sta 1228,x
-        lda #15
         sta 1229,x
         lda #16
         sta 1230,x
-        lda #17
-        sta 1231,x
         lda #18
+        sta 1231,x
         sta 1232,x
-        lda #20
+        lda #19
         sta 1233,x
         lda #21
         sta 1234,x
-        lda #54
+        lda #53
         sta 1235,x
         lda #55
         sta 1236,x
+        lda #119
         sta 1237,x
-        lda #54
+        lda #117
         sta 1238,x
-        lda #21
+        lda #85
         sta 1239,x
-        lda #20
+        lda #83
         sta 1240,x
-        lda #18
+        lda #82
         sta 1241,x
-        lda #17
         sta 1242,x
-        lda #16
+        lda #80
         sta 1243,x
-        lda #15
+        lda #78
         sta 1244,x
-        lda #14
         sta 1245,x
-        lda #13
+        lda #76
         sta 1246,x
-        lda #11
+        lda #74
         sta 1247,x
-        lda #10
         sta 1248,x
-        lda #9
+        lda #72
         sta 1249,x
-        lda #8
+        lda #70
         sta 1250,x
-        lda #7
         sta 1251,x
-        lda #6
+        lda #69
         sta 1252,x
-        lda #4
+        lda #67
         sta 1253,x
-        lda #3
         sta 1254,x
-        lda #2
+        lda #65
         sta 1255,x
-        lda #1
         sta 1256,x
         rts
 .segment "ROUTA"
@@ -2167,85 +2022,69 @@ rt34:
 rt35:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
         lda #69
         sta 1221,x
         lda #70
         sta 1222,x
-        lda #72
         sta 1223,x
-        lda #73
+        lda #72
         sta 1224,x
         lda #74
         sta 1225,x
-        lda #75
         sta 1226,x
         lda #76
         sta 1227,x
-        lda #77
         sta 1228,x
         lda #78
         sta 1229,x
-        lda #79
-        sta 1230,x
         lda #80
+        sta 1230,x
         sta 1231,x
-        lda #81
+        lda #82
         sta 1232,x
         lda #83
         sta 1233,x
-        lda #84
         sta 1234,x
         lda #85
         sta 1235,x
-        lda #118
-        sta 1236,x
         lda #119
+        sta 1236,x
         sta 1237,x
-        lda #118
         sta 1238,x
         lda #117
         sta 1239,x
-        lda #84
-        sta 1240,x
         lda #83
+        sta 1240,x
         sta 1241,x
-        lda #81
+        lda #82
         sta 1242,x
         lda #80
         sta 1243,x
-        lda #79
         sta 1244,x
         lda #78
         sta 1245,x
-        lda #77
-        sta 1246,x
         lda #76
+        sta 1246,x
         sta 1247,x
-        lda #75
-        sta 1248,x
         lda #74
+        sta 1248,x
         sta 1249,x
-        lda #73
-        sta 1250,x
         lda #72
-        sta 1251,x
+        sta 1250,x
         lda #70
+        sta 1251,x
         sta 1252,x
         lda #69
         sta 1253,x
-        lda #68
-        sta 1254,x
         lda #67
+        sta 1254,x
         sta 1255,x
-        lda #66
-        sta 1256,x
         lda #65
+        sta 1256,x
         sta 1257,x
         rts
 .segment "ROUTA"
@@ -2270,109 +2109,94 @@ rt36:
         sta 1225,x
         lda #119
         sta 1226,x
+        lda #55
         sta 1227,x
-        lda #117
+        lda #53
         sta 1228,x
-        lda #82
+        lda #18
         sta 1229,x
-        lda #80
+        lda #16
         sta 1230,x
-        lda #77
+        lda #13
         sta 1231,x
-        lda #75
+        lda #11
         sta 1232,x
-        lda #72
+        lda #8
         sta 1233,x
-        lda #70
+        lda #6
         sta 1234,x
-        lda #67
+        lda #3
         sta 1235,x
-        lda #65
+        lda #1
         sta 1236,x
         rts
 .segment "ROUTA"
 rt37:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
         lda #6
         sta 1222,x
-        lda #8
         sta 1223,x
-        lda #9
+        lda #8
         sta 1224,x
         lda #10
         sta 1225,x
-        lda #11
         sta 1226,x
         lda #12
         sta 1227,x
-        lda #13
         sta 1228,x
         lda #14
         sta 1229,x
-        lda #15
-        sta 1230,x
         lda #16
+        sta 1230,x
         sta 1231,x
-        lda #17
+        lda #18
         sta 1232,x
         lda #19
         sta 1233,x
-        lda #20
         sta 1234,x
         lda #21
         sta 1235,x
-        lda #54
-        sta 1236,x
         lda #55
+        sta 1236,x
         sta 1237,x
-        lda #54
         sta 1238,x
         lda #53
         sta 1239,x
-        lda #20
-        sta 1240,x
         lda #19
+        sta 1240,x
         sta 1241,x
-        lda #17
+        lda #18
         sta 1242,x
         lda #16
         sta 1243,x
-        lda #15
         sta 1244,x
         lda #14
         sta 1245,x
-        lda #13
-        sta 1246,x
         lda #12
+        sta 1246,x
         sta 1247,x
-        lda #11
-        sta 1248,x
         lda #10
+        sta 1248,x
         sta 1249,x
-        lda #9
-        sta 1250,x
         lda #8
-        sta 1251,x
+        sta 1250,x
         lda #6
+        sta 1251,x
         sta 1252,x
         lda #5
         sta 1253,x
-        lda #4
-        sta 1254,x
         lda #3
+        sta 1254,x
         sta 1255,x
-        lda #2
-        sta 1256,x
         lda #1
+        sta 1256,x
         sta 1257,x
         rts
 .segment "ROUTA"
@@ -2397,24 +2221,25 @@ rt38:
         sta 1225,x
         lda #55
         sta 1226,x
+        lda #119
         sta 1227,x
-        lda #53
+        lda #117
         sta 1228,x
-        lda #18
+        lda #82
         sta 1229,x
-        lda #16
+        lda #80
         sta 1230,x
-        lda #13
+        lda #77
         sta 1231,x
-        lda #11
+        lda #75
         sta 1232,x
-        lda #8
+        lda #72
         sta 1233,x
-        lda #6
+        lda #70
         sta 1234,x
-        lda #3
+        lda #67
         sta 1235,x
-        lda #1
+        lda #65
         sta 1236,x
         rts
 .segment "ROUTA"
@@ -2462,86 +2287,73 @@ rt39:
 rt40:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
         lda #6
         sta 1222,x
-        lda #8
         sta 1223,x
-        lda #9
+        lda #8
         sta 1224,x
-        lda #10
         sta 1225,x
-        lda #11
+        lda #10
         sta 1226,x
         lda #12
         sta 1227,x
-        lda #13
         sta 1228,x
         lda #14
         sta 1229,x
-        lda #15
-        sta 1230,x
         lda #16
+        sta 1230,x
         sta 1231,x
-        lda #17
+        lda #18
         sta 1232,x
-        lda #19
         sta 1233,x
-        lda #20
+        lda #19
         sta 1234,x
         lda #21
         sta 1235,x
-        lda #54
+        lda #53
         sta 1236,x
         lda #55
         sta 1237,x
+        lda #119
         sta 1238,x
-        lda #54
+        lda #117
         sta 1239,x
-        lda #21
+        lda #85
         sta 1240,x
-        lda #20
+        lda #83
         sta 1241,x
-        lda #19
+        lda #82
         sta 1242,x
-        lda #17
         sta 1243,x
-        lda #16
+        lda #80
         sta 1244,x
-        lda #15
         sta 1245,x
-        lda #14
+        lda #78
         sta 1246,x
-        lda #13
+        lda #76
         sta 1247,x
-        lda #12
         sta 1248,x
-        lda #11
+        lda #74
         sta 1249,x
-        lda #10
+        lda #72
         sta 1250,x
-        lda #9
         sta 1251,x
-        lda #8
+        lda #70
         sta 1252,x
-        lda #6
         sta 1253,x
-        lda #5
+        lda #69
         sta 1254,x
-        lda #4
+        lda #67
         sta 1255,x
-        lda #3
         sta 1256,x
-        lda #2
+        lda #65
         sta 1257,x
-        lda #1
         sta 1258,x
         rts
 .segment "ROUTA"
@@ -2589,86 +2401,73 @@ rt41:
 rt42:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
         lda #69
         sta 1221,x
         lda #70
         sta 1222,x
-        lda #72
         sta 1223,x
-        lda #73
+        lda #72
         sta 1224,x
-        lda #74
         sta 1225,x
-        lda #75
+        lda #74
         sta 1226,x
         lda #76
         sta 1227,x
-        lda #77
         sta 1228,x
         lda #78
         sta 1229,x
-        lda #79
-        sta 1230,x
         lda #80
+        sta 1230,x
         sta 1231,x
-        lda #81
+        lda #82
         sta 1232,x
-        lda #83
         sta 1233,x
-        lda #84
+        lda #83
         sta 1234,x
         lda #85
         sta 1235,x
-        lda #118
+        lda #117
         sta 1236,x
         lda #119
         sta 1237,x
+        lda #55
         sta 1238,x
-        lda #118
+        lda #53
         sta 1239,x
-        lda #85
+        lda #21
         sta 1240,x
-        lda #84
+        lda #19
         sta 1241,x
-        lda #83
+        lda #18
         sta 1242,x
-        lda #81
         sta 1243,x
-        lda #80
+        lda #16
         sta 1244,x
-        lda #79
         sta 1245,x
-        lda #78
+        lda #14
         sta 1246,x
-        lda #77
+        lda #12
         sta 1247,x
-        lda #76
         sta 1248,x
-        lda #75
+        lda #10
         sta 1249,x
-        lda #74
+        lda #8
         sta 1250,x
-        lda #73
         sta 1251,x
-        lda #72
+        lda #6
         sta 1252,x
-        lda #70
         sta 1253,x
-        lda #69
+        lda #5
         sta 1254,x
-        lda #68
+        lda #3
         sta 1255,x
-        lda #67
         sta 1256,x
-        lda #66
+        lda #1
         sta 1257,x
-        lda #65
         sta 1258,x
         rts
 .segment "ROUTA"
@@ -2677,7 +2476,7 @@ rt43:
         sta 1217,x
         lda #68
         sta 1218,x
-        lda #71
+        lda #70
         sta 1219,x
         lda #73
         sta 1220,x
@@ -2691,22 +2490,23 @@ rt43:
         sta 1224,x
         lda #119
         sta 1225,x
+        lda #55
         sta 1226,x
-        lda #116
+        lda #52
         sta 1227,x
-        lda #82
+        lda #18
         sta 1228,x
-        lda #79
+        lda #15
         sta 1229,x
-        lda #76
+        lda #12
         sta 1230,x
-        lda #73
+        lda #9
         sta 1231,x
-        lda #71
+        lda #6
         sta 1232,x
-        lda #68
+        lda #4
         sta 1233,x
-        lda #65
+        lda #1
         sta 1234,x
         rts
 .segment "ROUTA"
@@ -2715,7 +2515,7 @@ rt44:
         sta 1217,x
         lda #4
         sta 1218,x
-        lda #7
+        lda #6
         sta 1219,x
         lda #9
         sta 1220,x
@@ -2729,22 +2529,23 @@ rt44:
         sta 1224,x
         lda #55
         sta 1225,x
+        lda #119
         sta 1226,x
-        lda #52
+        lda #116
         sta 1227,x
-        lda #18
+        lda #82
         sta 1228,x
-        lda #15
+        lda #79
         sta 1229,x
-        lda #12
+        lda #76
         sta 1230,x
-        lda #9
+        lda #73
         sta 1231,x
-        lda #7
+        lda #70
         sta 1232,x
-        lda #4
+        lda #68
         sta 1233,x
-        lda #1
+        lda #65
         sta 1234,x
         rts
 .segment "ROUTA"
@@ -2753,7 +2554,7 @@ rt45:
         sta 1217,x
         lda #68
         sta 1218,x
-        lda #71
+        lda #70
         sta 1219,x
         lda #73
         sta 1220,x
@@ -2777,7 +2578,7 @@ rt45:
         sta 1229,x
         lda #73
         sta 1230,x
-        lda #71
+        lda #70
         sta 1231,x
         lda #68
         sta 1232,x
@@ -2790,7 +2591,7 @@ rt46:
         sta 1217,x
         lda #4
         sta 1218,x
-        lda #7
+        lda #6
         sta 1219,x
         lda #9
         sta 1220,x
@@ -2814,7 +2615,7 @@ rt46:
         sta 1229,x
         lda #9
         sta 1230,x
-        lda #7
+        lda #6
         sta 1231,x
         lda #4
         sta 1232,x
@@ -2825,82 +2626,71 @@ rt46:
 rt47:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
-        lda #70
+        lda #69
         sta 1221,x
-        lda #71
+        lda #70
         sta 1222,x
-        lda #72
         sta 1223,x
-        lda #73
+        lda #72
         sta 1224,x
         lda #74
         sta 1225,x
-        lda #75
         sta 1226,x
-        lda #77
+        lda #76
         sta 1227,x
         lda #78
         sta 1228,x
-        lda #79
         sta 1229,x
         lda #80
         sta 1230,x
-        lda #81
-        sta 1231,x
         lda #82
+        sta 1231,x
         sta 1232,x
-        lda #84
+        lda #83
         sta 1233,x
         lda #85
         sta 1234,x
-        lda #118
+        lda #117
         sta 1235,x
         lda #119
         sta 1236,x
+        lda #55
         sta 1237,x
-        lda #118
+        lda #53
         sta 1238,x
-        lda #85
+        lda #21
         sta 1239,x
-        lda #84
+        lda #19
         sta 1240,x
-        lda #82
+        lda #18
         sta 1241,x
-        lda #81
         sta 1242,x
-        lda #80
+        lda #16
         sta 1243,x
-        lda #79
+        lda #14
         sta 1244,x
-        lda #78
         sta 1245,x
-        lda #77
+        lda #12
         sta 1246,x
-        lda #75
+        lda #10
         sta 1247,x
-        lda #74
         sta 1248,x
-        lda #73
+        lda #8
         sta 1249,x
-        lda #72
+        lda #6
         sta 1250,x
-        lda #71
         sta 1251,x
-        lda #70
+        lda #5
         sta 1252,x
-        lda #68
+        lda #3
         sta 1253,x
-        lda #67
         sta 1254,x
-        lda #66
+        lda #1
         sta 1255,x
-        lda #65
         sta 1256,x
         rts
 .segment "ROUTA"
@@ -2921,20 +2711,21 @@ rt48:
         sta 1223,x
         lda #119
         sta 1224,x
+        lda #55
         sta 1225,x
-        lda #116
+        lda #52
         sta 1226,x
-        lda #81
+        lda #17
         sta 1227,x
-        lda #78
+        lda #14
         sta 1228,x
-        lda #74
+        lda #10
         sta 1229,x
-        lda #71
+        lda #7
         sta 1230,x
-        lda #68
+        lda #4
         sta 1231,x
-        lda #65
+        lda #1
         sta 1232,x
         rts
 .segment "ROUTA"
@@ -2955,237 +2746,213 @@ rt49:
         sta 1223,x
         lda #55
         sta 1224,x
+        lda #119
         sta 1225,x
-        lda #52
+        lda #116
         sta 1226,x
-        lda #17
+        lda #81
         sta 1227,x
-        lda #14
+        lda #78
         sta 1228,x
-        lda #10
+        lda #74
         sta 1229,x
-        lda #7
+        lda #71
         sta 1230,x
-        lda #4
+        lda #68
         sta 1231,x
-        lda #1
+        lda #65
         sta 1232,x
         rts
 .segment "ROUTA"
 rt50:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #4
+        lda #3
         sta 1219,x
         lda #5
         sta 1220,x
-        lda #6
         sta 1221,x
-        lda #7
+        lda #6
         sta 1222,x
-        lda #9
+        lda #8
         sta 1223,x
         lda #10
         sta 1224,x
-        lda #11
         sta 1225,x
-        lda #13
+        lda #12
         sta 1226,x
         lda #14
         sta 1227,x
-        lda #15
         sta 1228,x
-        lda #17
+        lda #16
         sta 1229,x
         lda #18
         sta 1230,x
         lda #19
         sta 1231,x
-        lda #20
         sta 1232,x
-        lda #54
+        lda #53
         sta 1233,x
         lda #55
         sta 1234,x
+        lda #119
         sta 1235,x
-        lda #54
+        lda #117
         sta 1236,x
-        lda #20
+        lda #83
         sta 1237,x
-        lda #19
         sta 1238,x
-        lda #18
+        lda #82
         sta 1239,x
-        lda #17
+        lda #80
         sta 1240,x
-        lda #15
+        lda #78
         sta 1241,x
-        lda #14
         sta 1242,x
-        lda #13
+        lda #76
         sta 1243,x
-        lda #11
+        lda #74
         sta 1244,x
-        lda #10
         sta 1245,x
-        lda #9
+        lda #72
         sta 1246,x
-        lda #7
+        lda #70
         sta 1247,x
-        lda #6
+        lda #69
         sta 1248,x
-        lda #5
         sta 1249,x
-        lda #4
+        lda #67
         sta 1250,x
-        lda #2
+        lda #65
         sta 1251,x
-        lda #1
         sta 1252,x
         rts
 .segment "ROUTA"
 rt51:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #4
+        lda #3
         sta 1219,x
         lda #5
         sta 1220,x
-        lda #6
         sta 1221,x
-        lda #7
+        lda #6
         sta 1222,x
-        lda #9
+        lda #8
         sta 1223,x
         lda #10
         sta 1224,x
-        lda #11
         sta 1225,x
-        lda #13
+        lda #12
         sta 1226,x
         lda #14
         sta 1227,x
-        lda #15
+        lda #16
         sta 1228,x
-        lda #17
         sta 1229,x
         lda #18
         sta 1230,x
         lda #19
         sta 1231,x
-        lda #20
+        lda #21
         sta 1232,x
-        lda #54
+        lda #53
         sta 1233,x
         lda #55
         sta 1234,x
-        lda #54
+        lda #53
         sta 1235,x
-        lda #52
         sta 1236,x
         lda #19
         sta 1237,x
         lda #18
         sta 1238,x
-        lda #17
+        lda #16
         sta 1239,x
-        lda #15
         sta 1240,x
         lda #14
         sta 1241,x
-        lda #13
+        lda #12
         sta 1242,x
-        lda #11
-        sta 1243,x
         lda #10
+        sta 1243,x
         sta 1244,x
-        lda #9
+        lda #8
         sta 1245,x
-        lda #7
-        sta 1246,x
         lda #6
-        sta 1247,x
+        sta 1246,x
         lda #5
+        sta 1247,x
         sta 1248,x
-        lda #4
+        lda #3
         sta 1249,x
-        lda #2
-        sta 1250,x
         lda #1
+        sta 1250,x
         sta 1251,x
         rts
 .segment "ROUTA"
 rt52:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #4
+        lda #3
         sta 1219,x
         lda #5
         sta 1220,x
-        lda #7
+        lda #6
         sta 1221,x
-        lda #8
         sta 1222,x
-        lda #9
+        lda #8
         sta 1223,x
-        lda #11
+        lda #10
         sta 1224,x
         lda #12
         sta 1225,x
-        lda #13
         sta 1226,x
-        lda #15
+        lda #14
         sta 1227,x
         lda #16
         sta 1228,x
         lda #18
         sta 1229,x
-        lda #19
         sta 1230,x
-        lda #20
+        lda #19
         sta 1231,x
-        lda #54
+        lda #53
         sta 1232,x
         lda #55
         sta 1233,x
+        lda #119
         sta 1234,x
-        lda #54
+        lda #117
         sta 1235,x
-        lda #20
+        lda #83
         sta 1236,x
-        lda #19
+        lda #82
         sta 1237,x
-        lda #18
         sta 1238,x
-        lda #16
+        lda #80
         sta 1239,x
-        lda #15
+        lda #78
         sta 1240,x
-        lda #13
+        lda #76
         sta 1241,x
-        lda #12
         sta 1242,x
-        lda #11
+        lda #74
         sta 1243,x
-        lda #9
+        lda #72
         sta 1244,x
-        lda #8
+        lda #70
         sta 1245,x
-        lda #7
         sta 1246,x
-        lda #5
+        lda #69
         sta 1247,x
-        lda #4
+        lda #67
         sta 1248,x
-        lda #2
+        lda #65
         sta 1249,x
-        lda #1
         sta 1250,x
         rts
 .segment "ROUTA"
@@ -3258,2969 +3025,2418 @@ rt54:
 rt55:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
         lda #69
         sta 1220,x
-        lda #70
         sta 1221,x
-        lda #71
+        lda #70
         sta 1222,x
         lda #72
         sta 1223,x
-        lda #74
         sta 1224,x
-        lda #75
+        lda #74
         sta 1225,x
         lda #76
         sta 1226,x
-        lda #77
-        sta 1227,x
         lda #78
+        sta 1227,x
         sta 1228,x
         lda #80
         sta 1229,x
-        lda #81
-        sta 1230,x
         lda #82
+        sta 1230,x
         sta 1231,x
         lda #83
         sta 1232,x
         lda #85
         sta 1233,x
-        lda #118
+        lda #117
         sta 1234,x
         lda #119
         sta 1235,x
-        lda #118
-        sta 1236,x
         lda #117
+        sta 1236,x
         sta 1237,x
         lda #83
         sta 1238,x
         lda #82
         sta 1239,x
-        lda #81
         sta 1240,x
         lda #80
         sta 1241,x
         lda #78
         sta 1242,x
-        lda #77
         sta 1243,x
         lda #76
         sta 1244,x
-        lda #75
-        sta 1245,x
         lda #74
-        sta 1246,x
+        sta 1245,x
         lda #72
+        sta 1246,x
         sta 1247,x
-        lda #71
-        sta 1248,x
         lda #70
-        sta 1249,x
+        sta 1248,x
         lda #69
+        sta 1249,x
         sta 1250,x
         lda #67
         sta 1251,x
-        lda #66
-        sta 1252,x
         lda #65
+        sta 1252,x
         sta 1253,x
         rts
 .segment "ROUTA"
 rt56:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
         lda #6
         sta 1222,x
-        lda #7
         sta 1223,x
         lda #8
         sta 1224,x
-        lda #9
         sta 1225,x
         lda #10
         sta 1226,x
-        lda #11
+        lda #12
         sta 1227,x
-        lda #13
         sta 1228,x
         lda #14
         sta 1229,x
-        lda #15
         sta 1230,x
         lda #16
         sta 1231,x
-        lda #17
-        sta 1232,x
         lda #18
+        sta 1232,x
         sta 1233,x
         lda #19
         sta 1234,x
-        lda #20
         sta 1235,x
         lda #21
         sta 1236,x
-        lda #54
-        sta 1237,x
         lda #55
+        sta 1237,x
         sta 1238,x
-        lda #54
         sta 1239,x
         lda #53
         sta 1240,x
-        lda #20
-        sta 1241,x
         lda #19
+        sta 1241,x
         sta 1242,x
         lda #18
         sta 1243,x
-        lda #17
         sta 1244,x
         lda #16
         sta 1245,x
-        lda #15
-        sta 1246,x
         lda #14
+        sta 1246,x
         sta 1247,x
-        lda #13
+        lda #12
         sta 1248,x
-        lda #11
         sta 1249,x
         lda #10
         sta 1250,x
-        lda #9
-        sta 1251,x
         lda #8
+        sta 1251,x
         sta 1252,x
-        lda #7
-        sta 1253,x
         lda #6
+        sta 1253,x
         sta 1254,x
         lda #5
         sta 1255,x
-        lda #4
-        sta 1256,x
         lda #3
+        sta 1256,x
         sta 1257,x
-        lda #2
-        sta 1258,x
         lda #1
+        sta 1258,x
         sta 1259,x
         rts
 .segment "ROUTA"
 rt57:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
         lda #69
         sta 1221,x
-        lda #70
         sta 1222,x
-        lda #71
+        lda #70
         sta 1223,x
         lda #72
         sta 1224,x
-        lda #73
         sta 1225,x
         lda #74
         sta 1226,x
-        lda #75
         sta 1227,x
-        lda #77
+        lda #76
         sta 1228,x
         lda #78
         sta 1229,x
-        lda #79
         sta 1230,x
         lda #80
         sta 1231,x
-        lda #81
         sta 1232,x
         lda #82
         sta 1233,x
         lda #83
         sta 1234,x
-        lda #84
         sta 1235,x
         lda #85
         sta 1236,x
-        lda #118
+        lda #117
         sta 1237,x
         lda #119
         sta 1238,x
+        lda #55
         sta 1239,x
-        lda #118
+        lda #53
         sta 1240,x
-        lda #85
+        lda #21
         sta 1241,x
-        lda #84
+        lda #19
         sta 1242,x
-        lda #83
         sta 1243,x
-        lda #82
+        lda #18
         sta 1244,x
-        lda #81
+        lda #16
         sta 1245,x
-        lda #80
         sta 1246,x
-        lda #79
+        lda #14
         sta 1247,x
-        lda #78
         sta 1248,x
-        lda #77
+        lda #12
         sta 1249,x
-        lda #75
+        lda #10
         sta 1250,x
-        lda #74
         sta 1251,x
-        lda #73
+        lda #8
         sta 1252,x
-        lda #72
         sta 1253,x
-        lda #71
+        lda #6
         sta 1254,x
-        lda #70
+        lda #5
         sta 1255,x
-        lda #69
         sta 1256,x
-        lda #68
+        lda #3
         sta 1257,x
-        lda #67
         sta 1258,x
-        lda #66
+        lda #1
         sta 1259,x
-        lda #65
         sta 1260,x
         rts
 .segment "ROUTA"
 rt58:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
-        lda #6
         sta 1222,x
-        lda #7
+        lda #6
         sta 1223,x
         lda #8
         sta 1224,x
-        lda #9
         sta 1225,x
         lda #10
         sta 1226,x
-        lda #11
         sta 1227,x
         lda #12
         sta 1228,x
-        lda #13
         sta 1229,x
         lda #14
         sta 1230,x
-        lda #15
-        sta 1231,x
         lda #16
+        sta 1231,x
         sta 1232,x
-        lda #17
-        sta 1233,x
         lda #18
+        sta 1233,x
         sta 1234,x
         lda #19
         sta 1235,x
-        lda #20
         sta 1236,x
         lda #21
         sta 1237,x
-        lda #54
-        sta 1238,x
         lda #55
+        sta 1238,x
         sta 1239,x
-        lda #54
         sta 1240,x
         lda #53
         sta 1241,x
-        lda #20
-        sta 1242,x
         lda #19
+        sta 1242,x
         sta 1243,x
         lda #18
         sta 1244,x
-        lda #17
         sta 1245,x
         lda #16
         sta 1246,x
-        lda #15
         sta 1247,x
         lda #14
         sta 1248,x
-        lda #13
-        sta 1249,x
         lda #12
+        sta 1249,x
         sta 1250,x
-        lda #11
-        sta 1251,x
         lda #10
+        sta 1251,x
         sta 1252,x
-        lda #9
-        sta 1253,x
         lda #8
+        sta 1253,x
         sta 1254,x
-        lda #7
-        sta 1255,x
         lda #6
-        sta 1256,x
+        sta 1255,x
         lda #5
+        sta 1256,x
         sta 1257,x
-        lda #4
-        sta 1258,x
         lda #3
+        sta 1258,x
         sta 1259,x
-        lda #2
-        sta 1260,x
         lda #1
+        sta 1260,x
         sta 1261,x
         rts
 .segment "ROUTA"
 rt59:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
         lda #69
         sta 1221,x
-        lda #70
         sta 1222,x
-        lda #71
+        lda #70
         sta 1223,x
-        lda #72
         sta 1224,x
-        lda #73
+        lda #72
         sta 1225,x
         lda #74
         sta 1226,x
-        lda #75
         sta 1227,x
         lda #76
         sta 1228,x
-        lda #77
         sta 1229,x
         lda #78
         sta 1230,x
-        lda #79
         sta 1231,x
         lda #80
         sta 1232,x
-        lda #81
-        sta 1233,x
         lda #82
+        sta 1233,x
         sta 1234,x
         lda #83
         sta 1235,x
-        lda #84
         sta 1236,x
         lda #85
         sta 1237,x
-        lda #118
+        lda #117
         sta 1238,x
         lda #119
         sta 1239,x
+        lda #55
         sta 1240,x
-        lda #118
+        lda #53
         sta 1241,x
-        lda #85
+        lda #21
         sta 1242,x
-        lda #84
+        lda #19
         sta 1243,x
-        lda #83
         sta 1244,x
-        lda #82
+        lda #18
         sta 1245,x
-        lda #81
         sta 1246,x
-        lda #80
+        lda #16
         sta 1247,x
-        lda #79
+        lda #14
         sta 1248,x
-        lda #78
         sta 1249,x
-        lda #77
+        lda #12
         sta 1250,x
-        lda #76
         sta 1251,x
-        lda #75
+        lda #10
         sta 1252,x
-        lda #74
         sta 1253,x
-        lda #73
+        lda #8
         sta 1254,x
-        lda #72
+        lda #6
         sta 1255,x
-        lda #71
         sta 1256,x
-        lda #70
+        lda #5
         sta 1257,x
-        lda #69
         sta 1258,x
-        lda #68
+        lda #3
         sta 1259,x
-        lda #67
         sta 1260,x
-        lda #66
+        lda #1
         sta 1261,x
-        lda #65
         sta 1262,x
         rts
 .segment "ROUTA"
 rt60:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
         lda #69
         sta 1221,x
-        lda #70
         sta 1222,x
-        lda #71
+        lda #70
         sta 1223,x
-        lda #72
         sta 1224,x
-        lda #73
+        lda #72
         sta 1225,x
-        lda #74
         sta 1226,x
-        lda #75
+        lda #74
         sta 1227,x
-        sta 1228,x
         lda #76
+        sta 1228,x
         sta 1229,x
-        lda #77
-        sta 1230,x
         lda #78
+        sta 1230,x
         sta 1231,x
-        lda #79
-        sta 1232,x
         lda #80
+        sta 1232,x
         sta 1233,x
-        lda #81
-        sta 1234,x
         lda #82
+        sta 1234,x
         sta 1235,x
         lda #83
         sta 1236,x
-        lda #84
-        sta 1237,x
         lda #85
+        sta 1237,x
         sta 1238,x
-        lda #118
-        sta 1239,x
         lda #119
+        sta 1239,x
         sta 1240,x
-        lda #118
         sta 1241,x
         lda #117
         sta 1242,x
-        lda #84
+        lda #85
         sta 1243,x
         lda #83
         sta 1244,x
         lda #82
         sta 1245,x
-        lda #81
         sta 1246,x
         lda #80
         sta 1247,x
-        lda #79
         sta 1248,x
         lda #78
         sta 1249,x
-        lda #77
         sta 1250,x
         lda #76
         sta 1251,x
-        lda #75
         sta 1252,x
-        sta 1253,x
         lda #74
-        sta 1254,x
-        lda #73
-        sta 1255,x
+        sta 1253,x
         lda #72
-        sta 1256,x
-        lda #71
-        sta 1257,x
+        sta 1254,x
+        sta 1255,x
         lda #70
-        sta 1258,x
+        sta 1256,x
+        sta 1257,x
         lda #69
+        sta 1258,x
         sta 1259,x
-        lda #68
-        sta 1260,x
         lda #67
+        sta 1260,x
         sta 1261,x
-        lda #66
-        sta 1262,x
         lda #65
+        sta 1262,x
         sta 1263,x
         rts
 .segment "ROUTA"
 rt61:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
-        lda #6
         sta 1222,x
-        lda #7
+        lda #6
         sta 1223,x
-        lda #8
         sta 1224,x
-        lda #9
+        lda #8
         sta 1225,x
-        lda #10
         sta 1226,x
-        lda #11
+        lda #10
         sta 1227,x
-        sta 1228,x
         lda #12
+        sta 1228,x
         sta 1229,x
-        lda #13
-        sta 1230,x
         lda #14
+        sta 1230,x
         sta 1231,x
-        lda #15
-        sta 1232,x
         lda #16
+        sta 1232,x
         sta 1233,x
-        lda #17
-        sta 1234,x
         lda #18
+        sta 1234,x
         sta 1235,x
         lda #19
         sta 1236,x
-        lda #20
-        sta 1237,x
         lda #21
+        sta 1237,x
         sta 1238,x
-        lda #54
-        sta 1239,x
         lda #55
+        sta 1239,x
         sta 1240,x
-        lda #54
         sta 1241,x
         lda #53
         sta 1242,x
-        lda #20
+        lda #21
         sta 1243,x
         lda #19
         sta 1244,x
         lda #18
         sta 1245,x
-        lda #17
         sta 1246,x
         lda #16
         sta 1247,x
-        lda #15
         sta 1248,x
         lda #14
         sta 1249,x
-        lda #13
         sta 1250,x
         lda #12
         sta 1251,x
-        lda #11
         sta 1252,x
-        sta 1253,x
         lda #10
-        sta 1254,x
-        lda #9
-        sta 1255,x
+        sta 1253,x
         lda #8
-        sta 1256,x
-        lda #7
-        sta 1257,x
+        sta 1254,x
+        sta 1255,x
         lda #6
-        sta 1258,x
+        sta 1256,x
+        sta 1257,x
         lda #5
+        sta 1258,x
         sta 1259,x
-        lda #4
-        sta 1260,x
         lda #3
+        sta 1260,x
         sta 1261,x
-        lda #2
-        sta 1262,x
         lda #1
+        sta 1262,x
         sta 1263,x
         rts
 .segment "ROUTA"
 rt62:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
-        lda #6
         sta 1222,x
-        lda #7
+        lda #6
         sta 1223,x
-        lda #8
         sta 1224,x
-        lda #9
+        lda #8
         sta 1225,x
-        lda #10
         sta 1226,x
-        lda #11
+        lda #10
         sta 1227,x
         sta 1228,x
         lda #12
         sta 1229,x
-        lda #13
-        sta 1230,x
         lda #14
+        sta 1230,x
         sta 1231,x
-        lda #15
-        sta 1232,x
         lda #16
+        sta 1232,x
         sta 1233,x
-        lda #17
-        sta 1234,x
         lda #18
+        sta 1234,x
         sta 1235,x
         lda #19
         sta 1236,x
-        lda #20
         sta 1237,x
         lda #21
         sta 1238,x
-        lda #54
+        lda #53
         sta 1239,x
         lda #55
         sta 1240,x
+        lda #119
         sta 1241,x
-        lda #54
+        lda #117
         sta 1242,x
-        lda #21
+        lda #85
         sta 1243,x
-        lda #20
+        lda #83
         sta 1244,x
-        lda #19
         sta 1245,x
-        lda #18
+        lda #82
         sta 1246,x
-        lda #17
         sta 1247,x
-        lda #16
+        lda #80
         sta 1248,x
-        lda #15
         sta 1249,x
-        lda #14
+        lda #78
         sta 1250,x
-        lda #13
         sta 1251,x
-        lda #12
+        lda #76
         sta 1252,x
-        lda #11
+        lda #74
         sta 1253,x
         sta 1254,x
-        lda #10
+        lda #72
         sta 1255,x
-        lda #9
         sta 1256,x
-        lda #8
+        lda #70
         sta 1257,x
-        lda #7
         sta 1258,x
-        lda #6
+        lda #69
         sta 1259,x
-        lda #5
         sta 1260,x
-        lda #4
+        lda #67
         sta 1261,x
-        lda #3
         sta 1262,x
-        lda #2
+        lda #65
         sta 1263,x
-        lda #1
         sta 1264,x
         rts
 .segment "ROUTA"
 rt63:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
-        lda #6
         sta 1222,x
+        lda #6
         sta 1223,x
-        lda #7
         sta 1224,x
         lda #8
         sta 1225,x
-        lda #9
         sta 1226,x
         lda #10
         sta 1227,x
-        lda #11
         sta 1228,x
         lda #12
         sta 1229,x
-        lda #13
         sta 1230,x
         lda #14
         sta 1231,x
-        lda #15
         sta 1232,x
         lda #16
         sta 1233,x
-        lda #17
+        lda #18
         sta 1234,x
         sta 1235,x
-        lda #18
-        sta 1236,x
         lda #19
+        sta 1236,x
         sta 1237,x
-        lda #20
-        sta 1238,x
         lda #21
+        sta 1238,x
         sta 1239,x
-        lda #54
-        sta 1240,x
         lda #55
+        sta 1240,x
         sta 1241,x
-        lda #54
         sta 1242,x
         lda #53
         sta 1243,x
-        lda #20
+        lda #21
         sta 1244,x
         lda #19
         sta 1245,x
-        lda #18
         sta 1246,x
-        lda #17
+        lda #18
         sta 1247,x
         sta 1248,x
         lda #16
         sta 1249,x
-        lda #15
-        sta 1250,x
         lda #14
+        sta 1250,x
         sta 1251,x
-        lda #13
-        sta 1252,x
         lda #12
+        sta 1252,x
         sta 1253,x
-        lda #11
-        sta 1254,x
         lda #10
+        sta 1254,x
         sta 1255,x
-        lda #9
-        sta 1256,x
         lda #8
+        sta 1256,x
         sta 1257,x
-        lda #7
-        sta 1258,x
         lda #6
+        sta 1258,x
         sta 1259,x
-        sta 1260,x
         lda #5
+        sta 1260,x
         sta 1261,x
-        lda #4
-        sta 1262,x
         lda #3
+        sta 1262,x
         sta 1263,x
-        lda #2
-        sta 1264,x
         lda #1
+        sta 1264,x
         sta 1265,x
         rts
 .segment "ROUTA"
 rt64:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
-        lda #6
         sta 1222,x
+        lda #6
         sta 1223,x
-        lda #7
         sta 1224,x
         lda #8
         sta 1225,x
-        lda #9
         sta 1226,x
         lda #10
         sta 1227,x
-        lda #11
         sta 1228,x
         lda #12
         sta 1229,x
-        lda #13
         sta 1230,x
         lda #14
         sta 1231,x
-        lda #15
         sta 1232,x
         lda #16
         sta 1233,x
-        lda #17
         sta 1234,x
-        sta 1235,x
         lda #18
+        sta 1235,x
         sta 1236,x
         lda #19
         sta 1237,x
-        lda #20
         sta 1238,x
         lda #21
         sta 1239,x
-        lda #54
+        lda #53
         sta 1240,x
         lda #55
         sta 1241,x
+        lda #119
         sta 1242,x
-        lda #54
+        lda #117
         sta 1243,x
-        lda #21
+        lda #85
         sta 1244,x
-        lda #20
+        lda #83
         sta 1245,x
-        lda #19
         sta 1246,x
-        lda #18
+        lda #82
         sta 1247,x
-        lda #17
         sta 1248,x
+        lda #80
         sta 1249,x
-        lda #16
         sta 1250,x
-        lda #15
+        lda #78
         sta 1251,x
-        lda #14
         sta 1252,x
-        lda #13
+        lda #76
         sta 1253,x
-        lda #12
         sta 1254,x
-        lda #11
+        lda #74
         sta 1255,x
-        lda #10
         sta 1256,x
-        lda #9
+        lda #72
         sta 1257,x
-        lda #8
         sta 1258,x
-        lda #7
+        lda #70
         sta 1259,x
-        lda #6
         sta 1260,x
+        lda #69
         sta 1261,x
-        lda #5
         sta 1262,x
-        lda #4
+        lda #67
         sta 1263,x
-        lda #3
         sta 1264,x
-        lda #2
+        lda #65
         sta 1265,x
-        lda #1
         sta 1266,x
         rts
 .segment "ROUTA"
 rt65:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
         sta 1222,x
         lda #6
         sta 1223,x
-        lda #7
         sta 1224,x
         lda #8
         sta 1225,x
-        lda #9
         sta 1226,x
         lda #10
         sta 1227,x
-        lda #11
         sta 1228,x
         lda #12
         sta 1229,x
         sta 1230,x
-        lda #13
-        sta 1231,x
         lda #14
+        sta 1231,x
         sta 1232,x
-        lda #15
-        sta 1233,x
         lda #16
+        sta 1233,x
         sta 1234,x
-        lda #17
-        sta 1235,x
         lda #18
+        sta 1235,x
         sta 1236,x
         lda #19
         sta 1237,x
         sta 1238,x
-        lda #20
-        sta 1239,x
         lda #21
+        sta 1239,x
         sta 1240,x
-        lda #54
-        sta 1241,x
         lda #55
+        sta 1241,x
         sta 1242,x
-        lda #54
         sta 1243,x
         lda #53
         sta 1244,x
-        lda #20
+        lda #21
         sta 1245,x
         lda #19
         sta 1246,x
         sta 1247,x
         lda #18
         sta 1248,x
-        lda #17
         sta 1249,x
         lda #16
         sta 1250,x
-        lda #15
         sta 1251,x
         lda #14
         sta 1252,x
-        lda #13
         sta 1253,x
         lda #12
         sta 1254,x
         sta 1255,x
-        lda #11
-        sta 1256,x
         lda #10
+        sta 1256,x
         sta 1257,x
-        lda #9
-        sta 1258,x
         lda #8
+        sta 1258,x
         sta 1259,x
-        lda #7
-        sta 1260,x
         lda #6
+        sta 1260,x
         sta 1261,x
         lda #5
         sta 1262,x
         sta 1263,x
-        lda #4
-        sta 1264,x
         lda #3
+        sta 1264,x
         sta 1265,x
-        lda #2
-        sta 1266,x
         lda #1
+        sta 1266,x
         sta 1267,x
         rts
 .segment "ROUTA"
 rt66:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
         sta 1222,x
         lda #6
         sta 1223,x
-        lda #7
         sta 1224,x
         lda #8
         sta 1225,x
-        lda #9
         sta 1226,x
         lda #10
         sta 1227,x
-        lda #11
         sta 1228,x
         lda #12
         sta 1229,x
         sta 1230,x
-        lda #13
-        sta 1231,x
         lda #14
+        sta 1231,x
         sta 1232,x
-        lda #15
-        sta 1233,x
         lda #16
+        sta 1233,x
         sta 1234,x
-        lda #17
-        sta 1235,x
         lda #18
+        sta 1235,x
         sta 1236,x
         lda #19
         sta 1237,x
         sta 1238,x
-        lda #20
+        lda #21
         sta 1239,x
-        lda #21
         sta 1240,x
-        lda #54
-        sta 1241,x
         lda #55
+        sta 1241,x
         sta 1242,x
+        lda #119
         sta 1243,x
-        lda #54
         sta 1244,x
-        lda #21
+        lda #85
         sta 1245,x
-        lda #20
         sta 1246,x
-        lda #19
+        lda #83
         sta 1247,x
         sta 1248,x
-        lda #18
+        lda #82
         sta 1249,x
-        lda #17
         sta 1250,x
-        lda #16
+        lda #80
         sta 1251,x
-        lda #15
         sta 1252,x
-        lda #14
+        lda #78
         sta 1253,x
-        lda #13
         sta 1254,x
-        lda #12
+        lda #76
         sta 1255,x
         sta 1256,x
-        lda #11
+        lda #74
         sta 1257,x
-        lda #10
         sta 1258,x
-        lda #9
+        lda #72
         sta 1259,x
-        lda #8
         sta 1260,x
-        lda #7
+        lda #70
         sta 1261,x
-        lda #6
         sta 1262,x
-        lda #5
+        lda #69
         sta 1263,x
         sta 1264,x
-        lda #4
+        lda #67
         sta 1265,x
-        lda #3
         sta 1266,x
-        lda #2
+        lda #65
         sta 1267,x
-        lda #1
         sta 1268,x
         rts
 .segment "ROUTA"
 rt67:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #67
         sta 1219,x
-        lda #68
+        lda #67
         sta 1220,x
         sta 1221,x
         lda #69
         sta 1222,x
-        lda #70
         sta 1223,x
-        lda #71
+        lda #70
         sta 1224,x
-        lda #72
         sta 1225,x
-        lda #73
+        lda #72
         sta 1226,x
         sta 1227,x
         lda #74
         sta 1228,x
-        lda #75
         sta 1229,x
         lda #76
         sta 1230,x
-        lda #77
         sta 1231,x
         lda #78
         sta 1232,x
-        lda #79
         sta 1233,x
-        sta 1234,x
         lda #80
+        sta 1234,x
         sta 1235,x
-        lda #81
-        sta 1236,x
         lda #82
+        sta 1236,x
         sta 1237,x
         lda #83
         sta 1238,x
-        lda #84
         sta 1239,x
-        sta 1240,x
         lda #85
+        sta 1240,x
         sta 1241,x
-        lda #118
-        sta 1242,x
         lda #119
+        sta 1242,x
         sta 1243,x
-        lda #118
         sta 1244,x
         lda #117
         sta 1245,x
-        lda #84
+        lda #85
         sta 1246,x
-        sta 1247,x
         lda #83
+        sta 1247,x
         sta 1248,x
         lda #82
         sta 1249,x
-        lda #81
         sta 1250,x
         lda #80
         sta 1251,x
-        lda #79
         sta 1252,x
-        sta 1253,x
         lda #78
+        sta 1253,x
         sta 1254,x
-        lda #77
-        sta 1255,x
         lda #76
+        sta 1255,x
         sta 1256,x
-        lda #75
-        sta 1257,x
         lda #74
+        sta 1257,x
         sta 1258,x
-        lda #73
+        lda #72
         sta 1259,x
         sta 1260,x
-        lda #72
-        sta 1261,x
-        lda #71
-        sta 1262,x
         lda #70
-        sta 1263,x
+        sta 1261,x
+        sta 1262,x
         lda #69
+        sta 1263,x
         sta 1264,x
-        lda #68
+        lda #67
         sta 1265,x
         sta 1266,x
-        lda #67
-        sta 1267,x
-        lda #66
-        sta 1268,x
         lda #65
+        sta 1267,x
+        sta 1268,x
         sta 1269,x
         rts
 .segment "ROUTA"
 rt68:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #3
         sta 1219,x
-        lda #4
+        lda #3
         sta 1220,x
         sta 1221,x
         lda #5
         sta 1222,x
-        lda #6
         sta 1223,x
-        lda #7
+        lda #6
         sta 1224,x
-        lda #8
         sta 1225,x
-        lda #9
+        lda #8
         sta 1226,x
         sta 1227,x
         lda #10
         sta 1228,x
-        lda #11
         sta 1229,x
         lda #12
         sta 1230,x
-        lda #13
         sta 1231,x
         lda #14
         sta 1232,x
-        lda #15
         sta 1233,x
-        sta 1234,x
         lda #16
+        sta 1234,x
         sta 1235,x
-        lda #17
-        sta 1236,x
         lda #18
+        sta 1236,x
         sta 1237,x
         lda #19
         sta 1238,x
-        lda #20
         sta 1239,x
+        lda #21
         sta 1240,x
-        lda #21
         sta 1241,x
-        lda #54
-        sta 1242,x
         lda #55
+        sta 1242,x
         sta 1243,x
+        lda #119
         sta 1244,x
-        lda #54
         sta 1245,x
-        lda #21
+        lda #85
         sta 1246,x
-        lda #20
         sta 1247,x
+        lda #83
         sta 1248,x
-        lda #19
         sta 1249,x
-        lda #18
+        lda #82
         sta 1250,x
-        lda #17
         sta 1251,x
-        lda #16
+        lda #80
         sta 1252,x
-        lda #15
         sta 1253,x
+        lda #78
         sta 1254,x
-        lda #14
         sta 1255,x
-        lda #13
+        lda #76
         sta 1256,x
-        lda #12
         sta 1257,x
-        lda #11
+        lda #74
         sta 1258,x
-        lda #10
         sta 1259,x
-        lda #9
+        lda #72
         sta 1260,x
         sta 1261,x
-        lda #8
+        lda #70
         sta 1262,x
-        lda #7
         sta 1263,x
-        lda #6
+        lda #69
         sta 1264,x
-        lda #5
         sta 1265,x
-        lda #4
+        lda #67
         sta 1266,x
         sta 1267,x
-        lda #3
+        lda #65
         sta 1268,x
-        lda #2
         sta 1269,x
-        lda #1
         sta 1270,x
         rts
 .segment "ROUTA"
 rt69:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #67
         sta 1219,x
+        lda #67
         sta 1220,x
-        lda #68
         sta 1221,x
         lda #69
         sta 1222,x
-        lda #70
         sta 1223,x
-        lda #71
+        lda #70
         sta 1224,x
-        lda #72
         sta 1225,x
+        lda #72
         sta 1226,x
-        lda #73
         sta 1227,x
         lda #74
         sta 1228,x
-        lda #75
         sta 1229,x
         lda #76
         sta 1230,x
         sta 1231,x
-        lda #77
-        sta 1232,x
         lda #78
+        sta 1232,x
         sta 1233,x
-        lda #79
-        sta 1234,x
         lda #80
+        sta 1234,x
         sta 1235,x
         sta 1236,x
-        lda #81
-        sta 1237,x
         lda #82
+        sta 1237,x
         sta 1238,x
         lda #83
         sta 1239,x
-        lda #84
         sta 1240,x
         lda #85
         sta 1241,x
         sta 1242,x
-        lda #118
-        sta 1243,x
         lda #119
+        sta 1243,x
         sta 1244,x
-        lda #118
         sta 1245,x
         lda #117
         sta 1246,x
         lda #85
         sta 1247,x
-        lda #84
-        sta 1248,x
         lda #83
+        sta 1248,x
         sta 1249,x
         lda #82
         sta 1250,x
-        lda #81
         sta 1251,x
         lda #80
         sta 1252,x
         sta 1253,x
-        lda #79
         sta 1254,x
         lda #78
         sta 1255,x
-        lda #77
         sta 1256,x
         lda #76
         sta 1257,x
         sta 1258,x
-        lda #75
-        sta 1259,x
         lda #74
+        sta 1259,x
         sta 1260,x
-        lda #73
-        sta 1261,x
         lda #72
+        sta 1261,x
         sta 1262,x
-        sta 1263,x
-        lda #71
-        sta 1264,x
         lda #70
-        sta 1265,x
+        sta 1263,x
+        sta 1264,x
         lda #69
+        sta 1265,x
         sta 1266,x
-        lda #68
-        sta 1267,x
         lda #67
+        sta 1267,x
         sta 1268,x
-        sta 1269,x
-        lda #66
-        sta 1270,x
         lda #65
+        sta 1269,x
+        sta 1270,x
         sta 1271,x
         rts
 .segment "ROUTA"
 rt70:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #3
         sta 1219,x
+        lda #3
         sta 1220,x
-        lda #4
         sta 1221,x
         lda #5
         sta 1222,x
-        lda #6
         sta 1223,x
-        lda #7
+        lda #6
         sta 1224,x
-        lda #8
         sta 1225,x
+        lda #8
         sta 1226,x
-        lda #9
         sta 1227,x
         lda #10
         sta 1228,x
-        lda #11
         sta 1229,x
         lda #12
         sta 1230,x
         sta 1231,x
-        lda #13
         sta 1232,x
         lda #14
         sta 1233,x
-        lda #15
         sta 1234,x
         lda #16
         sta 1235,x
         sta 1236,x
-        lda #17
-        sta 1237,x
         lda #18
+        sta 1237,x
         sta 1238,x
         lda #19
         sta 1239,x
-        lda #20
         sta 1240,x
         lda #21
         sta 1241,x
         sta 1242,x
-        lda #54
-        sta 1243,x
         lda #55
+        sta 1243,x
         sta 1244,x
+        lda #119
         sta 1245,x
-        lda #54
         sta 1246,x
-        lda #21
+        lda #85
         sta 1247,x
         sta 1248,x
-        lda #20
+        lda #83
         sta 1249,x
-        lda #19
         sta 1250,x
-        lda #18
+        lda #82
         sta 1251,x
-        lda #17
         sta 1252,x
-        lda #16
+        lda #80
         sta 1253,x
         sta 1254,x
-        lda #15
+        lda #78
         sta 1255,x
-        lda #14
         sta 1256,x
-        lda #13
+        lda #76
         sta 1257,x
-        lda #12
         sta 1258,x
         sta 1259,x
-        lda #11
+        lda #74
         sta 1260,x
-        lda #10
         sta 1261,x
-        lda #9
+        lda #72
         sta 1262,x
-        lda #8
         sta 1263,x
+        lda #70
         sta 1264,x
-        lda #7
         sta 1265,x
-        lda #6
+        lda #69
         sta 1266,x
-        lda #5
         sta 1267,x
-        lda #4
+        lda #67
         sta 1268,x
-        lda #3
         sta 1269,x
+        lda #65
         sta 1270,x
-        lda #2
         sta 1271,x
-        lda #1
         sta 1272,x
         rts
 .segment "ROUTA"
 rt71:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #3
         sta 1219,x
+        lda #3
         sta 1220,x
-        lda #4
         sta 1221,x
         lda #5
         sta 1222,x
-        lda #6
         sta 1223,x
+        lda #6
         sta 1224,x
-        lda #7
         sta 1225,x
         lda #8
         sta 1226,x
-        lda #9
         sta 1227,x
         lda #10
         sta 1228,x
         sta 1229,x
-        lda #11
         sta 1230,x
         lda #12
         sta 1231,x
-        lda #13
         sta 1232,x
         lda #14
         sta 1233,x
         sta 1234,x
-        lda #15
-        sta 1235,x
         lda #16
+        sta 1235,x
         sta 1236,x
-        lda #17
+        lda #18
         sta 1237,x
         sta 1238,x
-        lda #18
-        sta 1239,x
         lda #19
+        sta 1239,x
         sta 1240,x
-        lda #20
         sta 1241,x
         lda #21
         sta 1242,x
         sta 1243,x
-        lda #54
-        sta 1244,x
         lda #55
+        sta 1244,x
         sta 1245,x
-        lda #54
         sta 1246,x
         lda #53
         sta 1247,x
         lda #21
         sta 1248,x
-        lda #20
-        sta 1249,x
         lda #19
+        sta 1249,x
         sta 1250,x
-        lda #18
         sta 1251,x
-        lda #17
+        lda #18
         sta 1252,x
         sta 1253,x
         lda #16
         sta 1254,x
-        lda #15
         sta 1255,x
         lda #14
         sta 1256,x
         sta 1257,x
-        lda #13
-        sta 1258,x
         lda #12
+        sta 1258,x
         sta 1259,x
-        lda #11
-        sta 1260,x
         lda #10
+        sta 1260,x
         sta 1261,x
         sta 1262,x
-        lda #9
-        sta 1263,x
         lda #8
+        sta 1263,x
         sta 1264,x
-        lda #7
-        sta 1265,x
         lda #6
+        sta 1265,x
         sta 1266,x
-        sta 1267,x
         lda #5
+        sta 1267,x
         sta 1268,x
-        lda #4
-        sta 1269,x
         lda #3
+        sta 1269,x
         sta 1270,x
-        sta 1271,x
-        lda #2
-        sta 1272,x
         lda #1
+        sta 1271,x
+        sta 1272,x
         sta 1273,x
         rts
 .segment "ROUTA"
 rt72:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #67
         sta 1219,x
+        lda #67
         sta 1220,x
-        lda #68
         sta 1221,x
         lda #69
         sta 1222,x
-        lda #70
         sta 1223,x
+        lda #70
         sta 1224,x
-        lda #71
         sta 1225,x
         lda #72
         sta 1226,x
-        lda #73
         sta 1227,x
         lda #74
         sta 1228,x
         sta 1229,x
-        lda #75
         sta 1230,x
         lda #76
         sta 1231,x
-        lda #77
         sta 1232,x
         lda #78
         sta 1233,x
         sta 1234,x
-        lda #79
-        sta 1235,x
         lda #80
+        sta 1235,x
         sta 1236,x
-        lda #81
+        lda #82
         sta 1237,x
         sta 1238,x
-        lda #82
-        sta 1239,x
         lda #83
+        sta 1239,x
         sta 1240,x
-        lda #84
         sta 1241,x
         lda #85
         sta 1242,x
         sta 1243,x
-        lda #118
-        sta 1244,x
         lda #119
+        sta 1244,x
         sta 1245,x
-        lda #118
         sta 1246,x
         lda #117
         sta 1247,x
         lda #85
         sta 1248,x
-        lda #84
-        sta 1249,x
         lda #83
+        sta 1249,x
         sta 1250,x
-        lda #82
         sta 1251,x
-        lda #81
+        lda #82
         sta 1252,x
         sta 1253,x
         lda #80
         sta 1254,x
-        lda #79
         sta 1255,x
         lda #78
         sta 1256,x
         sta 1257,x
-        lda #77
-        sta 1258,x
         lda #76
+        sta 1258,x
         sta 1259,x
-        lda #75
-        sta 1260,x
         lda #74
+        sta 1260,x
         sta 1261,x
         sta 1262,x
-        lda #73
-        sta 1263,x
         lda #72
+        sta 1263,x
         sta 1264,x
-        lda #71
-        sta 1265,x
         lda #70
+        sta 1265,x
         sta 1266,x
-        sta 1267,x
         lda #69
+        sta 1267,x
         sta 1268,x
-        lda #68
-        sta 1269,x
         lda #67
+        sta 1269,x
         sta 1270,x
-        sta 1271,x
-        lda #66
-        sta 1272,x
         lda #65
+        sta 1271,x
+        sta 1272,x
         sta 1273,x
         rts
 .segment "ROUTA"
 rt73:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #3
         sta 1219,x
+        lda #3
         sta 1220,x
-        lda #4
         sta 1221,x
         lda #5
         sta 1222,x
-        lda #6
         sta 1223,x
+        lda #6
         sta 1224,x
-        lda #7
         sta 1225,x
         lda #8
         sta 1226,x
-        lda #9
         sta 1227,x
-        lda #10
         sta 1228,x
+        lda #10
         sta 1229,x
-        lda #11
         sta 1230,x
         lda #12
         sta 1231,x
-        lda #13
         sta 1232,x
         lda #14
         sta 1233,x
         sta 1234,x
-        lda #15
-        sta 1235,x
         lda #16
+        sta 1235,x
         sta 1236,x
-        lda #17
         sta 1237,x
-        sta 1238,x
         lda #18
+        sta 1238,x
         sta 1239,x
         lda #19
         sta 1240,x
-        lda #20
         sta 1241,x
         lda #21
         sta 1242,x
         sta 1243,x
-        lda #54
-        sta 1244,x
         lda #55
+        sta 1244,x
         sta 1245,x
+        lda #119
         sta 1246,x
-        lda #54
         sta 1247,x
-        lda #21
+        lda #85
         sta 1248,x
         sta 1249,x
-        lda #20
+        lda #83
         sta 1250,x
-        lda #19
         sta 1251,x
-        lda #18
+        lda #82
         sta 1252,x
-        lda #17
         sta 1253,x
+        lda #80
         sta 1254,x
-        lda #16
         sta 1255,x
-        lda #15
         sta 1256,x
-        lda #14
+        lda #78
         sta 1257,x
         sta 1258,x
-        lda #13
+        lda #76
         sta 1259,x
-        lda #12
         sta 1260,x
-        lda #11
+        lda #74
         sta 1261,x
-        lda #10
         sta 1262,x
+        lda #72
         sta 1263,x
-        lda #9
         sta 1264,x
-        lda #8
         sta 1265,x
-        lda #7
+        lda #70
         sta 1266,x
-        lda #6
         sta 1267,x
+        lda #69
         sta 1268,x
-        lda #5
         sta 1269,x
-        lda #4
+        lda #67
         sta 1270,x
-        lda #3
         sta 1271,x
+        lda #65
         sta 1272,x
-        lda #2
         sta 1273,x
-        lda #1
         sta 1274,x
         rts
 .segment "ROUTA"
 rt74:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #67
         sta 1219,x
+        lda #67
         sta 1220,x
-        lda #68
         sta 1221,x
         lda #69
         sta 1222,x
-        lda #70
         sta 1223,x
+        lda #70
         sta 1224,x
-        lda #71
         sta 1225,x
         lda #72
         sta 1226,x
-        lda #73
         sta 1227,x
-        lda #74
         sta 1228,x
+        lda #74
         sta 1229,x
-        lda #75
         sta 1230,x
         lda #76
         sta 1231,x
-        lda #77
         sta 1232,x
         lda #78
         sta 1233,x
         sta 1234,x
-        lda #79
-        sta 1235,x
         lda #80
+        sta 1235,x
         sta 1236,x
-        lda #81
         sta 1237,x
-        sta 1238,x
         lda #82
+        sta 1238,x
         sta 1239,x
         lda #83
         sta 1240,x
-        lda #84
         sta 1241,x
         lda #85
         sta 1242,x
         sta 1243,x
-        lda #118
-        sta 1244,x
         lda #119
+        sta 1244,x
         sta 1245,x
+        lda #55
         sta 1246,x
-        lda #118
         sta 1247,x
-        lda #85
+        lda #21
         sta 1248,x
         sta 1249,x
-        lda #84
+        lda #19
         sta 1250,x
-        lda #83
         sta 1251,x
-        lda #82
+        lda #18
         sta 1252,x
-        lda #81
         sta 1253,x
+        lda #16
         sta 1254,x
-        lda #80
         sta 1255,x
-        lda #79
         sta 1256,x
-        lda #78
+        lda #14
         sta 1257,x
         sta 1258,x
-        lda #77
+        lda #12
         sta 1259,x
-        lda #76
         sta 1260,x
-        lda #75
+        lda #10
         sta 1261,x
-        lda #74
         sta 1262,x
+        lda #8
         sta 1263,x
-        lda #73
         sta 1264,x
-        lda #72
         sta 1265,x
-        lda #71
+        lda #6
         sta 1266,x
-        lda #70
         sta 1267,x
+        lda #5
         sta 1268,x
-        lda #69
         sta 1269,x
-        lda #68
+        lda #3
         sta 1270,x
-        lda #67
         sta 1271,x
+        lda #1
         sta 1272,x
-        lda #66
         sta 1273,x
-        lda #65
         sta 1274,x
         rts
 .segment "ROUTA"
 rt75:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #67
         sta 1219,x
+        lda #67
         sta 1220,x
-        lda #68
         sta 1221,x
         lda #69
         sta 1222,x
-        lda #70
         sta 1223,x
+        lda #70
         sta 1224,x
-        lda #71
         sta 1225,x
-        lda #72
         sta 1226,x
-        lda #73
+        lda #72
         sta 1227,x
         sta 1228,x
         lda #74
         sta 1229,x
-        lda #75
         sta 1230,x
         lda #76
         sta 1231,x
         sta 1232,x
-        lda #77
-        sta 1233,x
         lda #78
+        sta 1233,x
         sta 1234,x
-        lda #79
         sta 1235,x
-        sta 1236,x
         lda #80
+        sta 1236,x
         sta 1237,x
-        lda #81
-        sta 1238,x
         lda #82
+        sta 1238,x
         sta 1239,x
-        sta 1240,x
         lda #83
+        sta 1240,x
         sta 1241,x
-        lda #84
-        sta 1242,x
         lda #85
+        sta 1242,x
         sta 1243,x
         sta 1244,x
-        lda #118
-        sta 1245,x
         lda #119
+        sta 1245,x
         sta 1246,x
-        lda #118
         sta 1247,x
         lda #117
         sta 1248,x
         lda #85
         sta 1249,x
-        lda #84
         sta 1250,x
         lda #83
         sta 1251,x
-        lda #82
         sta 1252,x
+        lda #82
         sta 1253,x
-        lda #81
         sta 1254,x
         lda #80
         sta 1255,x
-        lda #79
         sta 1256,x
-        sta 1257,x
         lda #78
+        sta 1257,x
         sta 1258,x
-        lda #77
         sta 1259,x
         lda #76
         sta 1260,x
         sta 1261,x
-        lda #75
-        sta 1262,x
         lda #74
+        sta 1262,x
         sta 1263,x
-        lda #73
+        lda #72
         sta 1264,x
         sta 1265,x
-        lda #72
-        sta 1266,x
-        lda #71
-        sta 1267,x
         lda #70
+        sta 1266,x
+        sta 1267,x
         sta 1268,x
-        sta 1269,x
         lda #69
+        sta 1269,x
         sta 1270,x
-        lda #68
-        sta 1271,x
         lda #67
+        sta 1271,x
         sta 1272,x
-        sta 1273,x
-        lda #66
-        sta 1274,x
         lda #65
+        sta 1273,x
+        sta 1274,x
         sta 1275,x
         rts
 .segment "ROUTA"
 rt76:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #3
         sta 1219,x
+        lda #3
         sta 1220,x
-        lda #4
         sta 1221,x
         lda #5
         sta 1222,x
-        lda #6
         sta 1223,x
+        lda #6
         sta 1224,x
-        lda #7
         sta 1225,x
-        lda #8
         sta 1226,x
-        lda #9
+        lda #8
         sta 1227,x
         sta 1228,x
         lda #10
         sta 1229,x
-        lda #11
         sta 1230,x
         lda #12
         sta 1231,x
         sta 1232,x
-        lda #13
-        sta 1233,x
         lda #14
+        sta 1233,x
         sta 1234,x
-        lda #15
         sta 1235,x
-        sta 1236,x
         lda #16
+        sta 1236,x
         sta 1237,x
-        lda #17
-        sta 1238,x
         lda #18
+        sta 1238,x
         sta 1239,x
-        sta 1240,x
         lda #19
+        sta 1240,x
         sta 1241,x
-        lda #20
-        sta 1242,x
         lda #21
+        sta 1242,x
         sta 1243,x
         sta 1244,x
-        lda #54
-        sta 1245,x
         lda #55
+        sta 1245,x
         sta 1246,x
-        lda #54
         sta 1247,x
         lda #53
         sta 1248,x
         lda #21
         sta 1249,x
-        lda #20
         sta 1250,x
         lda #19
         sta 1251,x
-        lda #18
         sta 1252,x
+        lda #18
         sta 1253,x
-        lda #17
         sta 1254,x
         lda #16
         sta 1255,x
-        lda #15
         sta 1256,x
-        sta 1257,x
         lda #14
+        sta 1257,x
         sta 1258,x
-        lda #13
         sta 1259,x
         lda #12
         sta 1260,x
         sta 1261,x
-        lda #11
-        sta 1262,x
         lda #10
+        sta 1262,x
         sta 1263,x
-        lda #9
+        lda #8
         sta 1264,x
         sta 1265,x
-        lda #8
-        sta 1266,x
-        lda #7
-        sta 1267,x
         lda #6
+        sta 1266,x
+        sta 1267,x
         sta 1268,x
-        sta 1269,x
         lda #5
+        sta 1269,x
         sta 1270,x
-        lda #4
-        sta 1271,x
         lda #3
+        sta 1271,x
         sta 1272,x
-        sta 1273,x
-        lda #2
-        sta 1274,x
         lda #1
+        sta 1273,x
+        sta 1274,x
         sta 1275,x
         rts
 .segment "ROUTA"
 rt77:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #3
         sta 1219,x
+        lda #3
         sta 1220,x
-        lda #4
         sta 1221,x
         lda #5
         sta 1222,x
-        lda #6
         sta 1223,x
+        lda #6
         sta 1224,x
-        lda #7
         sta 1225,x
-        lda #8
         sta 1226,x
-        lda #9
+        lda #8
         sta 1227,x
         sta 1228,x
         lda #10
         sta 1229,x
-        lda #11
         sta 1230,x
         lda #12
         sta 1231,x
         sta 1232,x
-        lda #13
         sta 1233,x
         lda #14
         sta 1234,x
-        lda #15
         sta 1235,x
-        sta 1236,x
         lda #16
+        sta 1236,x
         sta 1237,x
-        lda #17
-        sta 1238,x
         lda #18
+        sta 1238,x
         sta 1239,x
         sta 1240,x
         lda #19
         sta 1241,x
-        lda #20
         sta 1242,x
         lda #21
         sta 1243,x
         sta 1244,x
-        lda #54
-        sta 1245,x
         lda #55
+        sta 1245,x
         sta 1246,x
+        lda #119
         sta 1247,x
-        lda #54
         sta 1248,x
-        lda #21
+        lda #85
         sta 1249,x
         sta 1250,x
-        lda #20
+        lda #83
         sta 1251,x
-        lda #19
         sta 1252,x
-        lda #18
+        lda #82
         sta 1253,x
         sta 1254,x
-        lda #17
         sta 1255,x
-        lda #16
+        lda #80
         sta 1256,x
-        lda #15
         sta 1257,x
+        lda #78
         sta 1258,x
-        lda #14
         sta 1259,x
-        lda #13
+        lda #76
         sta 1260,x
-        lda #12
         sta 1261,x
         sta 1262,x
-        lda #11
+        lda #74
         sta 1263,x
-        lda #10
         sta 1264,x
-        lda #9
+        lda #72
         sta 1265,x
         sta 1266,x
-        lda #8
+        lda #70
         sta 1267,x
-        lda #7
         sta 1268,x
-        lda #6
         sta 1269,x
+        lda #69
         sta 1270,x
-        lda #5
         sta 1271,x
-        lda #4
+        lda #67
         sta 1272,x
-        lda #3
         sta 1273,x
+        lda #65
         sta 1274,x
-        lda #2
         sta 1275,x
-        lda #1
         sta 1276,x
         rts
 .segment "ROUTA"
 rt78:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
-        lda #67
         sta 1219,x
+        lda #67
         sta 1220,x
-        lda #68
         sta 1221,x
         lda #69
         sta 1222,x
-        lda #70
         sta 1223,x
+        lda #70
         sta 1224,x
-        lda #71
         sta 1225,x
-        lda #72
         sta 1226,x
-        lda #73
+        lda #72
         sta 1227,x
         sta 1228,x
         lda #74
         sta 1229,x
-        lda #75
         sta 1230,x
         lda #76
         sta 1231,x
         sta 1232,x
-        lda #77
         sta 1233,x
         lda #78
         sta 1234,x
-        lda #79
         sta 1235,x
-        sta 1236,x
         lda #80
+        sta 1236,x
         sta 1237,x
-        lda #81
-        sta 1238,x
         lda #82
+        sta 1238,x
         sta 1239,x
         sta 1240,x
         lda #83
         sta 1241,x
-        lda #84
         sta 1242,x
         lda #85
         sta 1243,x
         sta 1244,x
-        lda #118
-        sta 1245,x
         lda #119
+        sta 1245,x
         sta 1246,x
+        lda #55
         sta 1247,x
-        lda #118
         sta 1248,x
-        lda #85
+        lda #21
         sta 1249,x
         sta 1250,x
-        lda #84
+        lda #19
         sta 1251,x
-        lda #83
         sta 1252,x
-        lda #82
+        lda #18
         sta 1253,x
         sta 1254,x
-        lda #81
         sta 1255,x
-        lda #80
+        lda #16
         sta 1256,x
-        lda #79
         sta 1257,x
+        lda #14
         sta 1258,x
-        lda #78
         sta 1259,x
-        lda #77
+        lda #12
         sta 1260,x
-        lda #76
         sta 1261,x
         sta 1262,x
-        lda #75
+        lda #10
         sta 1263,x
-        lda #74
         sta 1264,x
-        lda #73
+        lda #8
         sta 1265,x
         sta 1266,x
-        lda #72
+        lda #6
         sta 1267,x
-        lda #71
         sta 1268,x
-        lda #70
         sta 1269,x
+        lda #5
         sta 1270,x
-        lda #69
         sta 1271,x
-        lda #68
+        lda #3
         sta 1272,x
-        lda #67
         sta 1273,x
+        lda #1
         sta 1274,x
-        lda #66
         sta 1275,x
-        lda #65
         sta 1276,x
         rts
 .segment "ROUTA"
 rt79:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #3
         sta 1219,x
+        lda #3
         sta 1220,x
-        lda #4
         sta 1221,x
         lda #5
         sta 1222,x
-        lda #6
         sta 1223,x
-        lda #7
+        lda #6
         sta 1224,x
-        lda #8
         sta 1225,x
+        lda #8
         sta 1226,x
-        lda #9
         sta 1227,x
         lda #10
         sta 1228,x
-        lda #11
         sta 1229,x
         lda #12
         sta 1230,x
         sta 1231,x
-        lda #13
-        sta 1232,x
         lda #14
+        sta 1232,x
         sta 1233,x
-        lda #15
-        sta 1234,x
         lda #16
+        sta 1234,x
         sta 1235,x
         sta 1236,x
-        lda #17
-        sta 1237,x
         lda #18
+        sta 1237,x
         sta 1238,x
         lda #19
         sta 1239,x
-        lda #20
         sta 1240,x
         lda #21
         sta 1241,x
         sta 1242,x
-        lda #54
-        sta 1243,x
         lda #55
+        sta 1243,x
         sta 1244,x
-        lda #54
         sta 1245,x
         lda #53
         sta 1246,x
         lda #21
         sta 1247,x
-        lda #20
-        sta 1248,x
         lda #19
+        sta 1248,x
         sta 1249,x
         lda #18
         sta 1250,x
-        lda #17
         sta 1251,x
         lda #16
         sta 1252,x
         sta 1253,x
-        lda #15
         sta 1254,x
         lda #14
         sta 1255,x
-        lda #13
         sta 1256,x
         lda #12
         sta 1257,x
         sta 1258,x
-        lda #11
-        sta 1259,x
         lda #10
+        sta 1259,x
         sta 1260,x
-        lda #9
-        sta 1261,x
         lda #8
+        sta 1261,x
         sta 1262,x
-        sta 1263,x
-        lda #7
-        sta 1264,x
         lda #6
-        sta 1265,x
+        sta 1263,x
+        sta 1264,x
         lda #5
+        sta 1265,x
         sta 1266,x
-        lda #4
-        sta 1267,x
         lda #3
+        sta 1267,x
         sta 1268,x
-        sta 1269,x
-        lda #2
-        sta 1270,x
         lda #1
+        sta 1269,x
+        sta 1270,x
         sta 1271,x
         rts
 .segment "ROUTA"
 rt80:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
-        lda #3
         sta 1219,x
-        lda #4
+        lda #3
         sta 1220,x
         sta 1221,x
         lda #5
         sta 1222,x
-        lda #6
         sta 1223,x
-        lda #7
+        lda #6
         sta 1224,x
-        lda #8
         sta 1225,x
-        lda #9
+        lda #8
         sta 1226,x
         sta 1227,x
         lda #10
         sta 1228,x
-        lda #11
         sta 1229,x
         lda #12
         sta 1230,x
-        lda #13
         sta 1231,x
         lda #14
         sta 1232,x
-        lda #15
         sta 1233,x
-        sta 1234,x
         lda #16
+        sta 1234,x
         sta 1235,x
-        lda #17
-        sta 1236,x
         lda #18
+        sta 1236,x
         sta 1237,x
         lda #19
         sta 1238,x
-        lda #20
         sta 1239,x
-        sta 1240,x
         lda #21
+        sta 1240,x
         sta 1241,x
-        lda #54
-        sta 1242,x
         lda #55
+        sta 1242,x
         sta 1243,x
-        lda #54
         sta 1244,x
         lda #53
         sta 1245,x
-        lda #20
+        lda #21
         sta 1246,x
-        sta 1247,x
         lda #19
+        sta 1247,x
         sta 1248,x
         lda #18
         sta 1249,x
-        lda #17
         sta 1250,x
         lda #16
         sta 1251,x
-        lda #15
         sta 1252,x
-        sta 1253,x
         lda #14
+        sta 1253,x
         sta 1254,x
-        lda #13
-        sta 1255,x
         lda #12
+        sta 1255,x
         sta 1256,x
-        lda #11
-        sta 1257,x
         lda #10
+        sta 1257,x
         sta 1258,x
-        lda #9
+        lda #8
         sta 1259,x
         sta 1260,x
-        lda #8
-        sta 1261,x
-        lda #7
-        sta 1262,x
         lda #6
-        sta 1263,x
+        sta 1261,x
+        sta 1262,x
         lda #5
+        sta 1263,x
         sta 1264,x
-        lda #4
+        lda #3
         sta 1265,x
         sta 1266,x
-        lda #3
-        sta 1267,x
-        lda #2
-        sta 1268,x
         lda #1
+        sta 1267,x
+        sta 1268,x
         sta 1269,x
         rts
 .segment "ROUTA"
 rt81:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
         lda #69
         sta 1221,x
         sta 1222,x
         lda #70
         sta 1223,x
-        lda #71
         sta 1224,x
         lda #72
         sta 1225,x
-        lda #73
         sta 1226,x
         lda #74
         sta 1227,x
-        lda #75
         sta 1228,x
         lda #76
         sta 1229,x
         sta 1230,x
-        lda #77
-        sta 1231,x
         lda #78
+        sta 1231,x
         sta 1232,x
-        lda #79
-        sta 1233,x
         lda #80
+        sta 1233,x
         sta 1234,x
-        lda #81
-        sta 1235,x
         lda #82
+        sta 1235,x
         sta 1236,x
         lda #83
         sta 1237,x
         sta 1238,x
-        lda #84
-        sta 1239,x
         lda #85
+        sta 1239,x
         sta 1240,x
-        lda #118
-        sta 1241,x
         lda #119
+        sta 1241,x
         sta 1242,x
-        lda #118
         sta 1243,x
         lda #117
         sta 1244,x
-        lda #84
+        lda #85
         sta 1245,x
         lda #83
         sta 1246,x
         sta 1247,x
         lda #82
         sta 1248,x
-        lda #81
         sta 1249,x
         lda #80
         sta 1250,x
-        lda #79
         sta 1251,x
         lda #78
         sta 1252,x
-        lda #77
         sta 1253,x
         lda #76
         sta 1254,x
         sta 1255,x
-        lda #75
-        sta 1256,x
         lda #74
+        sta 1256,x
         sta 1257,x
-        lda #73
-        sta 1258,x
         lda #72
+        sta 1258,x
         sta 1259,x
-        lda #71
-        sta 1260,x
         lda #70
+        sta 1260,x
         sta 1261,x
         lda #69
         sta 1262,x
         sta 1263,x
-        lda #68
-        sta 1264,x
         lda #67
+        sta 1264,x
         sta 1265,x
-        lda #66
-        sta 1266,x
         lda #65
+        sta 1266,x
         sta 1267,x
         rts
 .segment "ROUTA"
 rt82:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
         lda #69
         sta 1221,x
-        lda #70
         sta 1222,x
-        lda #71
+        lda #70
         sta 1223,x
-        lda #72
         sta 1224,x
-        lda #73
+        lda #72
         sta 1225,x
-        lda #74
         sta 1226,x
-        lda #75
+        lda #74
         sta 1227,x
         sta 1228,x
         lda #76
         sta 1229,x
-        lda #77
-        sta 1230,x
         lda #78
+        sta 1230,x
         sta 1231,x
-        lda #79
-        sta 1232,x
         lda #80
+        sta 1232,x
         sta 1233,x
-        lda #81
-        sta 1234,x
         lda #82
+        sta 1234,x
         sta 1235,x
         lda #83
         sta 1236,x
-        lda #84
         sta 1237,x
         lda #85
         sta 1238,x
-        lda #118
+        lda #117
         sta 1239,x
         lda #119
         sta 1240,x
+        lda #55
         sta 1241,x
-        lda #118
+        lda #53
         sta 1242,x
-        lda #85
+        lda #21
         sta 1243,x
-        lda #84
+        lda #19
         sta 1244,x
-        lda #83
         sta 1245,x
-        lda #82
+        lda #18
         sta 1246,x
-        lda #81
         sta 1247,x
-        lda #80
+        lda #16
         sta 1248,x
-        lda #79
         sta 1249,x
-        lda #78
+        lda #14
         sta 1250,x
-        lda #77
         sta 1251,x
-        lda #76
+        lda #12
         sta 1252,x
-        lda #75
+        lda #10
         sta 1253,x
         sta 1254,x
-        lda #74
+        lda #8
         sta 1255,x
-        lda #73
         sta 1256,x
-        lda #72
+        lda #6
         sta 1257,x
-        lda #71
         sta 1258,x
-        lda #70
+        lda #5
         sta 1259,x
-        lda #69
         sta 1260,x
-        lda #68
+        lda #3
         sta 1261,x
-        lda #67
         sta 1262,x
-        lda #66
+        lda #1
         sta 1263,x
-        lda #65
         sta 1264,x
         rts
 .segment "ROUTA"
 rt83:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
-        lda #6
         sta 1222,x
-        lda #7
+        lda #6
         sta 1223,x
         lda #8
         sta 1224,x
-        lda #9
         sta 1225,x
         lda #10
         sta 1226,x
-        lda #11
         sta 1227,x
-        lda #13
+        lda #12
         sta 1228,x
         lda #14
         sta 1229,x
-        lda #15
         sta 1230,x
         lda #16
         sta 1231,x
-        lda #17
         sta 1232,x
         lda #18
         sta 1233,x
         lda #19
         sta 1234,x
-        lda #20
         sta 1235,x
         lda #21
         sta 1236,x
-        lda #54
+        lda #53
         sta 1237,x
         lda #55
         sta 1238,x
+        lda #119
         sta 1239,x
-        lda #54
+        lda #117
         sta 1240,x
-        lda #21
+        lda #85
         sta 1241,x
-        lda #20
+        lda #83
         sta 1242,x
-        lda #19
         sta 1243,x
-        lda #18
+        lda #82
         sta 1244,x
-        lda #17
+        lda #80
         sta 1245,x
-        lda #16
         sta 1246,x
-        lda #15
+        lda #78
         sta 1247,x
-        lda #14
         sta 1248,x
-        lda #13
+        lda #76
         sta 1249,x
-        lda #11
+        lda #74
         sta 1250,x
-        lda #10
         sta 1251,x
-        lda #9
+        lda #72
         sta 1252,x
-        lda #8
         sta 1253,x
-        lda #7
+        lda #70
         sta 1254,x
-        lda #6
+        lda #69
         sta 1255,x
-        lda #5
         sta 1256,x
-        lda #4
+        lda #67
         sta 1257,x
-        lda #3
         sta 1258,x
-        lda #2
+        lda #65
         sta 1259,x
-        lda #1
         sta 1260,x
         rts
 .segment "ROUTA"
 rt84:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
         lda #69
         sta 1221,x
         lda #70
         sta 1222,x
-        lda #71
         sta 1223,x
         lda #72
         sta 1224,x
-        lda #73
         sta 1225,x
         lda #74
         sta 1226,x
-        lda #75
+        lda #76
         sta 1227,x
-        lda #77
         sta 1228,x
         lda #78
         sta 1229,x
-        lda #79
         sta 1230,x
         lda #80
         sta 1231,x
-        lda #81
-        sta 1232,x
         lda #82
+        sta 1232,x
         sta 1233,x
         lda #83
         sta 1234,x
-        lda #84
         sta 1235,x
         lda #85
         sta 1236,x
-        lda #118
-        sta 1237,x
         lda #119
+        sta 1237,x
         sta 1238,x
-        lda #118
         sta 1239,x
         lda #117
         sta 1240,x
-        lda #84
-        sta 1241,x
         lda #83
+        sta 1241,x
         sta 1242,x
         lda #82
         sta 1243,x
-        lda #81
         sta 1244,x
         lda #80
         sta 1245,x
-        lda #79
-        sta 1246,x
         lda #78
+        sta 1246,x
         sta 1247,x
-        lda #77
+        lda #76
         sta 1248,x
-        lda #75
         sta 1249,x
         lda #74
         sta 1250,x
-        lda #73
-        sta 1251,x
         lda #72
+        sta 1251,x
         sta 1252,x
-        lda #71
-        sta 1253,x
         lda #70
+        sta 1253,x
         sta 1254,x
         lda #69
         sta 1255,x
-        lda #68
-        sta 1256,x
         lda #67
+        sta 1256,x
         sta 1257,x
-        lda #66
-        sta 1258,x
         lda #65
+        sta 1258,x
         sta 1259,x
         rts
 .segment "ROUTA"
@@ -6239,18 +5455,19 @@ rt85:
         sta 1222,x
         lda #55
         sta 1223,x
+        lda #119
         sta 1224,x
-        lda #51
+        lda #115
         sta 1225,x
-        lda #16
+        lda #80
         sta 1226,x
-        lda #12
+        lda #76
         sta 1227,x
-        lda #8
+        lda #72
         sta 1228,x
-        lda #5
+        lda #69
         sta 1229,x
-        lda #1
+        lda #65
         sta 1230,x
         rts
 .segment "ROUTA"
@@ -6269,18 +5486,19 @@ rt86:
         sta 1222,x
         lda #119
         sta 1223,x
+        lda #55
         sta 1224,x
-        lda #115
+        lda #51
         sta 1225,x
-        lda #80
+        lda #16
         sta 1226,x
-        lda #76
+        lda #12
         sta 1227,x
-        lda #72
+        lda #8
         sta 1228,x
-        lda #69
+        lda #5
         sta 1229,x
-        lda #65
+        lda #1
         sta 1230,x
         rts
 .segment "ROUTA"
@@ -6355,16 +5573,17 @@ rt89:
         sta 1221,x
         lda #55
         sta 1222,x
+        lda #119
         sta 1223,x
-        lda #51
+        lda #115
         sta 1224,x
-        lda #14
+        lda #78
         sta 1225,x
-        lda #10
+        lda #74
         sta 1226,x
-        lda #5
+        lda #69
         sta 1227,x
-        lda #1
+        lda #65
         sta 1228,x
         rts
 .segment "ROUTA"
@@ -6381,16 +5600,17 @@ rt90:
         sta 1221,x
         lda #119
         sta 1222,x
+        lda #55
         sta 1223,x
-        lda #115
+        lda #51
         sta 1224,x
-        lda #78
+        lda #14
         sta 1225,x
-        lda #74
+        lda #10
         sta 1226,x
-        lda #69
+        lda #5
         sta 1227,x
-        lda #65
+        lda #1
         sta 1228,x
         rts
 .segment "ROUTA"
@@ -6447,7 +5667,7 @@ rt92:
 rt93:
         lda #65
         sta 1217,x
-        lda #71
+        lda #70
         sta 1218,x
         lda #76
         sta 1219,x
@@ -6455,21 +5675,22 @@ rt93:
         sta 1220,x
         lda #119
         sta 1221,x
+        lda #55
         sta 1222,x
-        lda #114
+        lda #50
         sta 1223,x
-        lda #76
+        lda #12
         sta 1224,x
-        lda #71
+        lda #6
         sta 1225,x
-        lda #65
+        lda #1
         sta 1226,x
         rts
 .segment "ROUTA"
 rt94:
         lda #1
         sta 1217,x
-        lda #7
+        lda #6
         sta 1218,x
         lda #12
         sta 1219,x
@@ -6477,21 +5698,22 @@ rt94:
         sta 1220,x
         lda #55
         sta 1221,x
+        lda #119
         sta 1222,x
-        lda #50
+        lda #114
         sta 1223,x
-        lda #12
+        lda #76
         sta 1224,x
-        lda #7
+        lda #70
         sta 1225,x
-        lda #1
+        lda #65
         sta 1226,x
         rts
 .segment "ROUTA"
 rt95:
         lda #65
         sta 1217,x
-        lda #71
+        lda #70
         sta 1218,x
         lda #76
         sta 1219,x
@@ -6503,7 +5725,7 @@ rt95:
         sta 1222,x
         lda #108
         sta 1223,x
-        lda #71
+        lda #70
         sta 1224,x
         lda #65
         sta 1225,x
@@ -6512,7 +5734,7 @@ rt95:
 rt96:
         lda #1
         sta 1217,x
-        lda #7
+        lda #6
         sta 1218,x
         lda #12
         sta 1219,x
@@ -6524,7 +5746,7 @@ rt96:
         sta 1222,x
         lda #44
         sta 1223,x
-        lda #7
+        lda #6
         sta 1224,x
         lda #1
         sta 1225,x
@@ -6539,15 +5761,16 @@ rt97:
         sta 1219,x
         lda #55
         sta 1220,x
+        lda #119
         sta 1221,x
-        lda #48
+        lda #112
         sta 1222,x
-        lda #8
+        lda #72
         sta 1223,x
-        lda #1
+        lda #65
         sta 1224,x
         rts
-.segment "AR2"
+.segment "ROUTA"
 rt98:
         lda #65
         sta 1217,x
@@ -6557,1053 +5780,700 @@ rt98:
         sta 1219,x
         lda #119
         sta 1220,x
+        lda #55
         sta 1221,x
-        lda #112
+        lda #48
         sta 1222,x
-        lda #72
+        lda #8
         sta 1223,x
-        lda #65
+        lda #1
         sta 1224,x
         rts
-.segment "AR2"
+.segment "ROUTA"
 rt99:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
         lda #69
         sta 1221,x
-        lda #70
         sta 1222,x
+        lda #70
         sta 1223,x
-        lda #71
         sta 1224,x
         lda #72
         sta 1225,x
-        lda #73
         sta 1226,x
         lda #74
         sta 1227,x
-        lda #75
         sta 1228,x
         lda #76
         sta 1229,x
-        lda #77
         sta 1230,x
         lda #78
         sta 1231,x
-        lda #79
         sta 1232,x
         lda #80
         sta 1233,x
-        lda #81
+        lda #82
         sta 1234,x
         sta 1235,x
-        lda #82
-        sta 1236,x
         lda #83
+        sta 1236,x
         sta 1237,x
-        lda #84
-        sta 1238,x
         lda #85
+        sta 1238,x
         sta 1239,x
-        lda #118
-        sta 1240,x
         lda #119
+        sta 1240,x
         sta 1241,x
-        lda #118
         sta 1242,x
         lda #117
         sta 1243,x
-        lda #84
+        lda #85
         sta 1244,x
         lda #83
         sta 1245,x
-        lda #82
         sta 1246,x
-        lda #81
+        lda #82
         sta 1247,x
         sta 1248,x
         lda #80
         sta 1249,x
-        lda #79
-        sta 1250,x
         lda #78
+        sta 1250,x
         sta 1251,x
-        lda #77
-        sta 1252,x
         lda #76
+        sta 1252,x
         sta 1253,x
-        lda #75
-        sta 1254,x
         lda #74
+        sta 1254,x
         sta 1255,x
-        lda #73
-        sta 1256,x
         lda #72
+        sta 1256,x
         sta 1257,x
-        lda #71
-        sta 1258,x
         lda #70
+        sta 1258,x
         sta 1259,x
-        sta 1260,x
         lda #69
+        sta 1260,x
         sta 1261,x
-        lda #68
-        sta 1262,x
         lda #67
+        sta 1262,x
         sta 1263,x
-        lda #66
-        sta 1264,x
         lda #65
+        sta 1264,x
         sta 1265,x
         rts
-.segment "AR2"
+.segment "ROUTA"
 rt100:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         sta 1219,x
         lda #67
         sta 1220,x
-        lda #68
         sta 1221,x
         lda #69
         sta 1222,x
         sta 1223,x
-        lda #70
         sta 1224,x
-        lda #71
+        lda #70
         sta 1225,x
-        lda #72
         sta 1226,x
+        lda #72
         sta 1227,x
-        lda #73
         sta 1228,x
         lda #74
         sta 1229,x
         sta 1230,x
-        lda #75
         sta 1231,x
         lda #76
         sta 1232,x
-        lda #77
         sta 1233,x
-        sta 1234,x
         lda #78
+        sta 1234,x
         sta 1235,x
-        lda #79
-        sta 1236,x
         lda #80
+        sta 1236,x
         sta 1237,x
         sta 1238,x
-        lda #81
-        sta 1239,x
         lda #82
+        sta 1239,x
         sta 1240,x
         lda #83
         sta 1241,x
         sta 1242,x
-        lda #84
-        sta 1243,x
         lda #85
+        sta 1243,x
         sta 1244,x
         sta 1245,x
-        lda #118
-        sta 1246,x
         lda #119
+        sta 1246,x
         sta 1247,x
-        lda #118
         sta 1248,x
         lda #117
         sta 1249,x
         lda #85
         sta 1250,x
-        lda #84
         sta 1251,x
         lda #83
         sta 1252,x
         sta 1253,x
         lda #82
         sta 1254,x
-        lda #81
         sta 1255,x
         lda #80
         sta 1256,x
         sta 1257,x
-        lda #79
         sta 1258,x
         lda #78
         sta 1259,x
-        lda #77
         sta 1260,x
-        sta 1261,x
         lda #76
+        sta 1261,x
         sta 1262,x
-        lda #75
-        sta 1263,x
         lda #74
+        sta 1263,x
         sta 1264,x
         sta 1265,x
-        lda #73
-        sta 1266,x
         lda #72
+        sta 1266,x
         sta 1267,x
-        sta 1268,x
-        lda #71
-        sta 1269,x
         lda #70
-        sta 1270,x
+        sta 1268,x
+        sta 1269,x
         lda #69
+        sta 1270,x
         sta 1271,x
         sta 1272,x
-        lda #68
-        sta 1273,x
         lda #67
+        sta 1273,x
         sta 1274,x
-        lda #66
+        lda #65
         sta 1275,x
         sta 1276,x
-        lda #65
         sta 1277,x
         rts
-.segment "AR2"
+.segment "ROUTA"
 rt101:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         sta 1219,x
         lda #67
         sta 1220,x
-        lda #68
         sta 1221,x
         lda #69
         sta 1222,x
         sta 1223,x
-        lda #70
         sta 1224,x
-        lda #71
+        lda #70
         sta 1225,x
         sta 1226,x
         lda #72
         sta 1227,x
-        lda #73
         sta 1228,x
         sta 1229,x
         lda #74
         sta 1230,x
-        lda #75
         sta 1231,x
         lda #76
         sta 1232,x
         sta 1233,x
-        lda #77
-        sta 1234,x
         lda #78
+        sta 1234,x
         sta 1235,x
         sta 1236,x
-        lda #79
-        sta 1237,x
         lda #80
+        sta 1237,x
         sta 1238,x
-        lda #81
+        lda #82
         sta 1239,x
         sta 1240,x
-        lda #82
         sta 1241,x
         lda #83
         sta 1242,x
         sta 1243,x
-        lda #84
-        sta 1244,x
         lda #85
+        sta 1244,x
         sta 1245,x
-        lda #86
         sta 1246,x
-        lda #118
-        sta 1247,x
         lda #119
+        sta 1247,x
         sta 1248,x
-        lda #118
         sta 1249,x
+        lda #117
         sta 1250,x
         lda #85
         sta 1251,x
-        lda #84
         sta 1252,x
         lda #83
         sta 1253,x
         sta 1254,x
         lda #82
         sta 1255,x
-        lda #81
         sta 1256,x
         sta 1257,x
         lda #80
         sta 1258,x
-        lda #79
         sta 1259,x
         lda #78
         sta 1260,x
         sta 1261,x
-        lda #77
         sta 1262,x
         lda #76
         sta 1263,x
         sta 1264,x
-        lda #75
-        sta 1265,x
         lda #74
+        sta 1265,x
         sta 1266,x
-        lda #73
+        lda #72
         sta 1267,x
         sta 1268,x
-        lda #72
         sta 1269,x
-        lda #71
+        lda #70
         sta 1270,x
         sta 1271,x
-        lda #70
-        sta 1272,x
         lda #69
+        sta 1272,x
         sta 1273,x
         sta 1274,x
-        lda #68
-        sta 1275,x
         lda #67
+        sta 1275,x
         sta 1276,x
-        lda #66
+        lda #65
         sta 1277,x
         sta 1278,x
-        lda #65
         sta 1279,x
         rts
-.segment "AR2"
+.segment "ROUTA"
 rt102:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         sta 1219,x
         lda #3
         sta 1220,x
-        lda #4
         sta 1221,x
         lda #5
         sta 1222,x
         sta 1223,x
-        lda #6
         sta 1224,x
-        lda #7
+        lda #6
         sta 1225,x
         sta 1226,x
         lda #8
         sta 1227,x
-        lda #9
         sta 1228,x
         sta 1229,x
         lda #10
         sta 1230,x
-        lda #11
         sta 1231,x
         lda #12
         sta 1232,x
         sta 1233,x
-        lda #13
-        sta 1234,x
         lda #14
+        sta 1234,x
         sta 1235,x
         sta 1236,x
-        lda #15
-        sta 1237,x
         lda #16
+        sta 1237,x
         sta 1238,x
-        lda #17
+        lda #18
         sta 1239,x
         sta 1240,x
-        lda #18
         sta 1241,x
         lda #19
         sta 1242,x
         sta 1243,x
-        lda #20
-        sta 1244,x
         lda #21
+        sta 1244,x
         sta 1245,x
-        lda #22
         sta 1246,x
-        lda #54
-        sta 1247,x
         lda #55
+        sta 1247,x
         sta 1248,x
-        lda #54
         sta 1249,x
+        lda #53
         sta 1250,x
         lda #21
         sta 1251,x
-        lda #20
         sta 1252,x
         lda #19
         sta 1253,x
         sta 1254,x
         lda #18
         sta 1255,x
-        lda #17
         sta 1256,x
         sta 1257,x
         lda #16
         sta 1258,x
-        lda #15
         sta 1259,x
         lda #14
         sta 1260,x
         sta 1261,x
-        lda #13
         sta 1262,x
         lda #12
         sta 1263,x
         sta 1264,x
-        lda #11
-        sta 1265,x
         lda #10
+        sta 1265,x
         sta 1266,x
-        lda #9
+        lda #8
         sta 1267,x
         sta 1268,x
-        lda #8
         sta 1269,x
-        lda #7
+        lda #6
         sta 1270,x
         sta 1271,x
-        lda #6
-        sta 1272,x
         lda #5
+        sta 1272,x
         sta 1273,x
         sta 1274,x
-        lda #4
-        sta 1275,x
         lda #3
+        sta 1275,x
         sta 1276,x
-        lda #2
+        lda #1
         sta 1277,x
         sta 1278,x
-        lda #1
         sta 1279,x
         rts
-.segment "AR2"
+.segment "ROUTA"
 rt103:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         sta 1219,x
         lda #3
         sta 1220,x
-        lda #4
         sta 1221,x
         lda #5
         sta 1222,x
         sta 1223,x
-        lda #6
         sta 1224,x
-        lda #7
+        lda #6
         sta 1225,x
-        lda #8
         sta 1226,x
+        lda #8
         sta 1227,x
-        lda #9
         sta 1228,x
         lda #10
         sta 1229,x
         sta 1230,x
-        lda #11
         sta 1231,x
         lda #12
         sta 1232,x
-        lda #13
         sta 1233,x
-        sta 1234,x
         lda #14
+        sta 1234,x
         sta 1235,x
-        lda #15
         sta 1236,x
         lda #16
         sta 1237,x
         sta 1238,x
-        lda #17
-        sta 1239,x
         lda #18
+        sta 1239,x
         sta 1240,x
         lda #19
         sta 1241,x
         sta 1242,x
-        lda #20
         sta 1243,x
         lda #21
         sta 1244,x
         sta 1245,x
-        lda #54
-        sta 1246,x
         lda #55
+        sta 1246,x
         sta 1247,x
+        lda #119
         sta 1248,x
-        lda #54
         sta 1249,x
-        lda #21
+        lda #85
         sta 1250,x
         sta 1251,x
-        lda #20
+        lda #83
         sta 1252,x
-        lda #19
         sta 1253,x
         sta 1254,x
-        lda #18
+        lda #82
         sta 1255,x
-        lda #17
         sta 1256,x
-        lda #16
+        lda #80
         sta 1257,x
         sta 1258,x
-        lda #15
+        lda #78
         sta 1259,x
-        lda #14
         sta 1260,x
-        lda #13
         sta 1261,x
+        lda #76
         sta 1262,x
-        lda #12
         sta 1263,x
-        lda #11
+        lda #74
         sta 1264,x
-        lda #10
         sta 1265,x
         sta 1266,x
-        lda #9
+        lda #72
         sta 1267,x
-        lda #8
         sta 1268,x
+        lda #70
         sta 1269,x
-        lda #7
         sta 1270,x
-        lda #6
+        lda #69
         sta 1271,x
-        lda #5
         sta 1272,x
         sta 1273,x
-        lda #4
+        lda #67
         sta 1274,x
-        lda #3
         sta 1275,x
-        lda #2
+        lda #65
         sta 1276,x
         sta 1277,x
-        lda #1
         sta 1278,x
         rts
-.segment "AR2"
+.segment "ROUTA"
 rt104:
         lda #1
         sta 1217,x
-        lda #2
         sta 1218,x
         lda #3
         sta 1219,x
-        lda #4
         sta 1220,x
         lda #5
         sta 1221,x
-        lda #6
         sta 1222,x
-        lda #7
+        lda #6
         sta 1223,x
-        lda #8
         sta 1224,x
-        lda #9
+        lda #8
         sta 1225,x
         lda #10
         sta 1226,x
-        lda #11
         sta 1227,x
         lda #12
         sta 1228,x
-        lda #13
         sta 1229,x
         lda #14
         sta 1230,x
-        lda #15
         sta 1231,x
         lda #16
         sta 1232,x
-        lda #17
-        sta 1233,x
         lda #18
+        sta 1233,x
         sta 1234,x
         lda #19
         sta 1235,x
-        lda #20
         sta 1236,x
         lda #21
         sta 1237,x
-        lda #54
+        lda #53
         sta 1238,x
         lda #55
         sta 1239,x
+        lda #119
         sta 1240,x
-        lda #54
+        lda #117
         sta 1241,x
-        lda #21
+        lda #85
         sta 1242,x
-        lda #20
+        lda #83
         sta 1243,x
-        lda #19
         sta 1244,x
-        lda #18
+        lda #82
         sta 1245,x
-        lda #17
         sta 1246,x
-        lda #16
+        lda #80
         sta 1247,x
-        lda #15
+        lda #78
         sta 1248,x
-        lda #14
         sta 1249,x
-        lda #13
+        lda #76
         sta 1250,x
-        lda #12
         sta 1251,x
-        lda #11
+        lda #74
         sta 1252,x
-        lda #10
         sta 1253,x
-        lda #9
+        lda #72
         sta 1254,x
-        lda #8
+        lda #70
         sta 1255,x
-        lda #7
         sta 1256,x
-        lda #6
+        lda #69
         sta 1257,x
-        lda #5
         sta 1258,x
-        lda #4
+        lda #67
         sta 1259,x
-        lda #3
         sta 1260,x
-        lda #2
+        lda #65
         sta 1261,x
-        lda #1
         sta 1262,x
         rts
 .segment "AR2"
 rt105:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
         lda #69
         sta 1221,x
-        lda #70
         sta 1222,x
+        lda #70
         sta 1223,x
-        lda #71
         sta 1224,x
         lda #72
         sta 1225,x
-        lda #73
         sta 1226,x
         lda #74
         sta 1227,x
-        lda #75
         sta 1228,x
         lda #76
         sta 1229,x
-        lda #77
         sta 1230,x
         lda #78
         sta 1231,x
-        lda #79
         sta 1232,x
         lda #80
         sta 1233,x
-        lda #81
         sta 1234,x
-        sta 1235,x
         lda #82
+        sta 1235,x
         sta 1236,x
         lda #83
         sta 1237,x
-        lda #84
         sta 1238,x
         lda #85
         sta 1239,x
-        lda #118
+        lda #117
         sta 1240,x
         lda #119
         sta 1241,x
+        lda #55
         sta 1242,x
-        lda #118
+        lda #53
         sta 1243,x
-        lda #85
+        lda #21
         sta 1244,x
-        lda #84
+        lda #19
         sta 1245,x
-        lda #83
         sta 1246,x
-        lda #82
+        lda #18
         sta 1247,x
-        lda #81
         sta 1248,x
+        lda #16
         sta 1249,x
-        lda #80
         sta 1250,x
-        lda #79
+        lda #14
         sta 1251,x
-        lda #78
         sta 1252,x
-        lda #77
+        lda #12
         sta 1253,x
-        lda #76
         sta 1254,x
-        lda #75
+        lda #10
         sta 1255,x
-        lda #74
         sta 1256,x
-        lda #73
+        lda #8
         sta 1257,x
-        lda #72
         sta 1258,x
-        lda #71
+        lda #6
         sta 1259,x
-        lda #70
         sta 1260,x
+        lda #5
         sta 1261,x
-        lda #69
         sta 1262,x
-        lda #68
+        lda #3
         sta 1263,x
-        lda #67
         sta 1264,x
-        lda #66
+        lda #1
         sta 1265,x
-        lda #65
         sta 1266,x
         rts
 .segment "AR2"
 rt106:
         lda #65
         sta 1217,x
-        lda #66
         sta 1218,x
         lda #67
         sta 1219,x
-        lda #68
         sta 1220,x
         lda #69
         sta 1221,x
         sta 1222,x
         lda #70
         sta 1223,x
-        lda #71
         sta 1224,x
         lda #72
         sta 1225,x
-        lda #73
         sta 1226,x
         lda #74
         sta 1227,x
-        lda #75
         sta 1228,x
         lda #76
         sta 1229,x
         sta 1230,x
-        lda #77
-        sta 1231,x
         lda #78
+        sta 1231,x
         sta 1232,x
-        lda #79
-        sta 1233,x
         lda #80
+        sta 1233,x
         sta 1234,x
-        lda #81
-        sta 1235,x
         lda #82
+        sta 1235,x
         sta 1236,x
         lda #83
         sta 1237,x
         sta 1238,x
-        lda #84
-        sta 1239,x
         lda #85
+        sta 1239,x
         sta 1240,x
-        lda #118
-        sta 1241,x
         lda #119
-        sta 1242,x
-        sta 1243,x
-        lda #118
-        sta 1244,x
-        lda #85
-        sta 1245,x
-        lda #84
-        sta 1246,x
-        lda #83
-        sta 1247,x
-        sta 1248,x
-        lda #82
-        sta 1249,x
-        lda #81
-        sta 1250,x
-        lda #80
-        sta 1251,x
-        lda #79
-        sta 1252,x
-        lda #78
-        sta 1253,x
-        lda #77
-        sta 1254,x
-        lda #76
-        sta 1255,x
-        sta 1256,x
-        lda #75
-        sta 1257,x
-        lda #74
-        sta 1258,x
-        lda #73
-        sta 1259,x
-        lda #72
-        sta 1260,x
-        lda #71
-        sta 1261,x
-        lda #70
-        sta 1262,x
-        lda #69
-        sta 1263,x
-        sta 1264,x
-        lda #68
-        sta 1265,x
-        lda #67
-        sta 1266,x
-        lda #66
-        sta 1267,x
-        lda #65
-        sta 1268,x
-        rts
-.segment "AR2"
-rt107:
-        lda #1
-        sta 1217,x
-        lda #2
-        sta 1218,x
-        sta 1219,x
-        lda #3
-        sta 1220,x
-        lda #4
-        sta 1221,x
-        lda #5
-        sta 1222,x
-        sta 1223,x
-        lda #6
-        sta 1224,x
-        lda #7
-        sta 1225,x
-        lda #8
-        sta 1226,x
-        sta 1227,x
-        lda #9
-        sta 1228,x
-        lda #10
-        sta 1229,x
-        sta 1230,x
-        lda #11
-        sta 1231,x
-        lda #12
-        sta 1232,x
-        lda #13
-        sta 1233,x
-        sta 1234,x
-        lda #14
-        sta 1235,x
-        lda #15
-        sta 1236,x
-        lda #16
-        sta 1237,x
-        sta 1238,x
-        lda #17
-        sta 1239,x
-        lda #18
-        sta 1240,x
-        lda #19
         sta 1241,x
         sta 1242,x
-        lda #20
-        sta 1243,x
-        lda #21
-        sta 1244,x
-        sta 1245,x
-        lda #54
-        sta 1246,x
         lda #55
-        sta 1247,x
-        lda #54
-        sta 1248,x
-        lda #53
-        sta 1249,x
+        sta 1243,x
+        sta 1244,x
         lda #21
-        sta 1250,x
-        lda #20
-        sta 1251,x
+        sta 1245,x
+        sta 1246,x
         lda #19
-        sta 1252,x
-        sta 1253,x
+        sta 1247,x
+        sta 1248,x
         lda #18
-        sta 1254,x
-        lda #17
-        sta 1255,x
+        sta 1249,x
+        sta 1250,x
         lda #16
-        sta 1256,x
-        sta 1257,x
-        lda #15
-        sta 1258,x
+        sta 1251,x
+        sta 1252,x
         lda #14
-        sta 1259,x
-        lda #13
-        sta 1260,x
-        sta 1261,x
+        sta 1253,x
+        sta 1254,x
         lda #12
-        sta 1262,x
-        lda #11
-        sta 1263,x
+        sta 1255,x
+        sta 1256,x
         lda #10
-        sta 1264,x
-        sta 1265,x
-        lda #9
-        sta 1266,x
+        sta 1257,x
+        sta 1258,x
         lda #8
+        sta 1259,x
+        sta 1260,x
+        lda #6
+        sta 1261,x
+        sta 1262,x
+        lda #5
+        sta 1263,x
+        sta 1264,x
+        lda #3
+        sta 1265,x
+        sta 1266,x
+        lda #1
         sta 1267,x
         sta 1268,x
-        lda #7
-        sta 1269,x
-        lda #6
-        sta 1270,x
-        lda #5
-        sta 1271,x
-        sta 1272,x
-        lda #4
-        sta 1273,x
-        lda #3
-        sta 1274,x
-        lda #2
-        sta 1275,x
-        sta 1276,x
-        lda #1
-        sta 1277,x
-        rts
-.segment "AR2"
-rt108:
-        lda #65
-        sta 1217,x
-        lda #66
-        sta 1218,x
-        lda #67
-        sta 1219,x
-        lda #68
-        sta 1220,x
-        lda #69
-        sta 1221,x
-        lda #70
-        sta 1222,x
-        lda #71
-        sta 1223,x
-        lda #72
-        sta 1224,x
-        lda #73
-        sta 1225,x
-        lda #74
-        sta 1226,x
-        lda #75
-        sta 1227,x
-        lda #76
-        sta 1228,x
-        lda #77
-        sta 1229,x
-        lda #78
-        sta 1230,x
-        lda #79
-        sta 1231,x
-        lda #80
-        sta 1232,x
-        lda #81
-        sta 1233,x
-        lda #82
-        sta 1234,x
-        lda #83
-        sta 1235,x
-        lda #84
-        sta 1236,x
-        lda #85
-        sta 1237,x
-        lda #118
-        sta 1238,x
-        lda #119
-        sta 1239,x
-        lda #118
-        sta 1240,x
-        lda #117
-        sta 1241,x
-        lda #84
-        sta 1242,x
-        lda #83
-        sta 1243,x
-        lda #82
-        sta 1244,x
-        lda #81
-        sta 1245,x
-        lda #80
-        sta 1246,x
-        lda #79
-        sta 1247,x
-        lda #78
-        sta 1248,x
-        lda #77
-        sta 1249,x
-        lda #76
-        sta 1250,x
-        lda #75
-        sta 1251,x
-        lda #74
-        sta 1252,x
-        lda #73
-        sta 1253,x
-        lda #72
-        sta 1254,x
-        lda #71
-        sta 1255,x
-        lda #70
-        sta 1256,x
-        lda #69
-        sta 1257,x
-        lda #68
-        sta 1258,x
-        lda #67
-        sta 1259,x
-        lda #66
-        sta 1260,x
-        lda #65
-        sta 1261,x
         rts
 .segment "ROUTA"
 .export rtlo, rthi
 rtlo:
-        .byte <rt0,<rt1,<rt2,<rt3,<rt4,<rt5,<rt6,<rt7,<rt8,<rt9,<rt10,<rt11,<rt12,<rt13,<rt14,<rt15,<rt16,<rt17,<rt18,<rt19,<rt20,<rt21,<rt22,<rt23,<rt24,<rt25,<rt26,<rt27,<rt28,<rt29,<rt30,<rt31,<rt32,<rt33,<rt34,<rt35,<rt36,<rt37,<rt38,<rt39,<rt40,<rt41,<rt42,<rt43,<rt44,<rt45,<rt46,<rt47,<rt48,<rt49,<rt50,<rt51,<rt52,<rt53,<rt54,<rt55,<rt56,<rt57,<rt58,<rt59,<rt60,<rt61,<rt62,<rt63,<rt64,<rt65,<rt66,<rt67,<rt68,<rt69,<rt70,<rt71,<rt72,<rt73,<rt74,<rt75,<rt76,<rt77,<rt78,<rt79,<rt80,<rt81,<rt82,<rt83,<rt84,<rt85,<rt86,<rt87,<rt88,<rt89,<rt90,<rt91,<rt92,<rt93,<rt94,<rt95,<rt96,<rt97,<rt98,<rt99,<rt100,<rt101,<rt102,<rt103,<rt104,<rt105,<rt106,<rt107,<rt108
+        .byte <rt0,<rt1,<rt2,<rt3,<rt4,<rt5,<rt6,<rt7,<rt8,<rt9,<rt10,<rt11,<rt12,<rt13,<rt14,<rt15,<rt16,<rt17,<rt18,<rt19,<rt20,<rt21,<rt22,<rt23,<rt24,<rt25,<rt26,<rt27,<rt28,<rt29,<rt30,<rt31,<rt32,<rt33,<rt34,<rt35,<rt36,<rt37,<rt38,<rt39,<rt40,<rt41,<rt42,<rt43,<rt44,<rt45,<rt46,<rt47,<rt48,<rt49,<rt50,<rt51,<rt52,<rt53,<rt54,<rt55,<rt56,<rt57,<rt58,<rt59,<rt60,<rt61,<rt62,<rt63,<rt64,<rt65,<rt66,<rt67,<rt68,<rt69,<rt70,<rt71,<rt72,<rt73,<rt74,<rt75,<rt76,<rt77,<rt78,<rt79,<rt80,<rt81,<rt82,<rt83,<rt84,<rt85,<rt86,<rt87,<rt88,<rt89,<rt90,<rt91,<rt92,<rt93,<rt94,<rt95,<rt96,<rt97,<rt98,<rt99,<rt100,<rt101,<rt102,<rt103,<rt104,<rt105,<rt106
 rthi:
-        .byte >rt0,>rt1,>rt2,>rt3,>rt4,>rt5,>rt6,>rt7,>rt8,>rt9,>rt10,>rt11,>rt12,>rt13,>rt14,>rt15,>rt16,>rt17,>rt18,>rt19,>rt20,>rt21,>rt22,>rt23,>rt24,>rt25,>rt26,>rt27,>rt28,>rt29,>rt30,>rt31,>rt32,>rt33,>rt34,>rt35,>rt36,>rt37,>rt38,>rt39,>rt40,>rt41,>rt42,>rt43,>rt44,>rt45,>rt46,>rt47,>rt48,>rt49,>rt50,>rt51,>rt52,>rt53,>rt54,>rt55,>rt56,>rt57,>rt58,>rt59,>rt60,>rt61,>rt62,>rt63,>rt64,>rt65,>rt66,>rt67,>rt68,>rt69,>rt70,>rt71,>rt72,>rt73,>rt74,>rt75,>rt76,>rt77,>rt78,>rt79,>rt80,>rt81,>rt82,>rt83,>rt84,>rt85,>rt86,>rt87,>rt88,>rt89,>rt90,>rt91,>rt92,>rt93,>rt94,>rt95,>rt96,>rt97,>rt98,>rt99,>rt100,>rt101,>rt102,>rt103,>rt104,>rt105,>rt106,>rt107,>rt108
+        .byte >rt0,>rt1,>rt2,>rt3,>rt4,>rt5,>rt6,>rt7,>rt8,>rt9,>rt10,>rt11,>rt12,>rt13,>rt14,>rt15,>rt16,>rt17,>rt18,>rt19,>rt20,>rt21,>rt22,>rt23,>rt24,>rt25,>rt26,>rt27,>rt28,>rt29,>rt30,>rt31,>rt32,>rt33,>rt34,>rt35,>rt36,>rt37,>rt38,>rt39,>rt40,>rt41,>rt42,>rt43,>rt44,>rt45,>rt46,>rt47,>rt48,>rt49,>rt50,>rt51,>rt52,>rt53,>rt54,>rt55,>rt56,>rt57,>rt58,>rt59,>rt60,>rt61,>rt62,>rt63,>rt64,>rt65,>rt66,>rt67,>rt68,>rt69,>rt70,>rt71,>rt72,>rt73,>rt74,>rt75,>rt76,>rt77,>rt78,>rt79,>rt80,>rt81,>rt82,>rt83,>rt84,>rt85,>rt86,>rt87,>rt88,>rt89,>rt90,>rt91,>rt92,>rt93,>rt94,>rt95,>rt96,>rt97,>rt98,>rt99,>rt100,>rt101,>rt102,>rt103,>rt104,>rt105,>rt106

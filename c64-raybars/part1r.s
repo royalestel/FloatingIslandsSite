@@ -5,9 +5,10 @@
 ;  (NTSC) or 63 (PAL) cycles each, in two copies (one per frame parity: the flicker palettes).  A row writes the swatch's ghost byte to
 ;  $3fff and its colour to $d021; the swatch comes from a 200-byte buffer through a DIM MAP:   ldy buf+n / lda (dm),y / tax.
 ;
-;  Each frame in the blank:  film time < 1240 (1a-1c): clear the buffer, draw the 3 bars with their UNROLLED ROUTINES (one per thickness and
-;  start-line parity, lda #index / sta buf+i,x) from a 7-byte record [dim level][routine, x] x 3;  later (1d): the delta stream = runs of
-;  changed rows copied from shape arrays into the persistent buffer.
+;  Each frame in the blank:  film time < 960 (1a-1b): clear the buffer, draw the 3 bars with their UNROLLED ROUTINES (one per thickness and
+;  start-line parity, lda #code / sta buf+i,x) from a 7-byte record [dim level][routine, x] x 3;  later (1c-1d: six bars, the red bars, the stack,
+;  the floor): the stream = [dim level][runs] of changed rows copied from shape arrays into the persistent buffer.  The buffer holds 8-bit codes;
+;  the dim map (256 entries) turns a code into a swatch index 0..127 (blue / red ramp x row-parity block x level) for the 128-entry tables.
 ; =============================================================================
         .setcpu "6502"
         .include "part1r.inc"
@@ -224,11 +225,21 @@ u_n1:    ldy rec                 ; the dim map
         DRAWBAR 1
         DRAWBAR 2
         jmp u_adv
-u_sec2:  lda #<map0              ; identity map
+u_sec2:  ldy #0                  ; the stream record: [dim level][number of runs][runs]
+        lda (rp),y
+        tay
+        lda #$35                ; RAM everywhere: the dim map pointers live under the ROM window
+        sta $01
+        lda dmlo,y
         sta dm
-        lda #>map0
+        lda dmhi,y
         sta dm+1
-        ldy #0
+        lda #$37
+        sta $01
+        inc rp
+        bne u_g0
+        inc rp+1
+u_g0:    ldy #0
         lda (rp),y
         sta nruns
         inc rp
@@ -363,13 +374,13 @@ LAB:
         nop
         nop
         .if N = 0
-        lda ght + 64 * (FP * 2 + (N .mod 2)),y
+        lda ght + 128 * (FP * 2 + (N .mod 2)),y
         sta IDLE
-        lda colt + 64 * (FP * 2 + (N .mod 2)),y
+        lda colt + 128 * (FP * 2 + (N .mod 2)),y
         .else
-        lda ght + 64 * (FP * 2 + (N .mod 2)),x
+        lda ght + 128 * (FP * 2 + (N .mod 2)),x
         sta IDLE
-        lda colt + 64 * (FP * 2 + (N .mod 2)),x
+        lda colt + 128 * (FP * 2 + (N .mod 2)),x
         .endif
         sta VIC_BG
         .if N < ROWS - 1

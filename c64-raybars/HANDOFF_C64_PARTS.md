@@ -158,16 +158,27 @@ after each run (`pkill -x`, never `pkill -f`).
   (`RATE = 1.0` in `part1r_gen.py`, `part2c_gen.py`, `part2_dump.py`, `part3_dump.py`; part 4 already did).  The tune still plays 5 frames in 6.
 * The SID branch (`claude/c64-raybars-ntsc-sid`) is merged in: this branch had its python side but not its 6502 sources (the loader expected the
   tune-resident layout the part sources did not have).
-* Part 1 (`part1r_gen.py`): follows `part1.py`'s own model (the stack, a 1 s pause, the straight 1.5 s move to part 2's floor, a 2 s hold; ends at
-  `part1.T_JOIN` = 1910); routines until `T_STACK` (1640), the delta stream after.  `OLDMOTION=1` = the earlier motion.  NOT on the C64: the mock-up's
-  three extra bars, the red bars and their transparency (`mock_part1_flicker.py`), and the bar-relative row parity.
-  `sim_part1r.py 1908`: all frames equal the model (the last update jumps to the loader).  Run the generator AFTER a build when part1r.s changed
-  (it reads `codeend` from part1r.lbl for the arrays' addresses).
+* Part 1 (`part1r_gen.py`, rewritten) draws what `mock_part1_flicker.py` draws: the three circling bars, three more between them from frame 960 (blinking in),
+  the red bars from the beat at 1218 (flicker in, depth swatches 4..1, back to blue as each lines up in the stack), the red-over-blue transparency (the
+  blue bar's swatch from the red ramp), solid red where two red bars overlap, the stack, the 1 s pause, the straight 1.5 s move to part 2's floor and the
+  2 s hold (ends at `part1.T_JOIN` = 1910).  Frames < 960: routines (3 bars, as before).  Frames >= 960: a STREAM of runs of changed buffer rows
+  copied from interned shape arrays (blue / red-tinted bar arrays, constant arrays), composed by `compose()` exactly like the mock (it imports the mock for
+  the extra bars and `red_state` / `red_swatch_for`).  Gaps of up to 4 unchanged rows are bridged; BUDGET 3700 (worst update + tune 3,682 cycles in the sim).
+* Buffer code (8 bits): level 1..24 | centre<<5 | blk<<6 | red<<7 (red with level 25..29 = a flat red swatch, never dimmed).  blk = the swatch table block =
+  the bar-relative row parity (min(i, T-1-i), the mock's) XOR the screen row's parity (the finished floor: screen parity, as part 2).  The dim MAP is 256
+  bytes x 16 dim levels ($C000-$CFFF), code -> swatch index 64*red + 32*blk + level (7 bits); the swatch tables (`part1r.inc` COLT / GHT) have 128 entries
+  per (frame parity, row parity) = blue ramp blocks 0/1 + red ramp blocks 0/1 ($5200-$55FF); the shape arrays use $0D40.., $3D00-$3EFF, $3F00 and
+  $5600-$7FFF.  Stream records of the stream part: [dim level][number of runs][runs]; the engine reads the dim map pointers with $01 = $35 (they are under the ROM window).
+* Part 1 shapes now come from `gp.PROF` (the mock's profiles) + the centre bit, not `q.FULL`.  Differences from the mock-up in the dimmed stretch: the
+  centre rows are per bar (the mock merges overlapping bars), 16 dim levels instead of 31.  Stale lines: 360 of 950 stream frames, mean 7 lines (frames
+  with more than 20: 25), mostly in the first frames after 960 and in the 1700-1790 move.  Rebuild order: `part1r_gen.py`, build, `part1r_gen.py`
+  again (the array pool follows the build's `codeend`), build.  `sim_part1r.py 1908`: 1,909 frames equal the model; `vice_check_1r.py`: the model is
+  rendered from the buffer, the dim map and the swatch tables.
 * Part 2 earthquake (`part2c`): 860 frames (the last tremor is gone, the waves start 1 s after the quake); the floor patterns are part2.py's still
   floor by SCREEN-row parity; a column's page = frame parity EOR its shift's parity (part2c.s).  Whole-floor quakes are pixel exact; while the
   columns differ the engine uses flat swatches on every line (the model keeps ghost swatches where a line's columns agree): ~93-97 % of pixels.
 * Part 2 waves: no pauses between the waves (732 frames); part 3: 484; part 4: 1116 (its stream was regenerated: the committed one did not match
   `mock_part4_seq.py` any more).  Wave streams built with `MUSIC_COST=1700`.
-* `python3 mk_cart_all.py routine_ntsc.crt`: 49 16K banks, 820 KB.  VICE 6567, whole chain, 51 screenshots against the models: part 1 19/19 exact,
+* `python3 mk_cart_all.py routine_ntsc.crt`: whole routine, 3 stream banks for part 1.  VICE 6567, whole chain, 51 screenshots against the models: part 1 19/19 exact (six bars, red, floor),
   earthquake 5/9 exact (see above), part 2 waves 6/7, part 3 4/5 (stale lines by design), part 4 10/11 (one shot matched no frame: probably
   taken mid-frame).  Total 5,102 frames = 85 s.

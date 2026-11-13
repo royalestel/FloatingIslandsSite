@@ -4,16 +4,19 @@
 import os, sys, time, socket, subprocess, pickle, re
 import numpy as np
 from PIL import Image
-import part1 as p
-import part1_proc as q
 import vice_check_p as vp
-import part1r_gen as g
 pal = vp.palette()
 M = pickle.load(open("/tmp/part1r_model.pkl", "rb"))
 def model(n):
-    m = [g.MAPS[M["dis"][n]][b] for b in M["bufs"][n]]
-    lv, par = q.parity_of(m)
-    return np.array([p.gp.draw([c] * p.gp.SEGS, (y & ~1) | par[y], n) for y, c in enumerate(lv)])
+    """frame n as the C64 shows it: the buffer codes through the dim map, then the swatch tables (colour, ghost byte) for the frame and row parity"""
+    b, mp, fp = M["bufs"][n], M["maps"][M["dis"][n]], n & 1
+    X = np.arange(320); img = np.zeros((200, 320), int)
+    for y in range(200):
+        x = mp[b[y]]; tb = fp * 2 + (y & 1)
+        row = np.full(320, M["col"][tb][x]); gb = M["gh"][tb][x]
+        if gb: row[((gb >> (7 - X % 8)) & 1) == 1] = 0
+        img[y] = row
+    return img
 def main():
     N = int(sys.argv[1]) if len(sys.argv) > 1 else 12
     crt = sys.argv[2] if len(sys.argv) > 2 else "part1r.crt"
