@@ -93,6 +93,10 @@ def advance(line, cycles, blocked):
 # initial phases, e.g. GOLD_INIT="orbit=90,tilt=26,lxa=45,lya=250,q=254,bt=254" (the hand-over from goldlight; frame 0 is the second update: initial + 2)
 for kv in filter(None, os.environ.get("GOLD_INIT", "").split(",")):
     k, v = kv.split("="); mem[labels[k]] = int(v)
+# what the program's start-up code sets (the simulator calls update directly): bar A is 24 lines tall, source map = identity, no near-clip
+mem[labels["ha"]] = 24
+for j in range(24): mem[labels["srcmap"] + j] = j
+mem[labels["clo_a"]] = mem[labels["chi_a"]] = 255
 call(labels["update"]); call(labels["updateb"])
 frames, worst = [], {"sprite": 0, "A": 0, "B": 0}
 pcA, pcS, pcB = [], [], []
