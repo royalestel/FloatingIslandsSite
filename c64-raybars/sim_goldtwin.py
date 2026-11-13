@@ -90,6 +90,9 @@ def advance(line, cycles, blocked):
         lines -= step
     return line
 
+# initial phases, e.g. GOLD_INIT="orbit=90,tilt=26,lxa=45,lya=250,q=254,bt=254" (the hand-over from goldlight; frame 0 is the second update: initial + 2)
+for kv in filter(None, os.environ.get("GOLD_INIT", "").split(",")):
+    k, v = kv.split("="); mem[labels[k]] = int(v)
 call(labels["update"]); call(labels["updateb"])
 frames, worst = [], {"sprite": 0, "A": 0, "B": 0}
 clear = True

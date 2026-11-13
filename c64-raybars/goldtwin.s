@@ -54,6 +54,11 @@ BTOP      = 231         ; raster line of bar B's first display row
 BCENTRE   = BTOP + 4 + BMAX/2   ; bar B's centre line
 DENLINE   = 44          ; top IRQ: clear DEN before raster line $30
 HTUNE     = 0           ; extra NOPs to line the first split up with hblank
+TRANS     = 128         ; frames of the hand-over from goldlight (bar A's bob, slant, the light's place, depth, size and drift blend from goldlight's to goldtwin's)
+YA_BASE   = 142         ; goldlight's bar A: y0 = 135 + 9 (its settled offset), less 2: goldtwin's slant is centred 2 lines lower (4 against 2)
+LYREST    = 56          ; goldlight: the light sprite's top, this many lines above the bar
+LYMIN     = 52          ; ... and never above this line
+DZ0       = 100         ; goldlight's light depth in front of the bar
 .ifndef STEAL
 STEAL     = 4           ; bar A rows shortened on sprite lines: 4 or 6
 .endif
@@ -98,6 +103,17 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 ; =============================================================================
 .segment "ZEROPAGE"
 orbit:   .res 1         ; bar A bob angle
+tw:      .res 1         ; frames of the hand-over so far (0 .. TRANS)
+wv:      .res 1         ; its weight 0 .. 255 (goldlight's -> goldtwin's)
+lxf:     .res 1         ; fraction of lxa: its step goes from 1 to 1/2 a frame during the hand-over
+lya:     .res 1         ; goldlight's light bob angle
+bya:     .res 1         ; blend: goldlight's value
+bdd:     .res 1         ; blend: the difference to goldtwin's
+bps:     .res 1         ; the slant's index
+sz:      .res 1         ; the ball's size (0..7)
+mma:     .res 1         ; multiply: |d|, then the weight and the product's low byte
+mmb:     .res 1
+msg:     .res 1
 tilt:    .res 1         ; see-saw angle (both bars)
 lxa:     .res 1         ; light sideways drift angle
 q:       .res 1         ; light orbit angle
@@ -270,15 +286,138 @@ done:   rts
 ;  update: the sprite and bar A for the next frame
 ; =============================================================================
 .proc update
+        lda tw                  ; the hand-over from goldlight first (TRANS frames), then the original code
+        cmp #TRANS
+        bcc blend
+        jmp steady
+blend:
+        ; ---------------- hand-over: everything blends from goldlight's value (w = 0) to goldtwin's (w = 255) -------------------------
+        inc fcount
+        inc orbit
+        inc tilt
+        inc q
+        lda lya                 ; goldlight's light bob
+        clc
+        adc #3
+        sta lya
+        ldy tw
+        lda wtab,y
+        sta wv
+        inc tw
+        lda wv                  ; the sideways drift: lxa advances (255 - w/2)/256 a frame, from 1 to 1/2
+        lsr
+        eor #$ff
+        clc
+        adc lxf
+        sta lxf
+        bcc :+
+        inc lxa
+:       ; -- bar A: goldlight's bob (+-64 about 142) and goldtwin's (+-22 about 140)
+        ldy orbit
+        lda ysin,y
+        clc
+        adc #::YA_BASE
+        sta bya
+        lda lsin,y
+        cmp #$80
+        ror                     ; +-22
+        clc
+        adc #::YBASE
+        sec
+        sbc bya                 ; goldtwin's - goldlight's (-88 .. 84)
+        sta bdd
+        jsr blendmul               ; A = bdd * w / 256
+        clc
+        adc bya
+        sta y0
+        ; -- the slant: ps = ysin[tilt] * (1 + w)  (+-64 -> +-127), the tables turn it into each segment's start index
+        ldy tilt
+        lda ysin,y
+        sta bdd
+        jsr blendmul
+        clc
+        adc bdd
+        tay
+        .repeat ::SEGS, K
+        lda .ident(.sprintf("tkps%d", K)),y
+        sta kb+K
+        .endrep
+        ; -- the light: goldlight's place (above the bar, bobbing) and the orbit's, blended
+        ldy lya
+        lda y0
+        clc
+        adc #<(2 - ::LYREST)    ; (goldlight's y0 is goldtwin's + 2)
+        clc
+        adc lyofftab,y          ; +-11
+        cmp #::LYMIN
+        bcs :+
+        lda #::LYMIN
+:       sta bya                 ; goldlight's sprite Y
+        ldy q
+        lda y0
+        clc
+        adc #::BARMID - 11
+        clc
+        adc orby,y
+        sec
+        sbc bya                 ; the orbit's - goldlight's
+        sta bdd
+        jsr blendmul
+        clc
+        adc bya
+        sta ly
+        sec                     ; light - bar A centre, vertical (what the orbit gives directly in steady state)
+        sbc y0
+        sec
+        sbc #::BARMID - 11
+        sta ldy_
+        ldy q                   ; light depth: orbit's z plus what is left of goldlight's 100 in front
+        lda #::DZ0
+        sec
+        sbc orbz,y              ; 60 .. 140 (unsigned)
+        sta bdd
+        lda wv
+        eor #$ff                ; 255 - w
+        sta mmb
+        lda bdd
+        jsr umul
+        ldy q
+        clc
+        adc orbz,y
+        sta ldz
+        ldy lxa
+        lda lx4tab,y
+        sta lx4
+        ldy q                   ; the ball: the orbit's size, but at first still the full ball (the floor falls from 7 to 0 over 112 frames)
+        lda orbsize,y
+        sta sz
+        lda tw
+        lsr
+        lsr
+        lsr
+        lsr
+        sta bdd
+        lda #7
+        sec
+        sbc bdd
+        bcs :+
+        lda #0
+:       cmp sz
+        bcc :+                  ; floor < size: keep the size
+        sta sz
+:       jmp common
+steady:
         ; ---- 1. animate ------------------------------------------------------
         inc fcount
         inc orbit               ; bar A bobs up and down
         inc tilt                ; both bars rock
         inc q                   ; light orbits bar A
-        lda fcount
-        and #1
-        bne :+
-        inc lxa                 ; and drifts sideways at half speed
+        lda lxf                 ; and drifts sideways at half speed
+        clc
+        adc #128
+        sta lxf
+        bcc :+
+        inc lxa
 :
 
         ; ---- 2. bar A -----------------------------------------------------------
@@ -311,6 +450,10 @@ done:   rts
         lda lx4tab,y
         sta lx4
 
+        ldy q
+        lda orbsize,y
+        sta sz
+common:
         ; ---- 4. the ball: pick its size, hide what is behind bar A -------------
         jsr drawball
 ::ballready:                    ; (the simulator checks the time to here)
@@ -420,18 +563,52 @@ patch:
 .endproc
 
 ; -----------------------------------------------------------------------------
+;  blend: A = bdd * w / 256 for a signed bdd and w = wv (0..255); umul: A = A * mmb / 256 for unsigned A.  (the hand-over)
+; -----------------------------------------------------------------------------
+.proc blendmul
+        lda wv
+        sta mmb
+        lda bdd
+        sta msg
+        bpl :+
+        eor #$ff
+        clc
+        adc #1                  ; |d|
+:       jsr umul
+        bit msg
+        bpl :+
+        eor #$ff
+        clc
+        adc #1
+:       rts
+.endproc
+.proc umul
+        sta mma
+        lda #0
+        ldx #8
+        lsr mmb                 ; the multiplier's bits come out of mmb's low end while the product's low byte goes in at its top
+:       bcc :+
+        clc
+        adc mma
+:       ror
+        ror mmb
+        dex
+        bne :--
+        rts
+.endproc
+
+; -----------------------------------------------------------------------------
 ;  drawball: the ball at its size into the back buffer, rows behind bar A
 ;  blanked while the light is behind it.
 ; -----------------------------------------------------------------------------
 .proc drawball
-        ldy q
-        lda orbsize,y
+        lda sz
         lsr
         lsr                     ; size * 64 = (size >> 2) * 256 + (size & 3) * 64
         clc
         adc #>balls
         sta src+1
-        lda orbsize,y
+        lda sz
         and #3
         lsr
         ror

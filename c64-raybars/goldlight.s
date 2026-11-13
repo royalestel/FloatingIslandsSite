@@ -474,6 +474,7 @@ blockend:
 
         .include "tables.inc"   ; spectab etc. (page aligned, see gen_tables)
         .include "light.inc"    ; lkbase0..4, lx4tab, lyofftab, ball
+        .include "lightgrow.inc" ; grow, growptr: the light grows in (small yellow dot -> full ball)
         .assert <spectab = 0, error, "spectab must be page aligned"
 
 .segment "RAMPS"

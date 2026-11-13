@@ -22,7 +22,7 @@ import vice_check_2c as v2
 import gold_frames as gf
 g4 = mw.ms.g4
 RGB = np.array(fb.C64RGB, dtype=float)
-W, H, R0 = 384, 240, 31                          # canvas: raster lines R0.., window row 0 = raster 51, x 32..351
+W, H, R0 = 384, 250, 31                          # canvas: raster lines R0.., window row 0 = raster 51, x 32..351
 WX, WY = 32, 51 - R0
 P4_FROM, P4_TO = 880, 1076                      # part 4 frames shown (the wipe's sweep up ends at 1075)
 MOVE, FADE, PART, GLIDE = 90, 30, 180, 30
@@ -85,7 +85,9 @@ def main(out):
     # the gold bar: goldtilt at its flat frame
     # goldtilt runs from phases chosen for this hand-over: the bob's orbit counter 204 (frame 0 shows 206: the bar near the top of its bob, about to descend, where the
     # blue bar joins it), tilt phase so that frame 90 (= T0) is flat; goldlight then continues the same bob and tilt from goldtilt's last frame
-    TILT_INIT, LIGHT_INIT = "orbit=204,tilt=164", "orbit=218,tilt=178,lxa=196,lya=0"
+    # (goldtilt: orbit counter 228 -> frame 90 shows 64, the bottom of the bob, with the tilt flat; goldlight: the bob goes on, 6 s: it ends with the bar rising at
+    #  orbit 91 and the light's bob at zero; goldtwin: bob, tilt and drift go on, the light's orbit starts at the top (q = 0), bar B starts far away)
+    TILT_INIT, LIGHT_INIT, TWIN_INIT = "orbit=228,tilt=164", "orbit=242,tilt=178,lxa=196,lya=197", "orbit=90,tilt=26,lxa=45,lya=250,q=254,bt=254"
     tilt = gf.frames_of("goldtilt", 270, init=TILT_INIT); traw = gf.raw_of("goldtilt", 270, TILT_INIT)
     T0 = next(i for i, fr in enumerate(traw) if all(len(set(r)) == 1 for r in fr[1]))
     gc = gold_canvas(*tilt[T0])
@@ -138,18 +140,14 @@ def main(out):
         return (r[0] + r[-1]) / 2.0 if r else None
     seq = []
     seq.append(("goldtilt", tilt, T0))
-    light = gf.frames_of("goldlight", 500, init=LIGHT_INIT); lraw = gf.raw_of("goldlight", 500, LIGHT_INIT)
+    light = gf.frames_of("goldlight", 420, init=LIGHT_INIT); lraw = gf.raw_of("goldlight", 420, LIGHT_INIT)
     L0 = 0                                                                   # (frame 0: the light at the left edge, moving right)
     seq.append(("goldlight", light, L0))
-    orbit = gf.frames_of("goldorbit", 1200); oraw = pickle.load(open("/tmp/gold_goldorbit_1200_raw.pkl", "rb"))
-    le = lraw[L0 + PART - 1]
-    O0 = min(range(0, 1200 - 2 * PART), key=lambda i: abs(oraw[i][0] - le[0]) + 0.5 * abs(oraw[i][3] - le[3]) + 0.5 * abs(oraw[i][2] - le[2]))
-    seq.append(("goldorbit", orbit, O0))
-    twin = gf.frames_of("goldtwin", 1200)
-    seq.append(("goldtwin", twin, O0 + PART))                            # bar A and the light move exactly as in goldorbit: the frame count carries on
+    twin = gf.frames_of("goldtwin", 420, init=TWIN_INIT)
+    seq.append(("goldtwin", twin, 0))                                        # (goldorbit is not used: goldtwin has its orbiting light and bar A)
     fly = gf.frames_of("goldfly", 600)
     seq.append(("goldfly", fly, 100))
-    RAW = {"goldtilt": traw, "goldlight": lraw, "goldorbit": oraw}
+    RAW = {"goldtilt": traw, "goldlight": lraw}
     def centre(name, i):
         """raster line of the middle of the (first) bar, from the speedcode colours the simulator recorded"""
         fr = RAW[name][i]; grid = fr[1]
@@ -160,13 +158,12 @@ def main(out):
         d0 = 0
         if prev_end is not None and name == "goldlight":
             print("goldtilt -> goldlight: bar centre %.1f -> %.1f raster lines (no glide: goldlight continues goldtilt's bob)" % (prev_end, centre(name, s0)))
-        if prev_end is not None and name == "goldorbit":                         # (goldtwin carries goldorbit's frame count on; goldfly is a cut)
-            d0 = int(round(prev_end - centre(name, s0)))
+
         info.append((name, s0, d0))
-        for j in range(PART):
-            dy = int(round(d0 * (1 - ss(min(1.0, j / GLIDE))))) if d0 else 0
-            frames.append(gold_canvas(*fr[s0 + j], dy=dy))
-        prev_end = centre(name, s0 + PART - 1) if name in RAW else None
+        n = {"goldtilt": 180, "goldlight": 360, "goldtwin": 360}.get(name, PART)          # goldtilt 3 s, goldlight 6 s, goldtwin 6 s, goldfly 3 s
+        for j in range(n):
+            frames.append(gold_canvas(*fr[s0 + j]))
+        prev_end = centre(name, s0 + n - 1) if name in RAW else None
     print("segments: part 4 %d-%d, move+fade %d (fade %d); " % (P4_FROM, P4_TO - 1, MOVE, FADE) + ", ".join(f"{n} from frame {s} (glide {d} lines)" for n, s, d in info))
     v = iv.Video(out, W * 3, H * 3, fps=60)
     for c in frames:

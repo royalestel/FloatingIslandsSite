@@ -924,3 +924,12 @@ less (3 k average, 6.9 k worst).  So the peak frames are a little over the 6.5 k
 * VICE (6569): 18 captures at different moments, all pixel exact (`vice_check_3c.py`; the model is the video's frames).
 * The loop ends at line 184 but may not START later than line 0: DEN must be high before line 51 (the border opens
   there), so the stable IRQ stays at line 49.
+
+## GOLDTWIN: the hand-over from goldlight
+
+`goldtwin.s` can take over from `goldlight.s` without a jump.  For its first `TRANS` = 128 frames (a smoothstep weight `wtab`, 0 -> 255) these blend from
+goldlight's value to goldtwin's own: bar A's bob (+-64 about 142 -> +-22 about 140; both keep `orbit` going), the slant (`ps = ysin[tilt] * (1 + w)`, tables `tkps0..4`:
+goldlight's slant is half goldtwin's), the light's place (goldlight's: above the bar, bobbing, never above line 52 -> the orbit's), its depth (100 in front -> the orbit's), its size
+(the full ball first, the floor falls from 7 to 0 over 112 frames) and the sideways drift (1 -> 1/2 step a frame, 8-bit fraction `lxf`); then the original code runs.  The blend costs about 900 cycles a frame
+for 128 frames (`blendmul` = bdd * w / 256 in 208 cycles).  `GOLD_INIT="orbit=90,tilt=26,lxa=45,lya=250,q=254,bt=254"` starts the simulator from goldlight's last frame (the light's orbit at the top, bar B far away).
+
