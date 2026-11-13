@@ -272,8 +272,6 @@ main:   lda frame               ; bar A has been drawn: build the next
         lda #0
         sta frame
         jsr update
-        lda fo                  ; (no bar B in the fly-out)
-        bne main
 :       lda frameb              ; bar B has been drawn: build the next bar B
         beq :-
         lda #0
@@ -866,11 +864,6 @@ nextrow:
         ldy bt
         lda bhtab,y
         sta bh
-        lda fo                  ; during the fly-out bar B is gone
-        beq :+
-        lda #0
-        sta bh
-:
         lda blevtab,y           ; brightness level 0..3 ...
         asl
         asl
@@ -903,9 +896,9 @@ nextrow:
 
         ; ---- the light seen from bar B ----------------------------------------
         ; vertical: light centre line (y0 + BARMID + ldy_) - BCENTRE, clamped
-        lda y0
+        lda yc                  ; bar A's centre line - 11 (the same as y0 + BARMID - 11 in the hold)
         clc
-        adc #::BARMID
+        adc #11
         clc
         adc ldy_
         sta dy                  ; light centre line, 92..216
@@ -1181,22 +1174,13 @@ blockend:
         lda #0
         sta VIC_BORDER
         sta VIC_BG
-        lda fo                  ; the fly-out has no bar B: straight to the top of the next frame
-        bne @nob
         lda #<irqb1             ; next: bar B
         sta $fffe
         lda #>irqb1
         sta $ffff
         lda #BTOP - 2
         sta VIC_RASTER
-        jmp @next
-@nob:   lda #<irqtop
-        sta $fffe
-        lda #>irqtop
-        sta $ffff
-        lda #DENLINE
-        sta VIC_RASTER
-@next:  asl VIC_IRQ
+        asl VIC_IRQ
         inc frame               ; main loop: build the next sprite + bar A
         lda save_a
         ldx save_x

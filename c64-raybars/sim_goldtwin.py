@@ -109,20 +109,19 @@ for f in range(FRAMES):
     fo_cur = mem[FOA]                       # the frame just drawn: 33 rows and a bar B, or (fly-out) all rows and no bar B
     ca, cball = call(labels["update"], labels["ballready"])
     fo_new = mem[FOA]
-    cb = 0
-    if not fo_new: cb, _ = call(labels["updateb"])
+    cb, _ = call(labels["updateb"])
     y = mem[Z["y0"]]
     rows_cur = ROWS if fo_cur else NROWS
     rows_new = ROWS if fo_new else NROWS
     a_end = y_cur + rows_cur + 2
-    blocked = ([(BSTART, BEND)] if not fo_cur else []) + [(312 + DENLINE, 312 + DENLINE + IRQTOP_LINES),
+    blocked = [(BSTART, BEND)] + [(312 + DENLINE, 312 + DENLINE + IRQTOP_LINES),
                (312 + y - 2, 312 + y + rows_new + 2)]
     t_ball = advance(a_end, cball, blocked)
     t_a = advance(a_end, ca, blocked)
     t_b = advance(max(t_a, BEND), cb, blocked)
     for k, t, start, dl in (("sprite", t_ball, a_end, 312 + DENLINE),
                             ("A", t_a, a_end, 312 + y - 2),
-                            ("B", t_b, BEND, 312 + BTOP - 2))[:3 if not fo_new else 2]:
+                            ("B", t_b, BEND, 312 + BTOP - 2)):
         worst[k] = max(worst[k], 100 * (t - start) / (dl - start))
         if k == "A": pcA.append(100 * (t - start) / (dl - start))
         if k == "sprite": pcS.append(100 * (t - start) / (dl - start))
