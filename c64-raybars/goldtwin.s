@@ -47,7 +47,14 @@ ROWSIZE   = SEGS*SEGSIZE + PADSIZE  ; 47 bytes, both bars
 BARH      = 24          ; gold lines
 BMAX      = 48          ; bar B's largest height
 PAD       = 8           ; black rows above and below the gold (>= max slant)
-COLLEN    = 2*PAD + BARH        ; bar A column length
+COLLEN    = 2*PAD + BARH + 56   ; bar A column length: room for the bar to slide up out of the window (the rows shift along the column)
+FLYAT     = 360         ; frames after the start: the fly-out to goldfly begins
+FLYT     = 128         ; frames of the fly-out (the light eases to the centre, bar A slides out through the top)
+FLYD     = 130         ; bar A's rise by the end of the fly-out: 130 * (f / FLYT)^2 lines
+FLYY     = 139         ; goldfly's light: CENTRE - 11 (goldfly.s SPRY)
+FLYX4    = 43          ; goldfly's light: SPRX 172 / 4
+FLYZ     = 80          ; ... in front of the bars
+YTOPMIN  = 52          ; bar A's top line never goes above the window (line 51): above it the rows shift along their column instead
 YBASE     = 140         ; raster line of bar A's top row when centred
 BARMID    = 16          ; bar A centre, in rows below its top row
 BTOP      = 231         ; raster line of bar B's first display row
@@ -103,6 +110,8 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 ; =============================================================================
 .segment "ZEROPAGE"
 orbit:   .res 1         ; bar A bob angle
+fcnt:    .res 2         ; frames since the start (16 bit): the fly-out begins at FLYAT
+fo:      .res 1         ; fly-out frame (0 = not yet; FLYT = done)
 tw:      .res 1         ; frames of the hand-over so far (0 .. TRANS)
 wv:      .res 1         ; its weight 0 .. 255 (goldlight's -> goldtwin's)
 lxf:     .res 1         ; fraction of lxa: its step goes from 1 to 1/2 a frame during the hand-over
@@ -192,13 +201,24 @@ start:  sei
 @zp:    sta $02,x
         dex
         bpl @zp
-        ldx #COLLEN*SEGS-1      ; clear bar A's columns (both halves)
-@col:   sta cols,x
-        sta cols + COLLEN*SEGS,x
+        lda #<cols              ; clear bar A's columns (both halves), page by page
+        sta dst
+        lda #>cols
+        sta dst+1
+        ldx #(2*::SEGS*::COLLEN)>>8
+        ldy #0
+@cpg:   tya                     ; (A = 0 here)
+@cpb:   sta (dst),y
+        iny
+        bne @cpb
+        inc dst+1
         dex
-        bne @col
-        sta cols
-        sta cols + COLLEN*SEGS
+        bne @cpg
+        ldy #0
+@cpr:   sta (dst),y             ; the rest of the last page
+        iny
+        cpy #(2*::SEGS*::COLLEN)&255
+        bne @cpr
         ldx #BCOLSIZE-1                 ; and bar B's
 @colb:  sta bcol,x
         dex
@@ -286,6 +306,24 @@ done:   rts
 ;  update: the sprite and bar A for the next frame
 ; =============================================================================
 .proc update
+        inc fcnt
+        bne :+
+        inc fcnt+1
+:       lda fo
+        beq @trig
+        cmp #::FLYT
+        bcs @flyd
+        inc fo
+        jmp @flyd
+@trig:  lda fcnt+1
+        cmp #>::FLYAT
+        bne @flyd
+        lda fcnt
+        cmp #<::FLYAT
+        bne @flyd
+        lda #1
+        sta fo
+@flyd:
         ; ---- 1. animate ------------------------------------------------------
         inc fcount
         inc orbit               ; bar A bobs up and down
@@ -349,6 +387,24 @@ done:   rts
         .endrep
 @slant:
 
+        ldx fo                  ; fly-out: the bob fades out (bob * (255 - w) / 256) and the bar rises by exitab[fo]
+        beq @nofb
+        ldy orbit
+        lda lsin,y
+        cmp #$80
+        ror
+        sta bdd
+        lda wtab,x
+        eor #$ff
+        sta wv
+        jsr blendmul
+        clc
+        adc #::YBASE
+        ldx fo
+        sec
+        sbc exitab,x
+        sta y0
+@nofb:
         ; ---- 3. the light ---------------------------------------------------------
         ldy q
         lda orby,y
@@ -368,6 +424,78 @@ done:   rts
         ldy q
         lda orbsize,y
         sta sz
+        ; ---- 3b. fly-out: the light eases to goldfly's place (centre, full size, in front) ----
+        ldx fo
+        beq @nofly
+        cpx #::FLYT
+        bcc @blend
+        lda #::FLYY             ; the last frame: exactly there
+        sta ly
+        lda #::FLYX4
+        sta lx4
+        lda #7
+        sta sz
+        lda #::FLYZ
+        sta ldz
+        jmp @ldy
+@blend: lda wtab,x
+        sta wv
+        lda #::FLYY
+        sec
+        sbc ly
+        sta bdd
+        jsr blendmul
+        clc
+        adc ly
+        sta ly
+        lda #::FLYX4
+        sec
+        sbc lx4
+        sta bdd
+        jsr blendmul
+        clc
+        adc lx4
+        sta lx4
+        lda #7
+        sec
+        sbc sz
+        sta bdd
+        jsr blendmul
+        clc
+        adc sz
+        sta sz
+        lda #::FLYZ
+        sec
+        sbc ldz
+        sta bdd
+        jsr blendmul
+        clc
+        adc ldz
+        sta ldz
+@ldy:   lda ly                  ; the light relative to bar A's centre (the highlight's angle)
+        sec
+        sbc y0
+        sec
+        sbc #::BARMID - 11
+        sta ldy_
+@nofly:
+        ; ---- 3c. bar A above the window: its rows shift along their columns, so only the rows inside the window show
+        lda y0
+        cmp #::YTOPMIN
+        bcs @clampok
+        lda #::YTOPMIN
+        sec
+        sbc y0
+        sta bdd
+        .repeat ::SEGS, K
+        lda kb+K
+        clc
+        adc bdd
+        sta kb+K
+        .endrep
+        lda #::YTOPMIN
+        sta y0
+@clampok:
 common:
         ; ---- 4. the ball: pick its size, hide what is behind bar A -------------
         jsr drawball
@@ -610,6 +738,11 @@ nextrow:
         ldy bt
         lda bhtab,y
         sta bh
+        lda fo                  ; during the fly-out bar B is gone
+        beq :+
+        lda #0
+        sta bh
+:
         lda blevtab,y           ; brightness level 0..3 ...
         asl
         asl

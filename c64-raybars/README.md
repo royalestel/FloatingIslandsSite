@@ -939,3 +939,9 @@ for 128 frames (`blendmul` = bdd * w / 256 in 208 cycles).  `GOLD_INIT="orbit=90
 - goldorbit: a 128-frame hand-over from goldlight (`tw`, `wtab`): bar bob ±64 → ±22, the light's place, depth, size and drift blend into the orbit's.  Phases: `GOLD_INIT="orbit=90,tilt=26,lxa=45,lya=250,q=254"`.
 - goldtwin: continues goldorbit's state (`orbit=194,tilt=130,lxa=0,lxf=255,q=102,tw=0,bt=254`); a 128-frame hand-over steepens the slant (`tkps`) and moves bar A 2 lines (its block has 2 more pad rows); bar B grows in from one line (no pop).
 - `python3 mock_gold_seq.py out.mp4` renders the whole thing (sims need `cl65 ... -Ln goldX.lbl -o goldX.prg goldX.s` first).
+
+### goldtwin → goldfly (fly-out, 128 frames after goldtwin's 6 s hold)
+- The light eases from its orbit to goldfly's place (y 139, x 172 = goldfly's SPRX/SPRY), grows to the full ball and moves in front of the bars (`FLYT`, `FLYY`, `FLYX4`, `FLYZ`).
+- Bar A's bob fades out while it rises by `exitab[f]` = 130·(f/128)² lines (accelerating, like goldfly's bars flying at the camera). Its top line is held at `YTOPMIN` = 52 (the window's top); above that, its visible rows are clipped by advancing the column start (`kb`), so it slides out through the top. `COLLEN` grew by 56 rows to make room.
+- Bar B is held off during the fly-out.  The mock fades goldfly in from black over its first 30 frames (its first frame already has bars in flight; the real routine would need a fade-in too).
+- Limitation: bar A keeps its height while it leaves; goldfly's bars also swell as they approach.

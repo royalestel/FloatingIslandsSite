@@ -147,10 +147,10 @@ def main(out):
     seq.append(("goldlight", light, L0))
     orb = gf.frames_of("goldorbit", 420, init=ORBIT_INIT)
     seq.append(("goldorbit", orb, 0))
-    twin = gf.frames_of("goldtwin", 420, init=TWIN_INIT)
+    twin = gf.frames_of("goldtwin", 490, init=TWIN_INIT)
     seq.append(("goldtwin", twin, 0))
     fly = gf.frames_of("goldfly", 600)
-    seq.append(("goldfly", fly, 100))
+    seq.append(("goldfly", fly, 0))
     RAW = {"goldtilt": traw, "goldlight": lraw}
     def centre(name, i):
         """raster line of the middle of the (first) bar, from the speedcode colours the simulator recorded"""
@@ -164,14 +164,17 @@ def main(out):
             print("goldtilt -> goldlight: bar centre %.1f -> %.1f raster lines (no glide: goldlight continues goldtilt's bob)" % (prev_end, centre(name, s0)))
 
         info.append((name, s0, d0))
-        n = {"goldtilt": 180, "goldlight": 360, "goldorbit": 360, "goldtwin": 360}.get(name, PART)          # goldtilt 3 s, goldlight 6 s, goldorbit 6 s, goldtwin 6 s, goldfly 3 s
+        n = {"goldtilt": 180, "goldlight": 360, "goldorbit": 360, "goldtwin": 360 + 128}.get(name, PART)   # goldtwin: 6 s hold + 128-frame fly-out          # goldtilt 3 s, goldlight 6 s, goldorbit 6 s, goldtwin 6 s, goldfly 3 s
         for j in range(n):
-            frames.append(gold_canvas(*fr[s0 + j]))
+            c = gold_canvas(*fr[s0 + j])
+            if name == "goldfly" and j < 30:                  # the bars are not in the fly-out's last frame: goldfly fades in from black
+                frames.append(RGB[c] * ((j + 1) / 30.0)); continue
+            frames.append(c)
         prev_end = centre(name, s0 + n - 1) if name in RAW else None
     print("segments: part 4 %d-%d, move+fade %d (fade %d); " % (P4_FROM, P4_TO - 1, MOVE, FADE) + ", ".join(f"{n} from frame {s} (glide {d} lines)" for n, s, d in info))
     v = iv.Video(out, W * 3, H * 3, fps=60)
     for c in frames:
-        rgb = RGB[c].astype(np.uint8)
+        rgb = (c if c.ndim == 3 else RGB[c]).astype(np.uint8)
         v.add(Image.fromarray(np.repeat(np.repeat(rgb, 3, axis=0), 3, axis=1)))
     v.close(); print("wrote", out, len(frames), "frames = %.1f s" % (len(frames) / 60.0))
 

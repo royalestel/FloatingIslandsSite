@@ -263,6 +263,11 @@ out.append("wtab:                           ; the hand-over weight 0 .. 255 per 
 wt = [int(round(255 * (lambda u: u * u * (3 - 2 * u))(t / TWIN_TRANS))) for t in range(TWIN_TRANS + 1)]
 for i in range(0, len(wt), 16):
     out.append("        .byte " + ",".join(f"${b:02x}" for b in wt[i:i + 16]))
+out.append("exitab:                         ; goldtwin's fly-out: bar A rises FLYD * (f / FLYT)^2 lines by fly-out frame f")
+FLYT_, FLYD_ = 128, 130
+ex = [int(round(FLYD_ * (f / FLYT_) ** 2)) for f in range(FLYT_ + 1)]
+for i in range(0, len(ex), 16):
+    out.append("        .byte " + ",".join(str(b) for b in ex[i:i + 16]))
 with open(os.path.join(here, "light.inc"), "w") as f:
     f.write("\n".join(out) + "\n")
 print("wrote light.inc")
