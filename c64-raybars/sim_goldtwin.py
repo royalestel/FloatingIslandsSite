@@ -104,18 +104,23 @@ clear = True
 BSTART, BEND = BTOP - 2, BTOP + ROWSB + 1
 NROWS = 33
 FLYT_ = 128
+labels_RSTART2 = 296 - 30 - 255        # = goldtwin.s RSTART2
+rows_prev = NROWS
 FOA = labels["fo"]
 for f in range(FRAMES):
     y_cur = mem[Z["y0"]]
-    fo_cur = mem[FOA]                       # the frame just drawn: 33 rows and a bar B, or (fly-out) all rows and no bar B
     ca, cball = call(labels["update"], labels["ballready"])
-    fo_new = mem[FOA]
     cb, _ = call(labels["updateb"])
     y = mem[Z["y0"]]
-    def arows(fo_):                         # bar A's rows: 33, then 57 while it swells, then none (gone)
-        return 0 if fo_ >= FLYT_ - 10 else (ROWS if fo_ else NROWS)
-    rows_cur = arows(fo_cur)
-    rows_new = arows(fo_new)
+    def arows():                            # bar A's rows: 33, then 57 while it swells, then none (gone), then goldfly's first bar (a few rows)
+        fo_, fo2_ = mem[FOA], mem[labels["fo2"]]
+        if fo_ == 0: return NROWS
+        if fo_ < FLYT_ - 10: return ROWS
+        if fo_ == 255 and fo2_ >= labels_RSTART2: return mem[labels["racnt"]]
+        return 0
+    rows_cur = rows_prev
+    rows_new = arows()
+    rows_prev = rows_new
     a_end = y_cur + rows_cur + 2
     blocked = [(BSTART, BEND)] + [(312 + DENLINE, 312 + DENLINE + IRQTOP_LINES),
                (312 + y - 2, 312 + y + rows_new + 2)]
@@ -133,6 +138,7 @@ for f in range(FRAMES):
     ly = mem[Z["ly"]]
     clear &= ly + 22 < BTOP - 2
     ga = [[mem[block + r * ROWSIZE + k * SEGSIZE + 1] if r < rows_new else 0 for k in range(SEGS)]
+          + ([1] if r < rows_new and mem[block + r * ROWSIZE + 4] == 0x21 else [])       # (a row that only writes $d021: the side borders stay black)
           for r in range(ROWS)]
     gb = [[mem[blockb + r * ROWSIZE + k * SEGSIZE + 1] for k in range(SEGS)]
           for r in range(ROWSB)]
@@ -186,8 +192,10 @@ def render(y, ga, gb, ly, lx, spr):
         for r, row in enumerate(grid):
             yy = top + r - TOP
             if 0 <= yy < H:
-                for k, c in enumerate(row):
+                narrow = len(row) > SEGS
+                for k, c in enumerate(row[:SEGS]):
                     for x in range(k * SEGW, (k + 1) * SEGW):
+                        if narrow and not 32 <= x < 352: continue      # window only (image x = canvas x)
                         px[x, yy] = RGB[c]
     for sy in range(21):
         yy = ly + 1 + sy - TOP

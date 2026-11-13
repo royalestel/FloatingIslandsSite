@@ -50,7 +50,9 @@ BMAX      = 48          ; bar B's largest height
 PAD       = 8           ; black rows above and below the gold (>= max slant)
 COLLEN    = 2*PAD + BMAX + 2    ; bar A column length (the patch reads kb + ROWS - 1 <= 64)
 AGONE    = FLYT - 10   ; bar A is gone from this fly-out frame on (10 frames before FLYT: before it gets too thick)
-FLYL     = 240         ; frames of the fly-out for the light (it eases in over all of them); bar A is gone long before (AGONE)
+FLYL     = 296         ; frames of the fly-out: the light eases in over all of them; bar B's near-clip ends exactly here (its second approach starts BPAUSE frames late); goldfly starts after
+HANDOFF  = 30          ; goldfly's first bar (a thin dim line by the light) is drawn by bar A's block this many frames before goldfly starts (handoff.inc)
+RSTART2  = FLYL - HANDOFF - 255 ; the replay starts when fo2 (the frames after fo reached 255) reaches this
 BPAUSE   = 180         ; bar B waits this long (frames) once it is gone (t 220) before its next approach starts: 3 s
 FLYAT     = 360         ; frames after the start: the fly-out to goldfly begins
 FLYT     = 128         ; frames of the fly-out (the light eases to the centre; bar A swells toward the camera and near-clips)
@@ -115,6 +117,9 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 orbit:   .res 1         ; bar A bob angle
 fcnt:    .res 2         ; frames since the start (16 bit): the fly-out begins at FLYAT
 fo:      .res 1         ; fly-out frame (0 = not yet; FLYT = done)
+fo2:     .res 1         ; fly-out frames after fo has reached 255 (0 .. FLYL - 255)
+racnt:   .res 1         ; replay: rows of this frame's bar
+rcnt:    .res 1         ; ... counted down
 bpause:  .res 1         ; frames bar B has waited so far at t 220 (up to BPAUSE)
 ha:      .res 1         ; bar A's height in lines (24 .. 48 while it swells toward the camera)
 e2:      .res 1         ; fly-out: how near the camera it is, 0 .. 255 (eased squared)
@@ -335,9 +340,14 @@ done:   rts
         inc fcnt+1
 :       lda fo
         beq @trig
-        cmp #::FLYL
-        bcs @flyd
+        cmp #255
+        bcs @fo2
         inc fo
+        jmp @flyd
+@fo2:   lda fo2                 ; (fo is 8 bit: the last FLYL - 255 frames are counted in fo2)
+        cmp #::FLYL - 255
+        bcs @flyd
+        inc fo2
         jmp @flyd
 @trig:  lda fcnt+1
         cmp #>::FLYAT
@@ -531,7 +541,10 @@ done:   rts
         ; ---- 3b. fly-out: the light eases to goldfly's place (centre, full size, in front) ----
         ldx fo
         beq @nofly
-        cpx #::FLYL
+        cpx #255
+        bcc @blend
+        ldx fo2
+        cpx #::FLYL - 255
         bcc @blend
         lda #::FLYY             ; the last frame: exactly there
         sta ly
@@ -542,8 +555,13 @@ done:   rts
         lda #::FLYZ
         sta ldz
         jmp @ldy
-@blend: lda lw,x
-        sta wv
+@blend: lda fo                  ; the light's easing weight: lw[fo], then lw[255 + fo2]
+        cmp #255
+        bcc :+
+        lda lw + 255,x
+        jmp @wset
+:       lda lw,x
+@wset:  sta wv
         lda #::FLYY
         sec
         sbc ly
@@ -697,7 +715,7 @@ patch:
         .endrep
 
         ; ---- 9. shorten bar A's rows where the sprite steals cycles -----------
-        lda y0
+steal9: lda y0
         sec
         sbc ly
         tax                     ; y0 - ly
@@ -712,6 +730,10 @@ patch:
 :       sta block + RR*::ROWSIZE + ::SEGS*::SEGSIZE
         .endrep
         lda fo
+        cmp #::AGONE            ; (gone / replaying: only the first rows are used)
+        bcc :+
+        rts
+:       lda fo
         bne :+
         jmp @steald
 :       .repeat ::ROWS - ::NROWS, R2
@@ -741,15 +763,82 @@ patch:
         lda #$8d                ; sta $d020
         sta block + ::NROWS*::ROWSIZE + 2
         rts
-goneblk:                        ; the fly-out is over for bar A: row 0 jumps straight to the end of the block
-        lda #$4c                ; jmp blockend
+goneblk:                        ; bar A is gone: row 0 jumps straight to the end of the block, until the replay of goldfly's first bar starts
+        lda fo
+        cmp #255
+        bcc @nore
+        lda fo2
+        cmp #::RSTART2
+        bcs @replay
+@nore:  lda #$4c                ; jmp blockend
         sta block
         lda #<blockend
         sta block + 1
         lda #>blockend
         sta block + 2
         rts
+@replay:                        ; goldfly's first bar, frame fo2 - RSTART2 of its first HANDOFF (handoff.inc): its rows go straight into the block
+        sec
+        sbc #::RSTART2
+        cmp #::HANDOFF
+        bcc :+
+        lda #::HANDOFF - 1      ; (the last one stays)
+:       tay
+        lda replo,y
+        sta rdop
+        lda rephi,y
+        sta rdop + 1
+        ldx #0
+        jsr rdb
+        sta y0                  ; the raster line of its first row
+        inx
+        jsr rdb
+        sta racnt
+        sta rcnt                ; its number of rows
+        inx
+        lda #<block
+        sta dst
+        lda #>block
+        sta dst + 1
+@rrow:  ldy #0                  ; (the row is a normal row again: lda #c ... sta $d020)
+        lda #$a9
+        sta (dst),y
+        ldy #2
+        lda #$8d
+        sta (dst),y
+        .repeat ::SEGS, K
+        jsr rdb
+        inx
+        ldy #K * ::SEGSIZE + 1
+        sta (dst),y
+        lda #$21                ; sta $d021 twice: goldfly's bars leave the side borders black (they write $d021 only)
+        ldy #K * ::SEGSIZE + 4
+        sta (dst),y
+        .endrep
+        lda dst
+        clc
+        adc #::ROWSIZE
+        sta dst
+        bcc :+
+        inc dst + 1
+:       dec rcnt
+        bne @rrow
+        ldy #0                  ; after its last row the block ends
+        lda #$4c
+        sta (dst),y
+        iny
+        lda #<blockend
+        sta (dst),y
+        iny
+        lda #>blockend
+        sta (dst),y
+        jmp steal9              ; (the sprite lines steal cycles from its rows as they do for any bar A row)
 .endproc
+
+; A = byte X of the record at the address patched into rdop (the replay's)
+rdb:    lda a:$0000,x           ; (absolute, forced: its operand is patched)
+        rts
+rdop = rdb + 1
 
 ; -----------------------------------------------------------------------------
 ;  blend: A = bdd * w / 256 for a signed bdd and w = wv (0..255); umul: A = A * mmb / 256 for unsigned A.  (the hand-over)
@@ -1289,6 +1378,7 @@ blockbend:
         .include "tables.inc"   ; spectab etc. (page aligned, see gen_tables)
         .include "light.inc"    ; lx4tab
         .include "orbit.inc"    ; orby, orbz, orbsize, balls
+        .include "handoff.inc"  ; goldfly's first bar (the replay)
         .include "twin.inc"     ; bar B: height, clip, brightness, depth, steps
         .assert <spectab = 0, error, "spectab must be page aligned"
 

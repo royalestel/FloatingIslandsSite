@@ -53,6 +53,9 @@
 
 
 NSLOT     = 3           ; bars in flight
+.ifndef HANDOFF
+HANDOFF   = 30          ; frames of the first bar's flight goldtwin draws before this program starts (see handoff.inc); -DHANDOFF=0 for the stand-alone start
+.endif
 SEGS      = 5
 PAD       = 8           ; black rows above / below a bar's rows (>= max slant)
 BASE      = 96          ; a bar's first row in its column; the rest of the
@@ -221,6 +224,10 @@ start:  sei
         jsr respawn             ; (marks its pads stale: full first build)
         dex
         bpl @stg
+.if HANDOFF > 0
+        lda #HANDOFF            ; goldtwin has already drawn this bar's first HANDOFF frames (handoff.inc): it starts that far into its flight
+        sta st
+.endif
 
         ldx #62                 ; the light: the largest ball, centred
 @spr:   lda balls + 7*64,x
@@ -1451,7 +1458,7 @@ bout:   lda save_a
         .include "fly.inc"      ; FLYD, flight tables, spawn cycles, dimmed palettes
         .assert <spectab = 0, error, "spectab must be page aligned"
 
-stagger: .byte 0, FLYD/3, 2*FLYD/3
+stagger: .byte 0, FLYD/3 - HANDOFF, 2*FLYD/3 - HANDOFF
 
 ; per-segment highlight drop: segment centres at sprite x 50/112/184/256/318,
 ; light at 184: |a| / 32
