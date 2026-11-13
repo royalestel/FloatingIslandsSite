@@ -64,6 +64,7 @@ pset:    .res 1                 ; the page set of the next frame (0/1); toggles 
 tgl:     .res 1                 ; 1 = this record toggles the set (bit 7 of F clear)
 nf:      .res 1                 ; F: the first active line of the frame shown after this blank (0 = from row 0)
 cnt:     .res 1
+cnt3:    .res 1
 save_a:  .res 1
 save_x:  .res 1
 save_y:  .res 1
@@ -274,45 +275,48 @@ nmi:    rti
 .proc doruns
         lda nruns
         beq @dn
-@run:   ldy #0
-        lda (sp),y              ; page id
-        tax
-        iny
-        lda (sp),y              ; first line
+@run:   ldy #0                  ; run = [first line][page address high][length] bytes   (the generator writes the page's high byte: PAGES = $2B00)
+        lda (sp),y
         sta @st + 1
-        lda pghi,x
-        sta @st + 2
+        sta @s2 + 1
         iny
-        lda (sp),y              ; length
+        lda (sp),y
+        sta @st + 2
+        sta @s2 + 2
+        iny
+        lda (sp),y
         sta cnt
         clc                     ; the bytes follow the 3 header bytes
-        lda sp
         adc #3
+        sta cnt3                ; the next run: sp + 3 + length
+        lda sp
+        adc #3                  ; (carry clear: the length is at most 120)
         sta @ld + 1
+        sta @l2 + 1
         lda sp+1
         adc #0
         sta @ld + 2
+        sta @l2 + 2
         ldy cnt
         dey
-@ld:    lda $ffff,y
+        lsr cnt                 ; odd length: start with the second half of the unrolled loop (one byte), then pairs
+        bcs @l2
+@ld:    lda $ffff,y             ; the copy loop, unrolled twice: 25 cycles for 2 bytes (the plain loop: 28)
 @st:    sta $ffff,y
+        dey
+@l2:    lda $ffff,y
+@s2:    sta $ffff,y
         dey
         bpl @ld
         clc                     ; sp += 3 + length
         lda sp
-        adc cnt
-        sta sp
-        bcc @a1
-        inc sp+1
-@a1:    clc
-        lda sp
-        adc #3
+        adc cnt3
         sta sp
         bcc @a2
         inc sp+1
 @a2:    dec nruns
         bne @run
-@dn:     rts
+@dn:    rts
 .endproc
 
 pghi:   .repeat 14, I

@@ -21,7 +21,7 @@ import wavesched as ws
 
 H = 200
 BUDGET = 3000 if os.environ.get("PLATFORM", "NTSC") == "NTSC" else 6700            # cycles of delta work in one blank: the blank holds about 7.4 k with the loop on lines 4..184; update itself takes ~600
-C_BYTE, C_RUN = 14, 81   # cost model (measured in the simulator): cycles a byte, cycles a run
+C_BYTE, C_RUN = float(os.environ.get("C_BYTE", 12.5)), float(os.environ.get("C_RUN", 123))   # cost model, fitted on the 6502 simulator (the engine's `doruns`, 2x unrolled): cycles a byte, cycles a run (the plain loop: 14 and 113)
 
 def load():
     frames, gh = pickle.load(open(os.environ.get("FRAMES", "/tmp/part4_frames.pkl"), "rb"))
@@ -59,6 +59,15 @@ def runs_between(a, b, parity):
     return out
 
 HOLD = tuple(int(v) for v in os.environ.get("HOLDRANGE", "270,730").split(",")) if os.environ.get("HOLD2") else None     # busy stretch: held frames (picture and flicker) in pairs (HS+2k, HS+2k+1)
+
+PAGE0_HI = 0x2B              # the pages sit at $2B00 (part4c.cfg: above the tune): page id p is at high byte $2B + p
+def record4(F, A, B):
+    """part 4's stream record: [F][nA][runs A][nB][runs B]; a run = [first line][page address high][length] bytes (the engine patches the copy loop from it directly)"""
+    out = bytearray([F, len(A)])
+    for page, line, data in A: out += bytes([line, PAGE0_HI + page, len(data)]) + data
+    out.append(len(B))
+    for page, line, data in B: out += bytes([line, PAGE0_HI + page, len(data)]) + data
+    return bytes(out)
 
 def page_sets(N):
     """the set (0/1) each frame is shown from: alternate, except the odd frame of a held pair keeps its partner's set"""
@@ -118,7 +127,7 @@ def main():
     start = {}
     for x in range(N):
         bx = blanks[(x + 1) % N]                        # stream record x is applied in the blank BEFORE frame x + 1
-        rec = bytearray(ws.record(*bx))
+        rec = bytearray(record4(*bx))
         assert len(bx[1]) < 250 and len(bx[2]) < 250
         if len(cur) + len(rec) > 0x4000 - 1:
             cur.append(0xFF); banks.append(bytes(cur).ljust(0x4000, b"\xff")); cur = bytearray()

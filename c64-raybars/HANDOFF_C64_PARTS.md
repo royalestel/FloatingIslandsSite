@@ -191,3 +191,10 @@ after each run (`pkill -x`, never `pkill -f`).
 * Cost of the music in part 4: stale frames 224 -> 674 of 1116 (lines of a frame that show the previous frame; mean 87 lines in those frames, frames 100-900); holding a
   wider stretch (down to 100-900) does not help (506 frames), the picture simply changes more than 1 blank per pair can carry.  VICE: 11 of 12 part 4 shots exact (the 12th has
   stale lines by design), the SID registers change throughout part 4.  Real fixes: the delayed-copy design (`mock_part4_wave.py`) or a cheaper copy engine.
+
+## Part 4 copy loop unrolled twice (NTSC)
+* `doruns` in `part4c.s`: a run is now [first line][page address HIGH byte][length] bytes (`part4c_gen.py` `record4`; PAGE0_HI = $2B; parts 2w / 3c keep `ws.record`), the next-run pointer is one add, and the
+  copy loop is unrolled twice (odd lengths enter at the second half).  Fitted on the 6502 simulator with 400 real runs: the plain loop cost 14 x bytes + 113 per run (the generator had
+  assumed 81 per run), the new one 12.5 x bytes + 123 per run (per-run overhead went UP by 10: the second copy's operands are patched too).  Unrolling 4x would not pay (more patching).
+* The generator's cost model is now fitted (`C_BYTE`, `C_RUN` env override).  With the TRUE costs of both engines and the tune in the budget: plain loop 761 stale frames of 1116, unrolled 591
+  (median stale lines 55 -> 11).  Without the tune: 224.  VICE: 11 of 12 part 4 shots exact, the 12th one stale line; the SID changes throughout.
