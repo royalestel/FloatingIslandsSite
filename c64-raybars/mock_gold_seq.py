@@ -150,13 +150,15 @@ def main(out):
     twin = gf.frames_of("goldtwin", 490, init=TWIN_INIT)
     seq.append(("goldtwin", twin, 0))
     fly = gf.frames_of("goldfly", 600)
-    seq.append(("goldfly", fly, 0))
+    OV = 40                                                  # goldfly's bars fade in over the fly-out's last OV frames (the light stays full)
+    seq.append(("goldfly", fly, OV))
     RAW = {"goldtilt": traw, "goldlight": lraw}
     def centre(name, i):
         """raster line of the middle of the (first) bar, from the speedcode colours the simulator recorded"""
         fr = RAW[name][i]; grid = fr[1]
         rows = [r for r, row in enumerate(grid) if any(row)]
         return fr[0] + (rows[0] + rows[-1]) / 2.0
+    LB0, LB1, LC0, LC1 = 106, 132, 172, 212                  # goldfly's light: canvas rows / columns around its sprite (raster 140..160, x 172+8..)
     prev_end = None; info = []
     for name, fr, s0 in seq:
         d0 = 0
@@ -167,8 +169,13 @@ def main(out):
         n = {"goldtilt": 180, "goldlight": 360, "goldorbit": 360, "goldtwin": 360 + 128}.get(name, PART)   # goldtwin: 6 s hold + 128-frame fly-out          # goldtilt 3 s, goldlight 6 s, goldorbit 6 s, goldtwin 6 s, goldfly 3 s
         for j in range(n):
             c = gold_canvas(*fr[s0 + j])
-            if name == "goldfly" and j < 30:                  # the bars are not in the fly-out's last frame: goldfly fades in from black
-                frames.append(RGB[c] * ((j + 1) / 30.0)); continue
+            if name == "goldtwin" and j >= n - OV:            # goldfly's bars (its frames 0..OV-1) fade in over goldtwin's picture: only where it is black, and not its light
+                k = j - (n - OV); f = gold_canvas(*fly[k]); ramp = (k + 1) / float(OV)
+                rgb = RGB[c].copy()
+                bars = (c == 0) & (f != 0)
+                bars[LB0:LB1, LC0:LC1] = False                # goldfly's light: goldtwin's own light arrives at the same place
+                rgb[bars] = RGB[f][bars] * ramp
+                frames.append(rgb); continue
             frames.append(c)
         prev_end = centre(name, s0 + n - 1) if name in RAW else None
     print("segments: part 4 %d-%d, move+fade %d (fade %d); " % (P4_FROM, P4_TO - 1, MOVE, FADE) + ", ".join(f"{n} from frame {s} (glide {d} lines)" for n, s, d in info))
