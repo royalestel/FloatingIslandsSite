@@ -90,7 +90,7 @@ for f in range(FRAMES):
     grid = [[mem[block + r * ROWSIZE + k * SEGSIZE + 1] for k in range(SEGS)]
             for r in range(ROWS)]
     spr = list(mem[mem[Z["lptr"]] * 64: mem[Z["lptr"]] * 64 + 63])
-    frames.append((y, grid, ly, lx, spr, sum(patched), cyc))
+    frames.append((y, grid, ly, lx, spr, sum(patched), cyc, dz))
 ok &= inwin and rowsok
 print(f"update(): {min(fr[6] for fr in frames)}-{max(fr[6] for fr in frames)} cycles, "
       f"worst {worst:.0f}% of the time before the top IRQ")

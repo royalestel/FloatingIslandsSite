@@ -111,6 +111,7 @@ lx4:     .res 1         ; sprite X register / 4 (next frame)
 lptr:    .res 1         ; sprite pointer (next frame)
 dy:      .res 1         ; light - bar, vertical (signed)
 dz:      .res 1         ; light - bar, depth (signed, + = toward camera)
+hz:      .res 1         ; the orbit's own depth: decides hiding behind the bar (during the hand-over dz is blended)
 neg:     .res 1         ; atan2 scratch
 sb:      .res 1         ; this line's specular level
 jstart:  .res 1         ; first sprite row hidden behind the bar
@@ -349,6 +350,9 @@ blend:
         sec
         sbc #::BARMID - 11
         sta dy
+        ldy q
+        lda orbz,y
+        sta hz                  ; behind the bar when the orbit says so, whatever the blend says
         ldy q                   ; light depth: orbit's z plus what is left of goldlight's 100 in front
         lda #::DZ0
         sec
@@ -418,6 +422,7 @@ steady:
         sta dy                  ; light - bar centre, vertical: +-40
         lda orbz,y
         sta dz                  ; light depth: +-40, + = in front
+        sta hz
         lda y0
         clc
         adc #::BARMID - 11      ; sprite centre row is 10, shown from Y+1
@@ -570,7 +575,7 @@ setdst: sta dst+1
         ; is on line ly + 1 + j.  Hidden if 0 <= j - jstart < 24 with
         ; jstart = y0 + off - ly - 1.
         lda #$80                ; in front: jstart far away, nothing hidden
-        bit dz
+        bit hz
         bpl front
         lda lx4                 ; segment under the ball: (lx4 + 5) / 20
         clc
