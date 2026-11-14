@@ -82,7 +82,7 @@ def joystick(f):
         j |= 2                                   # the loop
         if PILOT["state"] == 0 and 128 <= angh < 192:
             PILOT["state"] = 1                   # past the top
-        elif PILOT["state"] == 1 and (angh >= 252 or angh < 3):
+        elif PILOT["state"] == 1 and (angh >= 254 or angh < 2):
             PILOT["state"], PILOT["end"] = 2, f  # level again
     if PILOT["end"] is not None:
         t = f - PILOT["end"]
