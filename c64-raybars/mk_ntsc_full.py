@@ -35,7 +35,7 @@ def main():
             bank += len(st) // 0x4000
         print(f"{name}: image {len(image)} bytes, next bank {bank}")
     # the gold sequence: part 4d's memory (the loader, its code, its pages) is what goldtilt may only write over at the switch
-    jobs, report = g.make_jobs([(0x0300, 0x0400), (0x0800, 0x1000), (0x2B00, 0xB400)], [])
+    jobs, report = g.make_jobs([(0x02A8, 0x0400), (0x0800, 0x1000), (0x2B00, 0xB400)], [])
     joblist, gbanks, nbanks, total, nrec = g.layout(jobs, bank)
     for r in report: print(r)
     print(f"{nrec} job records, {total} bytes of gold data in banks {bank}..{nbanks - 1}")

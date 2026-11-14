@@ -17,11 +17,15 @@ start:  sei
         sta $d020
         sta $d021
         sta $d015
-        ldx #0
+        ldx #0                  ; (the loader is more than 256 bytes: two pieces)
 :       lda __BGLOAD_LOAD__,x
         sta __BGLOAD_RUN__,x
         inx
-        cpx #<__BGLOAD_SIZE__
+        bne :-
+:       lda __BGLOAD_LOAD__ + 256,x
+        sta __BGLOAD_RUN__ + 256,x
+        inx
+        cpx #<(__BGLOAD_SIZE__ - 256)
         bne :-
         lda #0
         sta JOB                 ; the job list: bank 0, $8000
@@ -29,14 +33,14 @@ start:  sei
         sta DONE+1
         lda #$80
         sta JOB+1
-        lda #$ff                ; (no tune yet: bgswitch does not call it)
+        lda #5                  ; (no tune yet: bgswitch's call is skipped)
         sta MC
-        jmp $0303               ; bgswitch: the tune, then tinit
+        jmp bgswitch            ; bgswitch: the tune, then tinit
 tinit:  lda #0
         jsr $1000               ; the tune's init
         lda #0
         sta MC
-        jmp $0303               ; bgswitch: goldtilt
+        jmp bgswitch            ; bgswitch: goldtilt
         .include "bgload.s"
 .segment "LOADADDR"
 .word $0801

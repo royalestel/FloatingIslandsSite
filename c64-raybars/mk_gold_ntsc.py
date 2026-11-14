@@ -150,7 +150,7 @@ def make_jobs(prev_live, head):
                     late[a] = v                                 # (after goldtilt's start: its own background job, ahead of goldlight's)
                     continue
             (sw if inside(a, prev_live) else bg)[a] = v
-        for a in range(*ZP): sw[a] = mem[a]
+        sw.update({a: mem[a] for a in range(*ZP) if mem[a]})            # (bgswitch clears the zero page first: only its non-zero bytes)
         sw[NIRQ] = mem[NIRQ]
         for a in list(range(*VIC)) + list(range(*CIA2)) + list(range(*VECTORS)):
             if a in written: sw[a] = mem[a]  # (only what start wrote: the rest stays as the hardware has it)
@@ -159,14 +159,17 @@ def make_jobs(prev_live, head):
             return [("copy", lo, bytes(d[a] for a in range(lo, hi))) for lo, hi in ranges(d)]
         jobs += recs(bg)
         jobs.append(("switch",))
-        data_sw = {a: v for a, v in sw.items() if not (0xD000 <= a < 0xE000 or VECTORS[0] <= a)}
-        io_sw = {a: v for a, v in sw.items() if (0xD000 <= a < 0xE000 or VECTORS[0] <= a)}
-        jobs += recs(data_sw) + recs(io_sw)
+        isreg = lambda a: ZP[0] <= a < ZP[1] or a == NIRQ or 0xD000 <= a < 0xE000 or VECTORS[0] <= a
+        data_sw = {a: v for a, v in sw.items() if not isreg(a)}
+        regs = sorted(((a, v) for a, v in sw.items() if isreg(a)), key=lambda t: (t[0] == 0xD019, t[0]))      # the interrupt flags' acknowledgement last
+        jobs += recs(data_sw)
+        for i in range(0, len(regs), 80):
+            jobs.append(("regs", regs[i:i + 80]))                      # one record: (address, value) entries, a store each: ~45 cycles an entry, nothing a record
         jobs.append(("start", lbl["resume"]))
         if late:
             jobs += [("copy", lo, bytes(late[a] for a in range(lo, hi))) for lo, hi in ranges(late)]
             late = {}
-        nsw = sum(len(v) for a, b, v in [(j[0], j[1], j[2]) for j in recs(sw)])
+        nsw = len(sw)
         report.append(f"{name}: image {len(own)} bytes + {len(extras)} written outside it; background {len(bg)}, at the switch {nsw} "
                       f"({len(data_sw) - 0x7E - 1} besides the zero page)")
         prev_live = [(a, b) for (a, b, _) in areas.values()] + RUNTIME[name] + [SHARED]
@@ -188,7 +191,12 @@ def layout(jobs, first_bank):
             if off == 0x4000: bank += 1; off = 0
         return out
     for j in jobs:
-        if j[0] == "copy":
+        if j[0] == "regs":
+            buf = b"".join(bytes([a & 255, a >> 8, v]) for a, v in j[1])
+            if off + len(buf) > 0x4000: bank += 1; off = 0                  # (a list does not straddle two banks)
+            (b, src, i, n), = place(buf)
+            recbytes.append(bytes([0xFE, src & 255, src >> 8, b, len(j[1]), 0, 0, 0]))
+        elif j[0] == "copy":
             dst, buf = j[1], j[2]
             for b, src, i, n in place(buf):
                 recbytes.append(struct.pack("<BHHHB", b, src, dst + i, n, 0))

@@ -123,17 +123,20 @@ start:  sei
         sta VIC_IRQ
         jsr clearpages
 .if CHAIN
-        ldx #0                  ; the background loader to $0300, its job list: bank 0 ROML, $8000
+        ldx #0                  ; the background loader to $02A8 (more than 256 bytes: two pieces), its job list: bank 0 ROML, $8000
 :       lda __BGLOAD_LOAD__,x
         sta __BGLOAD_RUN__,x
         inx
-        cpx #<__BGLOAD_SIZE__
+        bne :-
+:       lda __BGLOAD_LOAD__ + 256,x
+        sta __BGLOAD_RUN__ + 256,x
+        inx
+        cpx #<(__BGLOAD_SIZE__ - 256)
         bne :-
         lda #0
         sta JOB
         sta DONE
         sta DONE+1
-        sta NOTICK
         lda #$80
         sta JOB+1
 .endif
@@ -184,10 +187,8 @@ nmi:    rti
         lda fch
         cmp #>::NFE
         bne @go
-        lda mc                  ; the tune's cadence goes on (the blank's play call has been made)
+        lda #5                  ; the blank's play call has been made: bgswitch's own is skipped (MC 5 -> 6 -> 0), the cadence goes on from there
         sta MC
-        lda #1
-        sta NOTICK
         jmp bgswitch
 @go:
 .endif

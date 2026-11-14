@@ -1,5 +1,5 @@
 ; =============================================================================
-;  bgload.s -- the gold sequence's background loader, resident at $0300-$03FE
+;  bgload.s -- the gold sequence's background loader, resident at $02A8-$03FE (after the cart loader, which ends at $02A6)
 ;  (MC, the tune's frame counter, is $03FF).  See GOLD_NTSC_PLAN.md.
 ;
 ;  The job list lives in the cartridge, bank 0 ROML ($8000-), 8 bytes a record:
@@ -7,14 +7,14 @@
 ;     $FD                                                         the switch-time records follow (bgstep stops here)
 ;     $FF, start lo, start hi                                     the next routine's swstart (bgswitch jumps there)
 ;
-;  bgstep   ($0300, jsr): from a routine's idle loop.  Copies 32 bytes of the
+;  bgstep   ($02A8, jsr): from a routine's idle loop.  Copies 32 bytes of the
 ;           next routine's image if the next raster IRQ (NIRQ) is at least 20
 ;           lines away; with interrupts off, $01 = $37 (the cartridge visible).
-;  bgswitch ($0303, jmp): at a routine's end, interrupts off: copies whatever
+;  bgswitch ($02AB, jmp): at a routine's end, interrupts off: copies whatever
 ;           is left up to the barrier (the switch-time records: zero page,
 ;           shared sprite bytes), calls the tune once (the old routine skipped
 ;           this frame's call) and jumps to the next routine's swstart.
-;  tick     ($0306, jsr): the tune, 5 calls in 6 frames (the counter MC).
+;  tick     ($02AE, jsr): the tune, 5 calls in 6 frames (the counter MC).
 ; =============================================================================
 .ifndef JOB
         .include "bgzp.inc"
@@ -61,21 +61,51 @@ far:    lda $d011               ; C = 1: the next raster IRQ is MINLINES or more
 switch: sei
         ldx #$ff
         txs
+        lda #0                  ; the zero page cleared (the records that follow hold its non-zero bytes only)
+        ldx #$7d
+:       sta $02,x
+        dex
+        bpl :-
 @l:     jsr chunk
         bcc @l
         lda rec
         cmp #$ff
         beq @start
-        jsr next                ; the $FD marker: on
+        cmp #$fe
+        bne @nr
+        jsr regs                ; $FE: a list of (address, value) writes
+        jmp @l
+@nr:    jsr next                ; the $FD marker: on
         jmp @l
 @start: jsr next
-        lda MC
-        cmp #$ff                ; (goldboot: no tune yet)
-        beq :+
-        lda NOTICK
-        bne :+
-        jsr tick
-:       jmp (rec+1)
+        jsr tick                ; (a part that has just played this frame's tune sets MC = 5: this call is skipped)
+        jmp (rec+1)
+
+; regs: record $FE: [$FE][src lo][src hi][bank][count][0..]: count entries of (address lo, address hi, value) in the cartridge: a store each
+regs:   lda rec+3
+        sta $de00
+        lda #$37
+        sta $01
+        lda rec+1
+        sta SRC
+        lda rec+2
+        sta SRC+1
+        ldx #0
+        ldy #0
+@r:     lda (SRC),y
+        sta DST
+        iny
+        lda (SRC),y
+        sta DST+1
+        iny
+        lda (SRC),y
+        iny
+        sta (DST,x)
+        dec rec+4
+        bne @r
+        lda #$35
+        sta $01
+        jmp next
 
 ; chunk: C = 1 (nothing copied) at a marker, else up to CHUNK bytes of record JOB
 chunk:  lda #0                  ; the record: bank 0, at JOB

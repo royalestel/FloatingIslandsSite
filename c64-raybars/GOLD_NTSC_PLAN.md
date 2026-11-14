@@ -12,7 +12,7 @@ frame of the one before it (no gap).  The tune (Alpha, $1000-$2A33) plays throug
 | $00E7-$00F7 | background loader state (the record $E7-$EE, job $F0, done $F2, pointers $F4/$F6); $00EF `nirq`: the line the next raster IRQ is set for (every routine keeps it) |
 | $00FE-$00FF | the tune |
 | $0200-$02FF | cart loader (`jmp $0200` = load the next part, the old way) |
-| $0300-$03FF | background loader (`bgstep`), the switch (`bgswitch`), the job list, the tune counter `mc` ($03FF) |
+| $02A8-$03FF | background loader (`bgstep`), the switch (`bgswitch`), the job list, the tune counter `mc` ($03FF) |
 | $1000-$2A33 | the tune |
 | $E000-$FFF9 | shared: tables.inc + light.inc + orbit.inc, loaded once (during part4d) |
 | $4000-$4FFF | shared: hlrun.inc, loaded once (during goldtilt) |
@@ -37,3 +37,12 @@ In the main loop's idle time (waiting for the next frame): if the next raster IR
 bytes from the cart (ROML/ROMH, `$01` = $37, interrupts off: the IRQ vector would come from the KERNAL ROM).  The job list (4 bytes a
 record: bank, source page, destination page, pages) runs to a barrier per routine; deferred bytes (zero page, shared sprite buffers) are
 staged and copied at the switch.  Part4d copies at the end of its update.
+
+## As built (routine_ntsc_gold.crt, python3 mk_ntsc_full.py)
+- Banks 0..45: 46 of 64 used, 18 free.  Bank 0 ROML = the job list; banks 1..41 = parts 1..4d and part 4d's stream; banks 42..45 = the gold data (63.8 KB).
+- The loader (bgload.s) lives at $02A8-$03D2 (after the cart loader, which ends at $02A6); entries $02A8 bgstep, $02AB bgswitch, $02AE tick; MC $03FF.
+- Job records (8 bytes): copy runs, $FD barrier (bgstep stops), $FE (address, value) lists (zero page, VIC/CIA registers, vectors: ~45 cycles an entry), $FF start.
+  bgswitch clears the zero page first and the lists hold only the non-zero bytes: a switch costs ~45 lines.
+- Part 4d loads goldtilt (10 KB) in the idle spin before line 49 (a chunk of 24 bytes when 12+ lines remain), plays NFE = 1076 frames and goes on at the start of the
+  next blank.  goldtilt's MOVE (90 frames, move.inc from gen_move.py: part 4's last frame -> the gold bar) is its first part; everything stays below $D000.
+- VICE (6567R8) frame by frame at every join: no dark frame.
