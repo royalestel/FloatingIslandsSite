@@ -15,7 +15,7 @@ vertical-blank copy, then build for the next frame.  Checks:
   within 1.5 lines;
 * the build fits the frame's free time (else that frame would repeat).
 
-    cl65 -g -t none -C cosmic.cfg -Ln cosmic.lbl -o cosmicstrings.prg cosmicstrings.s
+    cl65 -g -t none -C cosmic.cfg -Ln cosmicstrings.lbl -o cosmicstrings.prg cosmicstrings.s
     python3 sim_cosmic.py crt.mp4 sharp.mp4
 """
 import math, os, sys
@@ -31,15 +31,18 @@ import gen_cosmic as gc
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = int(os.environ.get("FRAMES", 700))
-LINE, STEAL = 63, 7
+NTSC = int(os.environ.get("GOLD_NTSC", 0))          # 1: cosmicstrings_ntsc.prg (cl65 -Wa -DNTSC=1 ... -o cosmicstrings_ntsc.prg): 65-cycle lines, 263 lines
+LINE, STEAL = 63 + 2 * NTSC, int(os.environ.get("STEAL", 7))
+LINES = 263 if NTSC else 312
+MUSIC = int(os.environ.get("MUSIC", 1500))      # the tune's cycles a frame, taken off the build's free time
 WTOP = gc.WTOPR
 BAND = range(gc.SPRY, gc.SPRY + 21)            # raster lines with sprite DMA
 
 L = {}
-for ln in open(os.path.join(HERE, "cosmic.lbl")):
+for ln in open(os.path.join(HERE, "cosmicstrings_ntsc.lbl" if NTSC else "cosmicstrings.lbl")):
     _, a, nme = ln.split()
     L[nme.lstrip(".")] = int(a, 16)
-prg = open(os.path.join(HERE, "cosmicstrings.prg"), "rb").read()
+prg = open(os.path.join(HERE, "cosmicstrings_ntsc.prg" if NTSC else "cosmicstrings.prg"), "rb").read()
 mpu = MPU()
 mem = mpu.memory
 load = prg[0] | prg[1] << 8
@@ -207,7 +210,7 @@ for f in range(FRAMES):
     frames_rgb.append(rgb)
     # --- the build runs in the frame's free time: it is ready (and the
     # vertical blank takes it) once that has covered its cycles
-    free = 312 * LINE - disp - cyc_irq - 1500 - 21 * STEAL
+    free = LINES * LINE - disp - cyc_irq - MUSIC - 21 * STEAL
     if building:
         pending -= free
         if pending <= 0:

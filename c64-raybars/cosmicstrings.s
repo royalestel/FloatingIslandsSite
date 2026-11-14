@@ -51,10 +51,20 @@
         .setcpu "6502X"         ; with the stable illegal opcodes
         .include "cosmic.inc"
 
+.ifndef NTSC
+NTSC      = 0           ; -Wa -DNTSC=1: 6567R8, 65-cycle lines (every line 2 cycles longer, one more nop in irq2's wait)
+.endif
+.ifndef STEAL
+STEAL     = 7           ; cycles the ship's two sprites take from a line (VICE check for NTSC)
+.endif
+LINEN     = 63 + 2*NTSC ; cycles a line
+SHIPN     = LINEN - STEAL ; ... a ship line
 GAPMIN    = 6           ; black gaps shorter than this stay inside a block
 DENLINE   = 44
 VBLLINE   = 253
-HTUNE     = 0
+.ifndef HTUNE
+HTUNE     = (LINEN - 51) / 2   ; VICE: both writes (the colour, the idle byte) land before the window starts for 2..11 (NTSC): the middle.  A block starts one raster line early (setblk)
+.endif
 RECMAX    = 224         ; page 1 bytes for span records ($0100-$01df)
 NBMAX     = 32          ; bars kept per frame
 NPMAX     = 48          ; pieces
@@ -259,12 +269,17 @@ start:  sei
         lda $dd0d
         lda #$35
         sta $01
+        lda $dd02               ; (the bank bits are outputs: booted from a cartridge no KERNAL has set them up)
+        ora #$03
+        sta $dd02
         lda $dd00               ; VIC bank 2: $8000-$bfff
         and #$fc
         ora #$01
         sta $dd00
         lda #$10                ; screen $8400: sprite pointers $87f8
         sta $d018
+        lda #$c8                ; 40 columns (a cartridge boot has no KERNAL to have set it)
+        sta $d016
         lda #<nmi
         sta $fffa
         lda #>nmi
@@ -2250,6 +2265,8 @@ irqout: asl $d019
 glow:   .byte 1, 3              ; %11: white, cyan
 
 setblk: lda dline,x
+        sec
+        sbc #1                  ; (one line early: see HTUNE)
         sta $d012
         lda dss,x
         sta curs
@@ -2322,6 +2339,9 @@ irq1:   sta sav_a
         .endrep
 
 irq2:   txs
+        .if NTSC
+        nop                     ; (NTSC: the compare falls on the line change 2 cycles later)
+        .endif
         ldx #8
 @w:     dex
         bne @w
@@ -2377,7 +2397,7 @@ g_ne:   lda swtab+64,x          ; 19
         sta $bfff               ; 23
         dey                     ; 25
         beqnear nnext           ; 27 (28)
-        fill 36                 ; 63
+        fill LINEN - 27         ; 63 (NTSC 65)
 l_no:   lda (src),y
         tax
 c_no:    lda swtab+32,x
@@ -2386,9 +2406,9 @@ g_no:    lda swtab+96,x
         sta $bfff
         dey
         beqnear nnext
-        fill 33
+        fill LINEN - 30
         jmp l_ne                ; 63
-nnext:  fill 9                  ; 37
+nnext:  fill LINEN - 54         ; 37
         pla                     ; 41
         sta src                 ; 44
         pla                     ; 48
@@ -2405,7 +2425,7 @@ g_be:    lda swtab+64,x
         sta $bfff
         dey
         beqnear bnext
-        fill 29                 ; 56
+        fill SHIPN - 27         ; 56
 l_bo:   lda (src),y
         tax
 c_bo:    lda swtab+32,x
@@ -2414,9 +2434,9 @@ g_bo:    lda swtab+96,x
         sta $bfff
         dey
         beqnear bnext
-        fill 26
+        fill SHIPN - 30
         jmp l_be                ; 56
-bnext:  fill 2                  ; 30
+bnext:  fill SHIPN - 54         ; 30
         pla
         sta src
         pla
