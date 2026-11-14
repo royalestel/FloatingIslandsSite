@@ -719,13 +719,26 @@ controls:
         eor #$ff
         and #$1f
         sta joy
-        ldx #0                  ; target rate
-        lsr a                   ; bit 0 up: nose down
+        ldx #0                  ; target rate: by the pitch angle (ratetab, a
+                                ; teardrop loop: slow at the bottom, quick
+                                ; over the top, so the path advances)
+        lsr a                   ; bit 0 up: nose down (the mirrored angle)
         bcc :+
-        ldx #<(-RMAX)
+        pha
+        lda #0
+        sec
+        sbc angh
+        tay
+        lda ratetab,y
+        eor #$ff
+        clc
+        adc #1
+        tax
+        pla
 :       lsr a                   ; bit 1 down: nose up
         bcc :+
-        ldx #RMAX
+        ldy angh
+        ldx ratetab,y
 :       stx t0
         lda t0                  ; ease toward the target (signed: biased)
         eor #$80

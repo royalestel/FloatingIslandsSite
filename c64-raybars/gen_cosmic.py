@@ -313,6 +313,8 @@ def v10_swatch_tables():
         pages.append(bytes(b))
     return pages
 
+RLO, RHI = 24, 72                  # pitch rate at the bottom / over the top of a loop
+
 def pack_ramps():
     """Pages of ramps, stored bottom row first, first fit from the tallest,
     at page offsets 1..255: [(page bytes, {h: offset})]."""
@@ -446,6 +448,12 @@ def main():
                                      for h in range(i, i + 8)) for i in range(0, 256, 8)]
     L += byte_lines("hy", hy)
     L += ['', '.segment "TABLES2"', '        .align 256']
+    # the pull-up rate by pitch angle (angh, 256 a turn): a teardrop loop --
+    # slow at the bottom (heading forward), quick over the top -- so the
+    # path advances, instead of a closed circle (see RLO / RHI in the .s)
+    a = (RHI - RLO) / (RHI + RLO)
+    L += byte_lines("ratetab", bytes(round(RHI * (1 - a * math.cos(2 * math.pi * i / 256)) / (1 + a))
+                                     for i in range(256)))
     L += byte_lines("heldpg", bytes([sv.HELD]) * 256)
     ldmin = math.floor(128 * math.log2(consts["DNEAR"])) - 4
     ldmax = math.ceil(128 * math.log2(consts["DFAR"])) + 4

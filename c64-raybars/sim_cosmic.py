@@ -71,17 +71,25 @@ def call(addr):
     mpu.pc = addr
     return run_until(TRAMP)
 
+PILOT = dict(state=0, end=None)
 def joystick(f):
     """Autopilot: bits 1 up (nose down), 2 down (nose up), 16 fire.  A
-    loop-the-loop (held long enough for one full turn), then on forward,
-    weaving up and down between the bars."""
+    loop-the-loop (down held until the angle has come round a full turn),
+    then on forward, weaving up and down between the bars."""
     j = 0
-    if 60 <= f < 308:
+    angh = mem[L["angh"]]
+    if f >= 60 and PILOT["state"] < 2:
         j |= 2                                   # the loop
-    weave = [(340, 365, 2), (365, 415, 1), (415, 465, 2), (465, 515, 1), (515, 540, 2)]
-    for a, b, bit in weave:
-        if a <= f < b:
-            j |= bit
+        if PILOT["state"] == 0 and 128 <= angh < 192:
+            PILOT["state"] = 1                   # past the top
+        elif PILOT["state"] == 1 and (angh >= 252 or angh < 3):
+            PILOT["state"], PILOT["end"] = 2, f  # level again
+    if PILOT["end"] is not None:
+        t = f - PILOT["end"]
+        weave = [(32, 57, 2), (57, 107, 1), (107, 157, 2), (157, 207, 1), (207, 232, 2)]
+        for a, b, bit in weave:
+            if a <= t < b:
+                j |= bit
     return j
 
 # start-up: runs to the main loop (it built the first frame)
