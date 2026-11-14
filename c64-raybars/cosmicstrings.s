@@ -54,6 +54,14 @@
 .ifndef NTSC
 NTSC      = 0           ; -Wa -DNTSC=1: 6567R8, 65-cycle lines (every line 2 cycles longer, one more nop in irq2's wait)
 .endif
+.ifndef MUSIC
+MUSIC     = NTSC        ; call the tune (resident at $1000, play $1003) 5 frames in 6, from the vertical-blank IRQ: the cartridge
+.endif
+.ifndef CHAIN
+CHAIN     = 0           ; -Wa -DCHAIN=1: a link of the cartridge's gold sequence: `resume` is the point its image is a snapshot of
+.endif
+MC        = $03ff       ; the tune's frame counter, shared by all the parts that play it
+MUSIC_PLAY = $1003
 .ifndef STEAL
 STEAL     = 7           ; cycles the ship's two sprites take from a line (VICE check for NTSC)
 .endif
@@ -261,7 +269,9 @@ nrec:    .res 1
 .segment "CODE"
 
 start:  sei
+        .ifndef CART
         .assert * = 2062, error, "SYS 2061 must land on start"
+        .endif
         lda #$7f
         sta $dc0d
         sta $dd0d
@@ -345,6 +355,7 @@ start:  sei
         jsr build
         lda #1
         sta ready
+resume:                         ; (CHAIN: the image is a snapshot taken here)
         cli
 main:   lda copied
         beq main
@@ -2275,6 +2286,12 @@ setblk: lda dline,x
         lda #>irq1
         sta $ffff
         rts
+setvbl2: sta $d012
+        lda #<irqvbl
+        sta $fffe
+        lda #>irqvbl
+        sta $ffff
+        rts
 setvbl: lda #VBLLINE
         sta $d012
         lda #<irqvbl
@@ -2310,13 +2327,35 @@ irqvbl: sta sav_a
         sta ready
         lda #1
         sta copied
-@no:    lda #DENLINE
+@no:
+        .if MUSIC
+        lda $d012               ; the tune (up to ~1650 cycles) only if the top IRQ at line 44 is still far enough away
+        cmp #DENLINE - 26
+        bcc :+
+        cmp #DENLINE
+        bcc @nomus              ; (lines 18..43: too late: this frame has no tune call)
+:       jsr musicplay
+@nomus:
+        .endif
+        lda #DENLINE
         sta $d012
         lda #<irqtop
         sta $fffe
         lda #>irqtop
         sta $ffff
         jmp irqout
+
+.if MUSIC
+musicplay:                      ; 5 calls in 6 frames (NTSC: the tune was written for 50 Hz)
+        inc MC
+        lda MC
+        cmp #6
+        bne :+
+        lda #0
+        sta MC
+        rts
+:       jmp MUSIC_PLAY
+.endif
 
 ; =============================================================================
 ;  Blocks: stable raster (double IRQ), then the spans off the stack
@@ -2458,5 +2497,14 @@ exitd:  ldx sav_s
         bcs @last
         jsr setblk
         jmp irqout
-@last:  jsr setvbl
+@last:  .if MUSIC
+        lda $d012               ; the vertical-blank IRQ at once (this line + 3): the black screen below the last bar is time for the copy and the tune
+        clc
+        adc #3
+        cmp #VBLLINE
+        bcs :+
+        jsr setvbl2
+        jmp irqout
+:       .endif
+        jsr setvbl
         jmp irqout

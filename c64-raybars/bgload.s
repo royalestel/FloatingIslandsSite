@@ -62,10 +62,10 @@ switch: sei
         ldx #$ff
         txs
         lda #0                  ; the zero page cleared (the records that follow hold its non-zero bytes only)
-        ldx #$7d
-:       sta $02,x
+        ldx #$ae                ; $02..$AF (cosmicstrings's zero page is the largest)
+:       sta $01,x
         dex
-        bpl :-
+        bne :-
 @l:     jsr chunk
         bcc @l
         lda rec

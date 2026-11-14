@@ -48,6 +48,7 @@ mem = mpu.memory
 load = prg[0] | prg[1] << 8
 mem[load:load + len(prg) - 2] = list(prg[2:])
 
+mem[0x1003] = 0x60                               # the tune's play routine: rts (its cost is the MUSIC reserve)
 TRAMP = 0x0400                                   # free RAM: a return target
 def run_until(stop, limit=2_000_000):
     c = mpu.processorCycles
@@ -88,7 +89,7 @@ def joystick(f):
     return j
 
 # start-up: runs to the main loop (it built the first frame)
-mpu.pc, mpu.sp = 2061, 0xFF
+mpu.pc, mpu.sp = L["start"], 0xFF
 mem[0xDC00] = 0xFF
 run_until(L["main"], 5_000_000)
 

@@ -10,7 +10,7 @@ the routine before it may still be using (its memory, its sprites, the zero page
 the switch; everything else in the background.  The job list goes to bank 0 ROML ($8000).
 """
 import os, struct, subprocess, sys
-from py65.devices.mpu6502 import MPU
+from c64cpu import MPU                         # (py65 + the stable illegal opcodes: cosmicstrings uses LAX etc.)
 from py65.memory import ObservableMemory
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +37,15 @@ SEQ = [
         "W2": (0xB400, 0xBFFF, ["RAMPS", "BSS"]),
         "W3": (0xC000, 0xD000, ["TABLES"]),
         "HL": (HLRUN[0], HLRUN[1], ["HLRUN"])}),
+    ("cosmicstrings", [], 0, {                                  # (no end: it flies on; no shared tables of its own, see USES_SHARED)
+        "C1": (0x2B00, 0x7300, ["RAMPS1"]),
+        "C2": (0x7300, 0x8000, ["CODE"]),
+        "C3": (0x8000, 0x8400, ["BSS"]),
+        "C4": (0x8400, 0x87F8, ["DISP"]),
+        "C5": (0x8800, 0x9100, ["SPRITES"]),
+        "C6": (0x9100, 0xA600, ["TABLES2"]),
+        "C7": (0xA600, 0xBFFF, ["TABLES"]),
+        "C8": (0xC800, 0xD000, ["CODE2"])}),
     ("goldfly", ["SPRBUF=$8080"], 360, {
         "F1": (0x5000, 0x6E00, ["RAMPS"]),
         "F2": (0x6E00, 0x8000, ["CODE", "RASTER", "BSS"]),
@@ -46,6 +55,7 @@ SEQ = [
 EXTRA = {"goldlight": ["update"], "goldorbit": ["update"], "goldtwin": ["update", "updateb"]}   # the simulators' frame 0 is their second update
 # what each routine keeps writing while it runs, outside its image (sprite buffers, the sprite pointer, the idle byte)
 RUNTIME = {
+    "cosmicstrings": [(0x0100, 0x0200), (0xBFFF, 0xC000)],
     "goldtilt": [],
     "goldlight": [(0x3D40, 0x4000), (0x07F8, 0x07F9)],
     "goldorbit": [(0x0400, 0x0480), (0x07F8, 0x07F9), (0x3FFF, 0x4000)],
@@ -55,7 +65,7 @@ RUNTIME = {
 VIC = (0xD000, 0xD02F)
 CIA2 = (0xDD00, 0xDD03)
 VECTORS = (0xFFFA, 0x10000)
-ZP = (0x0002, 0x0080)
+ZP = (0x0002, 0x00B0)               # (cosmicstrings's zero page reaches $A9; bgswitch clears the same range)
 NIRQ = 0xEF
 
 def run(cmd):
@@ -66,9 +76,9 @@ def run(cmd):
 def link(name, defs, areas):
     """assemble <name>_ntsc.s with CHAIN=1, link it to its areas; returns {address: byte} of the areas, labels"""
     os.makedirs(TMP, exist_ok=True)
-    mem = ["    ZP: start = $0002, size = $007E, type = rw;", "    DUMMY: start = $0000, size = $0100, file = \"\";"]
+    mem = ["    ZP: start = $0002, size = $00FE, type = rw;", "    DUMMY: start = $0000, size = $0100, file = \"\";"]
     seg = ["    ZEROPAGE: load = ZP, type = zp;", "    LOADADDR: load = DUMMY, type = ro;", "    EXEHDR: load = DUMMY, type = ro;"]
-    shared = {"SH": (SHARED[0], SHARED[1], ["SHARED"])}
+    shared = {"SH": (SHARED[0], SHARED[1], ["SHARED"])} if USES_SHARED.get(name, True) else {}
     for an, (a, b, segs) in list(areas.items()) + list(shared.items()):
         mem.append(f"    {an}: start = ${a:04X}, size = ${b - a:04X}, file = \"{TMP}/{name}_{an}.bin\";")
         for s in segs:
@@ -91,6 +101,12 @@ def link(name, defs, areas):
         for i, v in enumerate(data): image[a + i] = v
     return image, lbl
 
+SEQ.sort(key=lambda t: t[0] == "cosmicstrings")          # (cosmicstrings after goldfly)
+USES_SHARED = {"cosmicstrings": False}
+STAGE2 = {"cosmicstrings"}               # its RAM overlaps what the routine before it still runs in: the pages that do are copied at the switch by cosmicstage2.s (with the tune)
+STAGE2_AT = 0x0800
+if os.environ.get("GOLD_SEQ"):                                    # (a test cartridge of some of them: GOLD_SEQ=goldfly,cosmicstrings)
+    SEQ[:] = [e for e in SEQ if e[0] in os.environ["GOLD_SEQ"].split(",")]
 SEQ_ENDF = [(n, e) for n, _, e, _ in SEQ]
 
 def snapshot(name, image, lbl):
@@ -98,6 +114,7 @@ def snapshot(name, image, lbl):
     written = set()
     mem = ObservableMemory()
     for a, v in image.items(): mem[a] = v
+    mem[0xDC00] = 0xFF                      # (the joystick: nothing pressed, for cosmicstrings)
     mem.subscribe_to_write(range(0x10000), lambda addr, val: written.add(addr))
     mpu = MPU(memory=mem)
     mpu.pc, mpu.sp = lbl["start"], 0xFF
@@ -137,7 +154,7 @@ def make_jobs(prev_live, head):
         own = set(image)
         extras = {a for a in written if not (a < 0x200 or 0xD000 <= a < 0xE000 or VECTORS[0] <= a or a in own)}
         allb = {a: mem[a] for a in own | extras}
-        shared_rs = [SHARED, HLRUN]
+        shared_rs = [SHARED, HLRUN] if USES_SHARED.get(name, True) else []
         bg, sw = {}, {}
         lightfrom = lbl["lkbase0"] if name == "goldtilt" else 0x10000      # goldtilt needs tables.inc only: light.inc and orbit.inc follow it in SHARED
         for a, v in allb.items():
@@ -158,14 +175,25 @@ def make_jobs(prev_live, head):
         def recs(d):
             return [("copy", lo, bytes(d[a] for a in range(lo, hi))) for lo, hi in ranges(d)]
         jobs += recs(bg)
-        jobs.append(("switch",))
         isreg = lambda a: ZP[0] <= a < ZP[1] or a == NIRQ or 0xD000 <= a < 0xE000 or VECTORS[0] <= a
         data_sw = {a: v for a, v in sw.items() if not isreg(a)}
         regs = sorted(((a, v) for a, v in sw.items() if isreg(a)), key=lambda t: (t[0] == 0xD019, t[0]))      # the interrupt flags' acknowledgement last
-        jobs += recs(data_sw)
-        for i in range(0, len(regs), 80):
-            jobs.append(("regs", regs[i:i + 80]))                      # one record: (address, value) entries, a store each: ~45 cycles an entry, nothing a record
-        jobs.append(("start", lbl["resume"]))
+        if name in STAGE2:
+            pages = {}
+            for a in data_sw: pages.setdefault(a >> 8, bytes(mem[(a & 0xFF00) + i] for i in range(256)))      # whole pages of the snapshot
+            late_regs = [(a, v) for a, v in regs if a >= 0xD000]
+            regs = [(a, v) for a, v in regs if a < 0xD000]
+            jobs.append(("stage2", pages, late_regs, lbl["resume"]))                     # (the stage 2 code + its tables: background, to $0800)
+            jobs.append(("switch",))
+            for i in range(0, len(regs), 80):
+                jobs.append(("regs", regs[i:i + 80]))
+            jobs.append(("start", STAGE2_AT))
+        else:
+            jobs.append(("switch",))
+            jobs += recs(data_sw)
+            for i in range(0, len(regs), 80):
+                jobs.append(("regs", regs[i:i + 80]))                  # one record: (address, value) entries, a store each: ~45 cycles an entry, nothing a record
+            jobs.append(("start", lbl["resume"]))
         if late:
             jobs += [("copy", lo, bytes(late[a] for a in range(lo, hi))) for lo, hi in ranges(late)]
             late = {}
@@ -190,7 +218,38 @@ def layout(jobs, first_bank):
             off += n; i += n
             if off == 0x4000: bank += 1; off = 0
         return out
+    def align_page():
+        nonlocal off, bank
+        off = (off + 255) & ~255
+        if off >= 0x4000: bank += 1; off = 0
     for j in jobs:
+        if j[0] == "stage2":
+            _, pages, late_regs, resume = j
+            align_page()
+            tbl, i, pgs = [], 0, sorted(pages)
+            while i < len(pgs):                                  # runs of consecutive destination pages, each within one bank (64 pages)
+                rn = [pgs[i]]
+                while i + len(rn) < len(pgs) and pgs[i + len(rn)] == rn[-1] + 1: rn.append(pgs[i + len(rn)])
+                i += len(rn)
+                k = 0
+                while k < len(rn):
+                    room = (0x4000 - off) // 256
+                    if room == 0: bank += 1; off = 0; room = 64
+                    n = min(room, len(rn) - k)
+                    tbl.append((bank, 0x80 + off // 256, rn[k], n))
+                    (b0, _, _, _), = place(b"".join(pages[p] for p in rn[k:k + n]))
+                    k += n
+            src = "tbl:\n" + "".join(f"        .byte {b}, ${sp:02x}, ${dp:02x}, {n}\n" for b, sp, dp, n in tbl) + "        .byte $ff\n"
+            src += "late:\n" + "".join(f"        .byte ${a & 255:02x}, ${a >> 8:02x}, ${v:02x}\n" for a, v in late_regs) + "        .byte 0, 0, 0\n"
+            open(f"{TMP}/cs2tab.inc", "w").write(src)
+            run(["cl65", "-t", "none", "-Wa", f"-DRESUME=${resume:04x}", "--asm-include-dir", TMP, "-C", "cosmicstage2.cfg", "-o", f"{TMP}/cs2.bin", "cosmicstage2.s"])
+            for f in os.listdir(HERE):
+                if f.endswith(".o"): os.remove(os.path.join(HERE, f))
+            code = open(f"{TMP}/cs2.bin", "rb").read()
+            assert STAGE2_AT + len(code) <= 0x1000, "stage 2 over $0FFF"
+            for b, src_, i_, n in place(code):
+                recbytes.append(struct.pack("<BHHHB", b, src_, STAGE2_AT + i_, n, 0))
+            continue
         if j[0] == "regs":
             buf = b"".join(bytes([a & 255, a >> 8, v]) for a, v in j[1])
             if off + len(buf) > 0x4000: bank += 1; off = 0                  # (a list does not straddle two banks)
