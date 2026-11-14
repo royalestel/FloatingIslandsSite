@@ -21,7 +21,11 @@ from py65.devices.mpu6502 import MPU
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FRAMES, NSLOT, SEGS, LINE = int(os.environ.get("FRAMES", 600)), 3, 5, 63
+NTSC = int(os.environ.get("GOLD_NTSC", 0))            # 1: the NTSC build (goldfly_ntsc.prg: 65-cycle rows, 263 lines)
+NAME = "goldfly_ntsc" if NTSC else "goldfly"
+MUSIC = int(os.environ.get("MUSIC", 0))                 # the tune's cycles a frame (NTSC cartridge), after build
+FRAMES, NSLOT, SEGS, LINE = int(os.environ.get("FRAMES", 600)), 3, 5, 65 if NTSC else 63
+NLINES = 263 if NTSC else 312
 SPRY, SPRX = 150 - 11, 184 - 12
 TOP, BOTTOM = 40, 270
 
@@ -31,10 +35,10 @@ PAL = [0x000000, 0xFFFFFF, 0x894036, 0x7ABFC7, 0x8A46AE, 0x68A941, 0x3E31A2,
 RGB = [((c >> 16) & 255, (c >> 8) & 255, c & 255) for c in PAL]
 
 L = {}
-for ln in open(os.path.join(HERE, "goldfly.lbl")):
+for ln in open(os.path.join(HERE, NAME + ".lbl")):
     _, a, nme = ln.split()
     L[nme.lstrip(".")] = int(a, 16)
-prg = open(os.path.join(HERE, "goldfly.prg"), "rb").read()
+prg = open(os.path.join(HERE, NAME + ".prg"), "rb").read()
 mpu = MPU()
 load = prg[0] | prg[1] << 8
 mpu.memory[load:load + len(prg) - 2] = list(prg[2:])
@@ -98,7 +102,7 @@ for f in range(FRAMES):
         call(L["nextbar"])
         line = mem[0xD012]
         D = line + 2
-        dly = mem[L["irq2"] + 2]          # ldx #delay after txs
+        dly = mem[L["irq2"] + 2 + NTSC]   # ldx #delay after txs (and the NTSC nop)
         baddly += dly != (7 if BAND0 <= D - 1 < BAND1 else 8)
         slot = mem[L["soff"] + nb * NSLOT + i]
         ptrs = [mem[L["ptr"] + (slot * SEGS + k) * 2] |
@@ -119,7 +123,7 @@ for f in range(FRAMES):
         for r in range(len(rows)):
             ln = D + r
             if r + 1 < len(rows):           # (the last row runs into bexit)
-                exp = 63 - STEAL if BAND0 <= ln < BAND1 else 63
+                exp = LINE - STEAL if BAND0 <= ln < BAND1 else LINE
                 badrow += starts[r + 1] - starts[r] != exp
             badcell += sum(rows[r][k] != want(k, ln) for k in range(SEGS))
         n = len(rows)
@@ -131,10 +135,10 @@ for f in range(FRAMES):
     # free time: not the top IRQ's lines, nor a block's rows, its 2 IRQ lines
     # and 2 more for bexit + nextbar; less the light's DMA (21 lines x 5)
     shown = sum(n + 4 for _, n, _ in ents)
-    budget = (312 - 12 - shown) * LINE - 300 - 21 * 5
-    worst = max(worst, 100 * cyc / budget)
-    ok &= cyc <= budget
-    over += cyc > budget
+    budget = (NLINES - 12 - shown) * LINE - 300 - 21 * 5
+    worst = max(worst, 100 * (cyc + MUSIC) / budget)
+    ok &= cyc + MUSIC <= budget
+    over += cyc + MUSIC > budget
     frames.append(ents)
     mem[L["buf"]] = nb ^ 1
     mem[L["ready"]] = 0
@@ -188,6 +192,8 @@ def render(ents):
                     px[SPRX + 8 + cx * 2 + dx, SPRY + 1 + sy - TOP] = MC[v]
     return im.resize((W * SCALE, H * SCALE), Image.NEAREST)
 
+if NTSC or os.environ.get("NOPREVIEW"):
+    sys.exit(0 if ok else 1)
 imgs = [render(e) for e in frames[100::2]]
 imgs[0].save(os.path.join(HERE, "preview_goldfly.gif"), save_all=True,
              append_images=imgs[1:], duration=40, loop=0)

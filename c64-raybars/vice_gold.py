@@ -19,7 +19,7 @@ def run(cmd):
 def cart(name, defs, out):
     """boot + the one part (loaded to $0801 by cartboot_all's loader, started at its `start`)"""
     flags = [x for d in defs for x in ("-Wa", f"-D{d}")]
-    prg, lbl = c64build.build(name, flags + ["-Wa", "-DBASE=1"])
+    prg, lbl = c64build.build(name, flags)
     image = b"\0" + prg[2:]
     pages = -(-len(image) // 256)
     nb = -(-len(image) // 0x4000)
@@ -96,7 +96,7 @@ def main():
     defs = sys.argv[2:] or ["FREEZE=1", "MUSIC=0"]
     crt = f"/tmp/vg_{name}.crt"
     cart(name, defs, crt)
-    files = shots(crt, [6, 2, 2], f"/tmp/vg_{name}")
+    files = shots(crt, [6] + [float(os.environ.get("GAP", 2))] * (int(os.environ.get("NSHOTS", 3)) - 1), f"/tmp/vg_{name}")
     pal = palette()
     allx = []
     for f in files:

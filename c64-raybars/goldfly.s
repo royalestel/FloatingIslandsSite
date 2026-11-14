@@ -53,6 +53,17 @@
 
 
 NSLOT     = 3           ; bars in flight
+.ifndef NTSC
+NTSC      = 0           ; -Wa -DNTSC=1: 6567R8, 65-cycle lines (each row loop 2 cycles longer, one more nop in irq2's wait)
+.endif
+.ifndef MUSIC
+MUSIC     = NTSC        ; call the tune (resident at $1000, play $1003) 5 frames in 6: the cartridge
+.endif
+MC        = $03ff       ; the tune's frame counter, shared by all the parts that play it
+MUSIC_PLAY = $1003
+XL        = 2*NTSC      ; extra cycles a row
+; (NTSC: the frame build + the tune fit in the 360 frames goldfly runs in the cartridge, 97 % at worst with the dearest
+;  tune call; run on, a merge at frame ~510 overruns and a frame is shown twice)
 .ifndef HANDOFF
 HANDOFF   = 30          ; frames of the first bar's flight goldtwin draws before this program starts (see handoff.inc); -DHANDOFF=0 for the stand-alone start
 .endif
@@ -276,7 +287,22 @@ main:   lda frameflag           ; the top IRQ has swapped in the last frame
         lda #0
         sta frameflag
         jsr build
+        .if MUSIC
+        jsr musicplay           ; the tune, 5 frames in 6 (it was written for 50 Hz)
+        .endif
         jmp main
+
+.if MUSIC
+musicplay:                      ; 5 calls in 6 frames (NTSC: the tune was written for 50 Hz)
+        inc MC
+        lda MC
+        cmp #6
+        bne :+
+        lda #0
+        sta MC
+        rts
+:       jmp MUSIC_PLAY
+.endif
 
 nmi:    rti
 
@@ -1361,6 +1387,9 @@ irq1:   sta save_a
 ; halts the CPU for cycles 55-59: 5 cycles in the middle of this delay
 ; (all reads), so the delay loop runs one turn less (dly_op = 7).
 irq2:   txs
+        .if NTSC
+        nop                     ; (NTSC: the compare falls on the line change 2 cycles later)
+        .endif
 dly_op = * + 1
         ldx #8
 @w:     dex
@@ -1416,31 +1445,31 @@ dly_op = * + 1
 .ident(.sprintf("n1c_%d", SL)) = * + 1
         cpy #0                  ; 49
         beq :+                  ; 51 (52 taken)
-        fill 9                  ; 60
-        jmp :-                  ; 63
+        fill 9 + XL             ; 60 (NTSC 62)
+        jmp :-                  ; 63 (65)
 :
 .ident(.sprintf("n1j_%d", SL)) = * + 1
         jmp bexit               ; 55: band entry or bexit
 .ident(.sprintf("be_%d", SL)):
-        fill 8                  ; the last n1 row: 63
+        fill 8 + XL             ; the last n1 row: 63 (65)
 .ident(.sprintf("b_%d", SL)):
 :       row SL
 .ident(.sprintf("bc_%d", SL)) = * + 1
         cpy #0
         beq :+
-        fill 9 - STEAL          ; 63 - STEAL
+        fill 9 + XL - STEAL     ; 63 (65) - STEAL
         jmp :-
 :
 .ident(.sprintf("bj_%d", SL)) = * + 1
         jmp bexit               ; 55: n2 entry or bexit
 .ident(.sprintf("n2e_%d", SL)):
-        fill 8 - STEAL          ; the last band row: 63 - STEAL
+        fill 8 + XL - STEAL     ; the last band row: 63 (65) - STEAL
 .ident(.sprintf("n2_%d", SL)):
 :       row SL
 .ident(.sprintf("n2c_%d", SL)) = * + 1
         cpy #0
         beq :+
-        fill 9
+        fill 9 + XL
         jmp :-
 :       jmp bexit
         .endrep
