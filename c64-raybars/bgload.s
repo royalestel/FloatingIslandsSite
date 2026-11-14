@@ -16,15 +16,13 @@
 ;           this frame's call) and jumps to the next routine's swstart.
 ;  tick     ($0306, jsr): the tune, 5 calls in 6 frames (the counter MC).
 ; =============================================================================
-NIRQ    = $ef           ; the line the next raster IRQ is set for (every chained routine keeps it)
-JOB     = $f0           ; 2: the record being copied ($8000 + 8 x its index)
-DONE    = $f2           ; 2: bytes of it copied
-SRC     = $f4           ; 2
-DST     = $f6           ; 2
+.ifndef JOB
+        .include "bgzp.inc"
+.endif
 MC      = $03ff
-rec     = $e7           ; 7: the record being copied
-n       = $ee           ; bytes this chunk
+.ifndef MUSIC_PLAY
 MUSIC_PLAY = $1003
+.endif
 CHUNK   = 24            ; bytes per bgstep: 24 x 18 cycles + ~170 = ~600 cycles, 9-10 lines
 MINLINES = 20          ; ... started only this far from the next raster IRQ (a late irq1 breaks the double IRQ)
 
@@ -74,6 +72,8 @@ switch: sei
         lda MC
         cmp #$ff                ; (goldboot: no tune yet)
         beq :+
+        lda NOTICK
+        bne :+
         jsr tick
 :       jmp (rec+1)
 

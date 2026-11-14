@@ -51,6 +51,9 @@ MUSIC_PLAY = $1003
 PADN      = (63 + 2*NTSC - 8*SEGS - 3)/2   ; nops after the bit $ea: 6 (7 on NTSC), 2 (3) with the seventh segment
 ROWSIZE   = SEGS*SEGSIZE + 2 + PADN         ; 44 / 45 bytes
 BARH      = 24          ; gold lines
+BORDER    = 36          ; MOVE: the borders' column in col0 / col1 starts here (the window's at 0)
+BCOLN     = 2*PAD+BARH + (BORDER + ROWS - 2*PAD - BARH)*MOVE
+TOPPAD    = 2           ; MOVE: black rows above the bar in the block (gen_move.py)
 PAD       = 6           ; black rows above and below the gold
 YBASE     = 135         ; raster line of the bar's top row when centred
 LZ        = 100         ; light depth in front of the bar
@@ -73,6 +76,9 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 runf:    .res 2         ; CHAIN: frames shown
 mvp:     .res 2         ; MOVE: the stream (move.inc) position
 mvf:     .res 1         ; MOVE: frames played
+mvn:     .res 1         ; MOVE: this frame's line count, border mode, a colour
+mvm:     .res 1
+mvt:     .res 1
 quit:    .res 1         ; CHAIN: ENDF reached, the idle loop switches
 orbit:   .res 1         ; vertical bob angle
 lang:    .res 1         ; light bob angle
@@ -124,14 +130,19 @@ start:  jsr hwinit
 .ifndef PH_MVF
 PH_MVF    = 0           ; -Wa -DPH_MVF=n: start at frame n of the move (the VICE checks)
 .endif
-        lda #<(mvdata + (2*ROWS + 1)*PH_MVF)
+.ifndef PH_MVOFF
+PH_MVOFF  = 0           ; ... and -Wa -DPH_MVOFF=n: that frame's offset in the stream (gen_move.py writes them to /tmp/move_offs.pkl)
+.endif
+        lda #<(mvdata + PH_MVOFF)
         sta mvp
-        lda #>(mvdata + (2*ROWS + 1)*PH_MVF)
+        lda #>(mvdata + PH_MVOFF)
         sta mvp+1
         lda #PH_MVF
         sta mvf
 .endif
         jsr update              ; first frame; also sets the IRQ line
+        lda #$0f
+        sta VIC_IRQ             ; (the update took long enough for the raster to pass the compare value of before it: acknowledge that match)
 resume:                         ; (CHAIN: the image is a snapshot taken here)
         cli
 @idle:
@@ -205,39 +216,6 @@ sign:   bit dy
 done:   rts
 .endproc
 
-.if MOVE
-; domove: this frame of move.inc: [Y0][30 colours of the window's segments (1..5)][30 colours of the borders (segments 0 and 6): black = window width]
-.proc domove
-        ldy #0
-        lda (mvp),y
-        sta y0                  ; the block's first line
-        .repeat ::ROWS, RR
-        ldy #RR + 1
-        lda (mvp),y
-          .repeat 5, K
-        sta block + RR*::ROWSIZE + (K + 1)*::SEGSIZE + 1
-          .endrep
-        ldy #RR + 1 + ::ROWS
-        lda (mvp),y
-        sta block + RR*::ROWSIZE + 0*::SEGSIZE + 1
-        sta block + RR*::ROWSIZE + 6*::SEGSIZE + 1
-        .endrep
-        .ifndef MVFREEZE        ; (-Wa -DMVFREEZE=1: the same frame again, for the VICE checks)
-        lda mvp
-        clc
-        adc #2*::ROWS + 1
-        sta mvp
-        bcc :+
-        inc mvp+1
-:       inc mvf
-        .endif
-        lda y0
-        sec
-        sbc #2
-        SETIRQ
-        rts
-.endproc
-.endif
 
 .if MUSIC
 musicplay:                      ; 5 calls in 6 frames (NTSC: the tune was written for 50 Hz)
@@ -333,6 +311,7 @@ hl1_op = * + 1
         dey
         bpl line
 
+mvpatch:
         ; ---- 5. patch the 180 colours into the speedcode ---------------------
         ;  row r, segment k = column[r + kb_k], kb_k = 6 - off_k
         .repeat ::SEGS, K
@@ -353,6 +332,85 @@ hl1_op = * + 1
         sbc #2
         SETIRQ
         rts
+.if ::MOVE
+; domove: this frame of move.inc.  Frames before MOVEX: [Y0][n][border mode][n colours]; from MOVEX on: [Y0] and the plain gold lines (mvgold).
+; The bar's lines go into col0 / col1 (the rows 0..29 for the window's segments 1..5, 36..65 for the borders: segments 0 and 6) below TOPPAD black
+; lines, the segments' start indices kb to match, and the speedcode is patched by section 5 as always.
+; border mode: 0 black (window width), 1 the line's colour (full width), 2 / 3 every other line (the half-bright step)
+domove: ldy #0
+        lda (mvp),y
+        sta y0                  ; the block's first line
+        ldx #::BCOLN - 1
+        lda #0
+:       sta col0,x
+        sta col1,x
+        dex
+        bpl :-
+        ldx #::SEGS - 1         ; the window's segments start at 0, the borders (0 and 6) at BORDER
+:       lda #0
+        sta kb,x
+        dex
+        bpl :-
+        lda #::BORDER
+        sta kb
+        sta kb + 6
+        lda mvf
+        cmp #::MOVEX
+        bcs @plain
+        iny
+        lda (mvp),y
+        sta mvn                 ; n lines
+        iny
+        lda (mvp),y
+        sta mvm                 ; border mode
+        ldx #0
+@l:     txa
+        clc
+        adc #3
+        tay
+        lda (mvp),y
+        sta col0 + ::TOPPAD,x
+        sta col1 + ::TOPPAD,x
+        sta mvt
+        lda mvm
+        beq @nb                 ; mode 0: black border
+        cmp #1
+        beq @bf
+        txa                     ; mode 2 / 3: the border has the colour on every other line (mode 2: on even i, mode 3: on odd i)
+        clc
+        adc mvm
+        and #1
+        bne @nb
+@bf:    lda mvt
+        sta col0 + ::BORDER + ::TOPPAD,x
+        sta col1 + ::BORDER + ::TOPPAD,x
+@nb:    inx
+        cpx mvn
+        bne @l
+        lda mvn
+        clc
+        adc #3
+        jmp @adv
+@plain: ldx #::BARH - 1
+:       lda mvgold,x
+        sta col0 + ::TOPPAD,x
+        sta col1 + ::TOPPAD,x
+        sta col0 + ::BORDER + ::TOPPAD,x
+        sta col1 + ::BORDER + ::TOPPAD,x
+        dex
+        bpl :-
+        lda #1
+@adv:
+        .ifndef MVFREEZE        ; (-Wa -DMVFREEZE=1: the same frame again, for the VICE checks)
+        clc
+        adc mvp
+        sta mvp
+        bcc :+
+        inc mvp+1
+:       inc mvf
+        .endif
+        jmp mvpatch
+.endif
 .endproc
 
 ; =============================================================================
@@ -462,6 +520,7 @@ gold:   .byte 9,8,12,7,7,0,9,8,15,7,7,1,7,1,7,0,0,0,9,12,10,12,8,9
 
 ; =============================================================================
 .segment "BSS"
-col0:   .res 2*PAD+BARH         ; the bar column for even display rows
-col1:   .res 2*PAD+BARH         ; ... and for odd ones
+col0:   .res BCOLN              ; the bar column for even display rows
+col1:   .res BCOLN              ; ... and for odd ones
+
         .include "goldshared.inc"

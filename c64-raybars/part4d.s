@@ -36,6 +36,12 @@ BASE = 1
 .endif
 STREAM_BANK0 = BASE + IMGBANKS      ; the stream's first ROML bank (cartboot: bank 0 = boot, banks 1.. = the program image)
 
+.ifndef CHAIN
+CHAIN      = 0                  ; -Wa -DCHAIN=1 -Wa -DNFE=n: after NFE frames go on with the gold sequence (bgload.s, GOLD_NTSC_PLAN.md) instead of the cartridge loader
+.endif
+.if CHAIN
+        .include "bgzp.inc"
+.endif
 VIC_CTRL1  = $d011
 VIC_RASTER = $d012
 VIC_SPREN  = $d015
@@ -116,6 +122,21 @@ start:  sei
         sta VIC_IRQEN
         sta VIC_IRQ
         jsr clearpages
+.if CHAIN
+        ldx #0                  ; the background loader to $0300, its job list: bank 0 ROML, $8000
+:       lda __BGLOAD_LOAD__,x
+        sta __BGLOAD_RUN__,x
+        inx
+        cpx #<__BGLOAD_SIZE__
+        bne :-
+        lda #0
+        sta JOB
+        sta DONE
+        sta DONE+1
+        sta NOTICK
+        lda #$80
+        sta JOB+1
+.endif
 jsr update              ; frame 0
         cli
 @idle:  .repeat 100
@@ -156,6 +177,20 @@ nmi:    rti
 ;  update: apply this blank's record, then patch the loop for the next frame's parity
 ; -----------------------------------------------------------------------------
 .proc update
+.if ::CHAIN
+        lda fcl                 ; the film is over (NFE frames shown): the gold sequence, at the start of the blank (it needs ~40 lines)
+        cmp #<::NFE
+        bne @go
+        lda fch
+        cmp #>::NFE
+        bne @go
+        lda mc                  ; the tune's cadence goes on (the blank's play call has been made)
+        sta MC
+        lda #1
+        sta NOTICK
+        jmp bgswitch
+@go:
+.endif
         lda #$37                ; ROML visible while we read the stream (interrupts are off here)
         sta $01
         lda bank
@@ -232,8 +267,12 @@ nmi:    rti
         sec
         sbc #49
         cmp #50
-        bcs @dw
-        lda #$1b
+        bcc @den
+.if ::CHAIN
+        jsr bgslot              ; (the time we would spin away: a chunk of the next routine from the cartridge, when it fits before line 49)
+.endif
+        jmp @dw
+@den:   lda #$1b
         sta VIC_CTRL1
 @noden: ldy #0
         lda (sp),y              ; nB
@@ -304,6 +343,22 @@ nmi:    rti
         sta $d01a
         rts
 .endproc
+
+.if CHAIN
+; bgslot: one chunk (bgload.s: 24 bytes, ~600 cycles = 10 lines) if there are 12 lines or more to line 49.  The chunk leaves $01 and the ROML bank as it
+; likes: the stream's again.
+bgslot: lda #49
+        sec
+        sbc VIC_RASTER
+        cmp #12
+        bcc @no
+        jsr chunk
+        lda #$37
+        sta $01
+        lda bank
+        sta $de00
+@no:    rts
+.endif
 
 ; the runs of a group: [page][line][len] bytes, copied into the pages (the stream is in the ROML window, $01 = $37)
 .proc doruns
@@ -471,3 +526,8 @@ blockend:
 ; =============================================================================
 ;  The 200 lines: one loop of 63 cycles (7 x (lda abs,x 4 + sta 4) + inx 2 + cpx 2 + bne 3)
 ; =============================================================================
+
+.if CHAIN
+        .import __BGLOAD_LOAD__, __BGLOAD_RUN__, __BGLOAD_SIZE__
+        .include "bgload.s"
+.endif
