@@ -734,6 +734,17 @@ patch:
         lda #OP_BCC             ; sprite row: STEAL cycles shorter
 :       sta block + RR*::ROWSIZE + ::SEGS*::SEGSIZE
         .endrep
+        ; the line before the bar (irq2's wait): if the VIC fetches the sprite at
+        ; its end, irq2 waits one turn less (5 cycles) so its line compare still
+        ; falls on the line change
+        txa
+        sec
+        sbc #1                  ; y0 - 1 - ly
+        cmp #21
+        lda #8
+        bcs :+
+        lda #7
+:       sta irqwait
 
         rts
 .endproc
@@ -799,7 +810,8 @@ irq2:   txs                     ; throw away irq2's stack frame
         .if NTSC
         nop                     ; (NTSC: the compare falls on the line change 2 cycles later)
         .endif
-        ldx #8
+        ldx #8                  ; (7 when the sprite is fetched at the end of this line: see step 8)
+irqwait = * - 1
 @w:     dex
         bne @w
         bit $00

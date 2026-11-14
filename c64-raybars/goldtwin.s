@@ -40,10 +40,26 @@
 
 ROWS      = 33          ; bar A display rows: 24 lines + 8 lines of slant + 1 (in the fly-out the bar is at most this thick inside the window)
 NROWS     = 33          ; bar A rows run normally (24 lines + 8 lines of slant + 1); the fly-out runs all ROWS
-ROWSB     = 56          ; bar B display rows: 48 lines + 8 lines of slant
+.ifndef NTSC
+NTSC      = 0           ; -Wa -DNTSC=1: 6567R8, 65-cycle lines (one more nop a row, and in irq2's wait), bar B cut at the picture's bottom
+.endif
+.ifndef FREEZE
+FREEZE    = 0
+.endif
+.ifndef MUSIC
+MUSIC     = NTSC        ; call the tune (resident at $1000, play $1003) 5 frames in 6: the cartridge
+.endif
+MC        = $03ff       ; the tune's frame counter, shared by all the parts that play it
+MUSIC_PLAY = $1003
+ROWSBT    = 56          ; bar B's rows: 48 lines + 8 lines of slant
+.if NTSC
+ROWSB     = 44          ; ... run: lines 231 .. 274 (= 11 of the next frame: the last line an NTSC picture shows)
+.else
+ROWSB     = ROWSBT
+.endif
 SEGS      = 5           ; horizontal segments per row
 SEGSIZE   = 8           ; bytes per segment: lda #c (2) sta $d020 (3) sta $d021 (3)
-PADSIZE   = 7           ; bytes of padding per row
+PADSIZE   = 7 + NTSC    ; bytes of padding per row
 ROWSIZE   = SEGS*SEGSIZE + PADSIZE  ; 47 bytes, both bars
 BARH      = 24          ; gold lines
 BMAX      = 48          ; bar B's largest height
@@ -73,7 +89,7 @@ LYREST    = 56          ; goldlight: the light sprite's top, this many lines abo
 LYMIN     = 52          ; ... and never above this line
 DZ0       = 100         ; goldlight's light depth in front of the bar
 .ifndef STEAL
-STEAL     = 4           ; bar A rows shortened on sprite lines: 4 or 6
+STEAL     = 4 + NTSC    ; bar A rows shortened on sprite lines: 4 or 6 (PAL), 5 (NTSC, as goldorbit)
 .endif
 VICBANK   = $8000       ; VIC bank 2
 SPRBUF0   = VICBANK + $0000     ; sprite double buffer (pointers 0 / 1)
@@ -83,6 +99,8 @@ IDLEBYTE  = VICBANK + $3fff
 
 .if STEAL = 4
 SKIP      = 2
+.elseif STEAL = 5 && NTSC
+SKIP      = 3           ; NTSC: skip three nops: 3 + 5 + 2 = 10 = 15 - 5
 .elseif STEAL = 6
 SKIP      = 3
 .else
@@ -287,6 +305,41 @@ start:  sei
         lda #$01
         sta VIC_IRQEN           ; raster IRQ only
         sta VIC_IRQ
+; start phases (-Wa -DPH_ORBIT=n ...: the hand-overs of the gold sequence, the VICE checks)
+.ifdef PH_ORBIT
+        lda #PH_ORBIT
+        sta orbit
+.endif
+.ifdef PH_TILT
+        lda #PH_TILT
+        sta tilt
+.endif
+.ifdef PH_LXA
+        lda #PH_LXA
+        sta lxa
+.endif
+.ifdef PH_LYA
+        lda #PH_LYA
+        sta lya
+.endif
+.ifdef PH_Q
+        lda #PH_Q
+        sta q
+.endif
+.ifdef PH_TW
+        lda #PH_TW
+        sta tw
+.endif
+.ifdef PH_BT
+        lda #PH_BT
+        sta bt
+.endif
+.ifdef PH_FCNT
+        lda #<PH_FCNT
+        sta fcnt
+        lda #>PH_FCNT
+        sta fcnt+1
+.endif
         jsr update              ; first frame
         jsr updateb
         cli
@@ -301,7 +354,22 @@ main:   lda frame               ; bar A has been drawn: build the next
         lda #0
         sta frameb
         jsr updateb
+        .if MUSIC
+        jsr musicplay           ; the tune, 5 frames in 6 (it was written for 50 Hz)
+        .endif
         jmp main
+
+.if MUSIC
+musicplay:                      ; 5 calls in 6 frames (NTSC: the tune was written for 50 Hz)
+        inc MC
+        lda MC
+        cmp #6
+        bne :+
+        lda #0
+        sta MC
+        rts
+:       jmp MUSIC_PLAY
+.endif
 
 nmi:    rti                     ; RESTORE key does nothing
 
@@ -362,10 +430,13 @@ done:   rts
 ;  update: the sprite and bar A for the next frame
 ; =============================================================================
 .proc update
+.if ::FREEZE = 0                  ; (frozen, FREEZE 1 or 2: the fly-out never starts, unless PH_FCNT puts it in)
         inc fcnt
         bne :+
         inc fcnt+1
-:       lda fo
+:
+.endif
+        lda fo
         beq @trig
         cmp #255
         bcs @fo2
@@ -387,6 +458,7 @@ done:   rts
 @flyd:
         ; ---- 1. animate ------------------------------------------------------
         inc fcount
+.if ::FREEZE <> 1                 ; (-Wa -DFREEZE=1: a still picture, for the VICE checks; 2: animated, without the fly-out)
         inc orbit               ; bar A bobs up and down
         inc tilt                ; both bars rock
         inc q                   ; light orbits bar A
@@ -397,6 +469,7 @@ done:   rts
         bcc :+
         inc lxa
 :
+.endif
 
         ; ---- 2. bar A -----------------------------------------------------------
         ldy orbit
@@ -831,6 +904,17 @@ steal9: lda y0
         lda #OP_BCC             ; sprite row: STEAL cycles shorter
 :       sta block + RR*::ROWSIZE + ::SEGS*::SEGSIZE
         .endrep
+        ; the line before the bar (irq2's wait): if the VIC fetches the sprite at
+        ; its end, irq2 waits one turn less (5 cycles) so its line compare still
+        ; falls on the line change
+        txa
+        sec
+        sbc #1                  ; y0 - 1 - ly
+        cmp #21
+        lda #8
+        bcs :+
+        lda #7
+:       sta irqwait
 @steald:
         rts
 goneblk:                        ; bar A is gone: row 0 jumps straight to the end of the block, until the replay of goldfly's first bar starts
@@ -1058,7 +1142,10 @@ nextrow:
         bcs @adv
         inc bpause
         jmp @go
-@adv:   inc bt
+@adv:
+.if ::FREEZE <> 1
+        inc bt
+.endif
         bne @go
         lda #0
         sta bpause              ; (wrapped: the next cycle waits again)
@@ -1343,7 +1430,11 @@ irq1:   sta save_a
         .endrep
 
 irq2:   txs                     ; throw away irq2's stack frame
-        ldx #8
+        .if NTSC
+        nop                     ; (NTSC: the compare falls on the line change 2 cycles later)
+        .endif
+        ldx #8                  ; (7 when the sprite is fetched at the end of this line: see steal9)
+irqwait = * - 1
 @w:     dex
         bne @w
         bit $00
@@ -1364,10 +1455,18 @@ block:                          ; ---- bar A ---------------------------------
         sta VIC_BG              ; 4   display-window part
           .endrep               ;     = 10 cycles = 80 pixels per segment
         .byte OP_BCS, SKIP      ; 2   (bcc: 3, skipping ahead)
+        .if NTSC
+        nop                     ; 6   (skipped on sprite lines)
+        nop
+        nop
+        inc $ea                 ; 5
+        nop                     ; 2   5*10 + 15 = 65 cycles = 1 NTSC line
+        .else
         inc $ea                 ; 5
         nop                     ; 6
         nop
         nop                     ; 5*10 + 13 = 63 cycles = 1 PAL line
+        .endif
         .assert >(block + RR*ROWSIZE + SEGS*SEGSIZE + 2) = >(block + RR*ROWSIZE + SEGS*SEGSIZE + 2 + SKIP), error, "row branch crosses a page"
         .endrep
 blockend:
@@ -1408,6 +1507,9 @@ irqb1:  sta save_a
         .endrep
 
 irqb2:  txs
+        .if NTSC
+        nop
+        .endif
         ldx #8
 @w:     dex
         bne @w
@@ -1422,11 +1524,16 @@ irqb2:  txs
         nop                     ; same 2 cycles as bar A's clc
 
 blockb:                         ; ---- bar B ---------------------------------
-        .repeat ROWSB
+        .repeat ROWSB, RR
           .repeat SEGS
         lda #0                  ; 2   patched every frame
+          .if BTOP + RR < 251
         sta VIC_BORDER          ; 4
-        sta VIC_BG              ; 4
+        sta VIC_BG              ; 4   inside the window: the colour changes here
+          .else
+        sta VIC_BG              ; 4   below the window (line 251 on) the whole line is border:
+        sta VIC_BORDER          ; 4   the border write comes second, so the edges line up with the rows above
+          .endif
           .endrep
         bit $ea                 ; 3
         nop                     ; 10
@@ -1434,6 +1541,9 @@ blockb:                         ; ---- bar B ---------------------------------
         nop
         nop
         nop                     ; 5*10 + 13 = 63 cycles
+        .if NTSC
+        nop                     ; + 2 = 65
+        .endif
         .endrep
 blockbend:
         .assert blockbend - blockb = ROWSB*ROWSIZE, error, "bar B row size mismatch"
@@ -1480,11 +1590,19 @@ gold:   .byte 9,8,12,7,7,0,9,8,15,7,7,1,7,1,7,0,0,0,9,12,10,12,8,9
 ; Bar B's highlight colours by brightness: medium grey at least.
 hlcol:  .byte 12, 12, 15, 1, 1, 1
 ; Bar B's display rows: address of each row's first lda #immediate
-rowlo:  .repeat ROWSB, RR
+rowlo:  .repeat ROWSBT, RR
+        .if RR < ROWSB
         .byte <(blockb + RR*ROWSIZE + 1)
+        .else
+        .byte <(rowscr + 1)     ; (NTSC: rows below the picture are not run: their highlight goes to a scratch row)
+        .endif
         .endrep
-rowhi:  .repeat ROWSB, RR
+rowhi:  .repeat ROWSBT, RR
+        .if RR < ROWSB
         .byte >(blockb + RR*ROWSIZE + 1)
+        .else
+        .byte >(rowscr + 1)
+        .endif
         .endrep
 
 ; =============================================================================
@@ -1494,9 +1612,12 @@ rowhi:  .repeat ROWSB, RR
 cols:   .res 2*SEGS*COLLEN
 srcmap: .res BMAX               ; bar A: source line of each output row (identity until it swells)
 ; Bar B: one column: PAD black, up to 48 bar rows, black after.
-BCOLSIZE = PAD + ROWSB + 2
+BCOLSIZE = PAD + ROWSBT + 2
 bcol:   .res BCOLSIZE
 srccol: .res BARH               ; bar B's 24 source lines, dimmed
 specb:  .res BARH               ; ... and their specular levels
 rsrc:   .res BCOLSIZE           ; source line of each bcol position
+.if ROWSB < ROWSBT
+rowscr: .res ROWSIZE            ; NTSC: the scratch row
+.endif
         .assert * <= VICBANK, error, "program runs into the VIC bank"

@@ -15,13 +15,15 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = 512
-ROWS, ROWSB, SEGS, SEGSIZE, ROWSIZE = 33, 56, 5, 8, 47
+NTSC = int(os.environ.get("GOLD_NTSC", 0))            # 1: the NTSC build (goldtwin_ntsc.prg: 65-cycle rows, 263 lines, bar B 44 rows)
+NAME = "goldtwin_ntsc" if NTSC else "goldtwin"
+ROWS, ROWSB, SEGS, SEGSIZE, ROWSIZE = 33, 44 if NTSC else 56, 5, 8, 47 + NTSC
 BMAXROWS = 48
-SEGW, DENLINE, STEAL, BTOP = 80, 44, 4, 231
+SEGW, DENLINE, STEAL, BTOP = 80, 44, 4 + NTSC, 231
 TOP, BOTTOM = 50, 300
 OP_BCS, OP_BCC = 0xB0, 0x90
-LINE = int(os.environ.get("LINEC", 63))
-LINES = int(os.environ.get("LINES", 312))         # PAL 312 / NTSC 263 (estimates: the code is PAL)
+LINE = int(os.environ.get("LINEC", 65 if NTSC else 63))
+LINES = int(os.environ.get("LINES", 263 if NTSC else 312))
 MUSIC = int(os.environ.get("MUSIC", 0))          # the tune's cycles a frame (NTSC cartridge), after updateb
 BROWS = int(os.environ.get("BROWS", 0))          # bar B's rows actually run (0 = all ROWSB; NTSC: clipped at the window, ~20)
 IRQTOP_LINES = 6                # top IRQ: line 44 until DEN is back at 49
@@ -33,10 +35,10 @@ PAL = [0x000000, 0xFFFFFF, 0x894036, 0x7ABFC7, 0x8A46AE, 0x68A941, 0x3E31A2,
 RGB = [((c >> 16) & 255, (c >> 8) & 255, c & 255) for c in PAL]
 
 labels = {}
-for ln in open(os.path.join(HERE, "goldtwin.lbl")):
+for ln in open(os.path.join(HERE, NAME + ".lbl")):
     _, addr, name = ln.split()
     labels[name.lstrip(".")] = int(addr, 16)
-prg = open(os.path.join(HERE, "goldtwin.prg"), "rb").read()
+prg = open(os.path.join(HERE, NAME + ".prg"), "rb").read()
 mpu = MPU()
 load = prg[0] | prg[1] << 8
 mpu.memory[load:load + len(prg) - 2] = list(prg[2:])
@@ -62,7 +64,7 @@ ok &= all(c == LINE - STEAL for c in time_rows(block, ROWS))
 for r in range(ROWS):
     mem[block + r * ROWSIZE + SEGS * SEGSIZE] = OP_BCS
 ok &= all(c == LINE for c in time_rows(blockb, ROWSB))
-print(f"rows: bar A 63 (59 on sprite lines), bar B 63: {'OK' if ok else 'WRONG'}")
+print(f"rows: bar A {LINE} ({LINE - STEAL} on sprite lines), bar B {LINE}: {'OK' if ok else 'WRONG'}")
 
 # --- 2. the main loop's frame work, on a timeline ----------------------------------
 # The main loop starts the next sprite + bar A when bar A has been drawn, and
@@ -212,6 +214,8 @@ def render(y, ga, gb, ly, lx, spr):
                         px[xx, yy] = MC[v]
     return im.resize((W * SCALE, H * SCALE), Image.NEAREST)
 
+if NTSC or os.environ.get("NOPREVIEW"):
+    sys.exit(0 if ok else 1)
 imgs = [render(*fr[:6]) for fr in frames[::3]]
 imgs[0].save(os.path.join(HERE, "preview_goldtwin.gif"), save_all=True,
              append_images=imgs[1:], duration=50, loop=0)
