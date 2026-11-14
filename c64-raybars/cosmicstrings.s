@@ -373,8 +373,10 @@ start:  sei
         sta dfl
         lda #>(DFAR >> 8)
         sta dfh
-        .endif
+        lda #$7b                ; (the display on, all black: an invalid mode) so the light stays on in the frame the switch ends in
+        .else
         lda #$0b
+        .endif
         sta $d011
         lda #DENLINE
         sta $d012
