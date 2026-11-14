@@ -31,7 +31,10 @@
         .setcpu "6502"
 
 ROWS      = 30          ; display rows: 24 bar lines + 5 lines of slant + 1
-SEGS      = 6           ; horizontal segments per row
+.ifndef MOVE
+MOVE      = 0           ; -Wa -DMOVE=1: the first MOVEN frames play move.inc: part 4's blue bar becomes this gold bar (gen_move.py)
+.endif
+SEGS      = 6 + MOVE    ; horizontal segments per row (MOVE: a seventh, the right border: the bar ends at the window's edge while part 4's bar is 320 pixels wide)
 SEGSIZE   = 6           ; bytes per segment: lda #c (2) sta $d020 (3) nop (1)
 .ifndef NTSC
 NTSC      = 0           ; -Wa -DNTSC=1: 6567R8, 65-cycle lines (one more nop a row, and in irq2's wait)
@@ -45,7 +48,8 @@ MC        = $03ff       ; the tune's frame counter, shared by all the parts that
 ENDF      = 0           ; CHAIN: frames to show before the switch to the next routine (0: for ever)
 .endif
 MUSIC_PLAY = $1003
-ROWSIZE   = SEGS*SEGSIZE + 8 + NTSC ; + bit $ea (2) + 6 nops (+ 1 on NTSC) = 44 / 45 bytes
+PADN      = (63 + 2*NTSC - 8*SEGS - 3)/2   ; nops after the bit $ea: 6 (7 on NTSC), 2 (3) with the seventh segment
+ROWSIZE   = SEGS*SEGSIZE + 2 + PADN         ; 44 / 45 bytes
 BARH      = 24          ; gold lines
 PAD       = 6           ; black rows above and below the gold
 YBASE     = 135         ; raster line of the bar's top row when centred
@@ -67,6 +71,8 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 ; =============================================================================
 .segment "ZEROPAGE"
 runf:    .res 2         ; CHAIN: frames shown
+mvp:     .res 2         ; MOVE: the stream (move.inc) position
+mvf:     .res 1         ; MOVE: frames played
 quit:    .res 1         ; CHAIN: ENDF reached, the idle loop switches
 orbit:   .res 1         ; vertical bob angle
 lang:    .res 1         ; light bob angle
@@ -113,6 +119,17 @@ start:  jsr hwinit
 .ifdef PH_LANG
         lda #PH_LANG
         sta lang
+.endif
+.if MOVE
+.ifndef PH_MVF
+PH_MVF    = 0           ; -Wa -DPH_MVF=n: start at frame n of the move (the VICE checks)
+.endif
+        lda #<(mvdata + (2*ROWS + 1)*PH_MVF)
+        sta mvp
+        lda #>(mvdata + (2*ROWS + 1)*PH_MVF)
+        sta mvp+1
+        lda #PH_MVF
+        sta mvf
 .endif
         jsr update              ; first frame; also sets the IRQ line
 resume:                         ; (CHAIN: the image is a snapshot taken here)
@@ -188,6 +205,40 @@ sign:   bit dy
 done:   rts
 .endproc
 
+.if MOVE
+; domove: this frame of move.inc: [Y0][30 colours of the window's segments (1..5)][30 colours of the borders (segments 0 and 6): black = window width]
+.proc domove
+        ldy #0
+        lda (mvp),y
+        sta y0                  ; the block's first line
+        .repeat ::ROWS, RR
+        ldy #RR + 1
+        lda (mvp),y
+          .repeat 5, K
+        sta block + RR*::ROWSIZE + (K + 1)*::SEGSIZE + 1
+          .endrep
+        ldy #RR + 1 + ::ROWS
+        lda (mvp),y
+        sta block + RR*::ROWSIZE + 0*::SEGSIZE + 1
+        sta block + RR*::ROWSIZE + 6*::SEGSIZE + 1
+        .endrep
+        .ifndef MVFREEZE        ; (-Wa -DMVFREEZE=1: the same frame again, for the VICE checks)
+        lda mvp
+        clc
+        adc #2*::ROWS + 1
+        sta mvp
+        bcc :+
+        inc mvp+1
+:       inc mvf
+        .endif
+        lda y0
+        sec
+        sbc #2
+        SETIRQ
+        rts
+.endproc
+.endif
+
 .if MUSIC
 musicplay:                      ; 5 calls in 6 frames (NTSC: the tune was written for 50 Hz)
         inc MC
@@ -214,6 +265,13 @@ musicplay:                      ; 5 calls in 6 frames (NTSC: the tune was writte
         inc tilt                ; rock the slant
 .endif
 
+.if ::MOVE
+        lda mvf
+        cmp #::MOVEN
+        bcs @bob
+        jmp domove              ; the blue bar of part 4 -> this bar (the stream decides everything)
+@bob:
+.endif
         ; ---- 2. where the bar is and how it slants ----------------------------
         ldy orbit
         lda ysin,y
@@ -221,10 +279,14 @@ musicplay:                      ; 5 calls in 6 frames (NTSC: the tune was writte
         adc #YBASE
         sta y0
         ldy tilt
-        .repeat ::SEGS, K
+        .repeat 6, K
         lda .ident(.sprintf("kbase%d", K)),y
         sta kb+K
         .endrep
+        .if ::MOVE
+        lda kbase5,y            ; (the seventh segment follows the sixth)
+        sta kb+6
+        .endif
 
         ; ---- 3. the light, seen from the bar -----------------------------------
         ldy lang
@@ -338,15 +400,9 @@ block:                          ; ---- the slanted bar ---------------------
         nop                     ; 2   = 8 cycles = 64 pixels per segment
           .endrep
         bit $ea                 ; 3
-        nop                     ; 12
-        nop
-        nop
-        nop
-        nop
-        nop                     ; 6*8 + 3 + 12 = 63 cycles = 1 PAL line
-        .if NTSC
-        nop                     ; + 2 = 65 cycles = 1 NTSC line
-        .endif
+        .repeat PADN
+        nop                     ; 6*8 + 3 + 12 = 63 cycles = 1 PAL line (+ 2 = 65 = 1 NTSC line)
+        .endrep
         .endrep
 blockend:
         .assert blockend - block = ROWS*ROWSIZE, error, "row size mismatch"
@@ -386,6 +442,9 @@ blockend:
 
 ; =============================================================================
 .segment "TABLES"
+.if MOVE
+        .include "move.inc"     ; mvdata, MOVEN
+.endif
         .include "tilt.inc"     ; kbase0..5[tilt]
         .assert <spectab = 0, error, "spectab must be page aligned"
 
