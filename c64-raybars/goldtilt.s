@@ -40,6 +40,10 @@ NTSC      = 0           ; -Wa -DNTSC=1: 6567R8, 65-cycle lines (one more nop a r
 MUSIC     = NTSC        ; call the tune (resident at $1000, play $1003) 5 frames in 6: the cartridge
 .endif
 MC        = $03ff       ; the tune's frame counter, shared by all the parts that play it
+        .include "goldchain.inc"
+.ifndef ENDF
+ENDF      = 0           ; CHAIN: frames to show before the switch to the next routine (0: for ever)
+.endif
 MUSIC_PLAY = $1003
 ROWSIZE   = SEGS*SEGSIZE + 8 + NTSC ; + bit $ea (2) + 6 nops (+ 1 on NTSC) = 44 / 45 bytes
 BARH      = 24          ; gold lines
@@ -62,6 +66,8 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 
 ; =============================================================================
 .segment "ZEROPAGE"
+runf:    .res 2         ; CHAIN: frames shown
+quit:    .res 1         ; CHAIN: ENDF reached, the idle loop switches
 orbit:   .res 1         ; vertical bob angle
 lang:    .res 1         ; light bob angle
 tilt:    .res 1         ; see-saw angle
@@ -85,7 +91,42 @@ save_y:  .res 1
 ; =============================================================================
 .segment "CODE"
 
-start:  sei
+start:  jsr hwinit
+        ldx #$7d                ; clear our zero page ($02-$7f)
+        lda #0
+@zp:    sta $02,x
+        dex
+        bpl @zp
+        ldx #2*PAD+BARH-1       ; clear both columns (black padding)
+@col:   sta col0,x
+        sta col1,x
+        dex
+        bpl @col
+.ifdef PH_ORBIT                 ; start phases (-Wa -DPH_ORBIT=n ...: the hand-overs of the gold sequence, the VICE checks)
+        lda #PH_ORBIT
+        sta orbit
+.endif
+.ifdef PH_TILT
+        lda #PH_TILT
+        sta tilt
+.endif
+.ifdef PH_LANG
+        lda #PH_LANG
+        sta lang
+.endif
+        jsr update              ; first frame; also sets the IRQ line
+resume:                         ; (CHAIN: the image is a snapshot taken here)
+        cli
+@idle:
+.if CHAIN
+        lda quit
+        beq :+
+        jmp BGSWITCH            ; shown ENDF frames: on to the next routine
+:       jsr BGSTEP              ; idle: load the next routine
+.endif
+        jmp @idle               ; everything happens in the IRQ
+
+hwinit: sei
         lda #$7f                ; silence the CIA timer interrupts
         sta CIA1_ICR
         sta CIA2_ICR
@@ -106,36 +147,13 @@ start:  sei
         sta VIC_BORDER
         sta VIC_BG
         sta VIC_SPREN           ; no sprites: they would steal raster cycles
-        ldx #$7d                ; clear our zero page ($02-$7f)
-@zp:    sta $02,x
-        dex
-        bpl @zp
-        ldx #2*PAD+BARH-1       ; clear both columns (black padding)
-@col:   sta col0,x
-        sta col1,x
-        dex
-        bpl @col
-
         lda #$0b                ; DEN=0: screen off, no badlines, bit 7 = 0
         sta VIC_CTRL1
         lda #$01
         sta VIC_IRQEN           ; raster IRQ only
-        sta VIC_IRQ
-.ifdef PH_ORBIT                 ; start phases (-Wa -DPH_ORBIT=n ...: the hand-overs of the gold sequence, the VICE checks)
-        lda #PH_ORBIT
-        sta orbit
-.endif
-.ifdef PH_TILT
-        lda #PH_TILT
-        sta tilt
-.endif
-.ifdef PH_LANG
-        lda #PH_LANG
-        sta lang
-.endif
-        jsr update              ; first frame; also sets the IRQ line
-        cli
-@idle:  jmp @idle               ; everything happens in the IRQ
+        lda #$0f
+        sta VIC_IRQ             ; (acknowledge whatever is pending)
+        rts
 
 nmi:    rti                     ; RESTORE key does nothing
 
@@ -271,7 +289,7 @@ hl1_op = * + 1
         lda y0
         sec
         sbc #2
-        sta VIC_RASTER
+        SETIRQ
         rts
 .endproc
 
@@ -341,10 +359,25 @@ blockend:
         sta $ffff
         asl VIC_IRQ
 
+        .if CHAIN && ENDF
+        inc runf
+        bne :+
+        inc runf+1
+:       lda runf
+        cmp #<ENDF
+        bne :+
+        lda runf+1
+        cmp #>ENDF
+        bne :+
+        inc quit                ; the idle loop switches (bgswitch calls the tune)
+        jmp @out
+:
+        .endif
         jsr update              ; build the next frame
         .if MUSIC
         jsr musicplay           ; the tune, 5 frames in 6 (it was written for 50 Hz)
         .endif
+@out:
 
         lda save_a
         ldx save_x
@@ -353,8 +386,6 @@ blockend:
 
 ; =============================================================================
 .segment "TABLES"
-
-        .include "tables.inc"   ; spectab etc. (page aligned, see gen_tables)
         .include "tilt.inc"     ; kbase0..5[tilt]
         .assert <spectab = 0, error, "spectab must be page aligned"
 
@@ -374,3 +405,4 @@ gold:   .byte 9,8,12,7,7,0,9,8,15,7,7,1,7,1,7,0,0,0,9,12,10,12,8,9
 .segment "BSS"
 col0:   .res 2*PAD+BARH         ; the bar column for even display rows
 col1:   .res 2*PAD+BARH         ; ... and for odd ones
+        .include "goldshared.inc"

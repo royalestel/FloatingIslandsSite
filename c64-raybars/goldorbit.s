@@ -40,6 +40,10 @@ NTSC      = 0           ; -Wa -DNTSC=1: 6567R8, 65-cycle lines (one more nop a r
 MUSIC     = NTSC        ; call the tune (resident at $1000, play $1003) 5 frames in 6: the cartridge
 .endif
 MC        = $03ff       ; the tune's frame counter, shared by all the parts that play it
+        .include "goldchain.inc"
+.ifndef ENDF
+ENDF      = 0           ; CHAIN: frames to show before the switch to the next routine (0: for ever)
+.endif
 MUSIC_PLAY = $1003
 PADSIZE   = 7 + NTSC    ; bytes of padding per row (see below)
 ROWSIZE   = SEGS*SEGSIZE + PADSIZE  ; 47 bytes
@@ -101,6 +105,7 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 
 ; =============================================================================
 .segment "ZEROPAGE"
+runf:    .res 2         ; CHAIN: frames shown
 orbit:   .res 1         ; bar bob angle
 tw:      .res 1         ; frames of the hand-over so far (0 .. TRANS)
 wv:      .res 1         ; its weight 0 .. 255 (goldlight's -> goldorbit's)
@@ -207,7 +212,7 @@ start:  sei
         lda #$0b                ; DEN=0 for now; bit 7 = 0
         sta VIC_CTRL1
         lda #DENLINE
-        sta VIC_RASTER
+        SETIRQ
         lda #$01
         sta VIC_IRQEN           ; raster IRQ only
         sta VIC_IRQ
@@ -237,9 +242,28 @@ start:  sei
         sta tw
 .endif
         jsr update              ; first frame
+resume:                         ; (CHAIN: the image is a snapshot taken here)
         cli
 main:   lda frame               ; the bar has been drawn: build the next frame
-        beq main
+        bne @go
+        .if CHAIN
+        jsr BGSTEP              ; idle: load the next routine
+        .endif
+        jmp main
+@go:
+        .if CHAIN && ENDF
+        inc runf                ; frames shown: on to the next routine after ENDF
+        bne :+
+        inc runf+1
+:       lda runf
+        cmp #<ENDF
+        bne :+
+        lda runf+1
+        cmp #>ENDF
+        bne :+
+        jmp BGSWITCH            ; (it calls the tune)
+:
+        .endif
         lda #0
         sta frame
         jsr update
@@ -780,7 +804,7 @@ irqtop: pha
         lda y0
         sec
         sbc #2                  ; 2 lines above the bar
-        sta VIC_RASTER
+        SETIRQ
         asl VIC_IRQ
         pla
         rti
@@ -860,7 +884,7 @@ blockend:
         lda #>irqtop
         sta $ffff
         lda #DENLINE
-        sta VIC_RASTER
+        SETIRQ
         asl VIC_IRQ
 
         inc frame               ; main loop: build the next frame (irqtop may cut in)
@@ -872,10 +896,6 @@ blockend:
 
 ; =============================================================================
 .segment "TABLES"
-
-        .include "tables.inc"   ; spectab etc. (page aligned, see gen_tables)
-        .include "light.inc"    ; lkbase0..4, lx4tab
-        .include "orbit.inc"    ; orby, orbz, orbsize, balls
         .assert <spectab = 0, error, "spectab must be page aligned"
 
 .segment "RAMPS"
@@ -892,3 +912,4 @@ cols:   .res 2*SEGS*(2*PAD+BARH)
 
 .segment "HIGHTAB"               ; CPU-only: above the VIC bank
         .include "hlrun.inc"    ; hlo, hhi: the highlight runs
+        .include "goldshared.inc"

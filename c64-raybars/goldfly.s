@@ -60,6 +60,10 @@ NTSC      = 0           ; -Wa -DNTSC=1: 6567R8, 65-cycle lines (each row loop 2 
 MUSIC     = NTSC        ; call the tune (resident at $1000, play $1003) 5 frames in 6: the cartridge
 .endif
 MC        = $03ff       ; the tune's frame counter, shared by all the parts that play it
+        .include "goldchain.inc"
+.ifndef ENDF
+ENDF      = 0           ; CHAIN: frames to show before the switch to the next routine (0: for ever)
+.endif
 MUSIC_PLAY = $1003
 XL        = 2*NTSC      ; extra cycles a row
 ; (NTSC: the frame build + the tune fit in the 360 frames goldfly runs in the cartridge, 97 % at worst with the dearest
@@ -113,6 +117,7 @@ theta2    = theta2_12
 
 ; =============================================================================
 .segment "ZEROPAGE"
+runf:    .res 2         ; CHAIN: frames shown
 ptr:     .res NSLOT*SEGS*2      ; live column pointers (read by the bars)
 frameflag: .res 1               ; top IRQ: start building the next frame
 ready:   .res 1                 ; main loop: next frame is built
@@ -275,15 +280,33 @@ start:  sei
         lda #$0b
         sta VIC_CTRL1
         lda #DENLINE
-        sta VIC_RASTER
+        SETIRQ
         lda #$01
         sta VIC_IRQEN
         sta VIC_IRQ
         jsr build               ; first frame
+resume:                         ; (CHAIN: the image is a snapshot taken here)
         cli
-
 main:   lda frameflag           ; the top IRQ has swapped in the last frame
-        beq main
+        bne @go
+        .if CHAIN
+        jsr BGSTEP              ; idle: load the next routine
+        .endif
+        jmp main
+@go:
+        .if CHAIN && ENDF
+        inc runf                ; frames shown: on to the next routine after ENDF
+        bne :+
+        inc runf+1
+:       lda runf
+        cmp #<ENDF
+        bne :+
+        lda runf+1
+        cmp #>ENDF
+        bne :+
+        jmp BGSWITCH            ; (it calls the tune)
+:
+        .endif
         lda #0
         sta frameflag
         jsr build
@@ -1309,7 +1332,7 @@ noswap:
         jsr nextbar
         jmp out
 notbar: lda #DENLINE
-        sta VIC_RASTER
+        SETIRQ
 out:    asl VIC_IRQ
         lda save_a
         ldx save_x
@@ -1324,7 +1347,7 @@ nextbar:
         adc sbase
         tax
         lda sline,x
-        sta VIC_RASTER
+        SETIRQ
         lda sentlo,x
         sta curvec
         lda senthi,x
@@ -1490,7 +1513,7 @@ last:   lda #<irqtop
         lda #>irqtop
         sta $ffff
         lda #DENLINE
-        sta VIC_RASTER
+        SETIRQ
 bout:   lda save_a
         ldx save_x
         ldy save_y
@@ -1498,8 +1521,6 @@ bout:   lda save_a
 
 ; =============================================================================
 .segment "TABLES"
-        .include "tables.inc"   ; spectab, theta2_12, log2/atan
-        .include "orbit.inc"    ; balls
         .include "fly.inc"      ; FLYD, flight tables, spawn cycles, dimmed palettes
         .assert <spectab = 0, error, "spectab must be page aligned"
 
@@ -1549,7 +1570,6 @@ n2ehi:  .hibytes n2e_0, n2e_1, n2e_2
 
 ; =============================================================================
 .segment "TABLES"
-        .include "hlrun.inc"    ; hlo, hhi: the highlight runs
 
 .segment "BSS"
 tbag:   .res NTILT              ; tilt ring, oldest shown first
@@ -1610,3 +1630,7 @@ hi:     .res 1
 cols:   .res 2*NSLOT*SEGS*256   ; a page per column, 2 buffers
         .assert <cols = 0, error, "cols must be page aligned"
         .assert * <= VICBANK, error, "program runs into the VIC bank"
+
+.segment "HLRUN"                 ; CPU-only (the NTSC cartridge: $4000, shared)
+        .include "hlrun.inc"    ; hlo, hhi: the highlight runs
+        .include "goldshared.inc"

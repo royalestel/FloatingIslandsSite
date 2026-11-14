@@ -50,6 +50,10 @@ FREEZE    = 0
 MUSIC     = NTSC        ; call the tune (resident at $1000, play $1003) 5 frames in 6: the cartridge
 .endif
 MC        = $03ff       ; the tune's frame counter, shared by all the parts that play it
+        .include "goldchain.inc"
+.ifndef ENDF
+ENDF      = 0           ; CHAIN: frames to show before the switch to the next routine (0: for ever)
+.endif
 MUSIC_PLAY = $1003
 ROWSBT    = 56          ; bar B's rows: 48 lines + 8 lines of slant
 .if NTSC
@@ -133,6 +137,7 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 
 ; =============================================================================
 .segment "ZEROPAGE"
+runf:    .res 2         ; CHAIN: frames shown
 orbit:   .res 1         ; bar A bob angle
 fcnt:    .res 2         ; frames since the start (16 bit): the fly-out begins at FLYAT
 fo:      .res 1         ; fly-out frame (0 = not yet; FLYT = done)
@@ -301,7 +306,7 @@ start:  sei
         lda #$0b                ; DEN=0 for now; bit 7 = 0
         sta VIC_CTRL1
         lda #DENLINE
-        sta VIC_RASTER
+        SETIRQ
         lda #$01
         sta VIC_IRQEN           ; raster IRQ only
         sta VIC_IRQ
@@ -342,15 +347,38 @@ start:  sei
 .endif
         jsr update              ; first frame
         jsr updateb
+resume:                         ; (CHAIN: the image is a snapshot taken here)
         cli
-
 main:   lda frame               ; bar A has been drawn: build the next
-        beq main                ; sprite and bar A (bar B's IRQ may cut in)
+        bne @go
+        .if CHAIN
+        jsr BGSTEP              ; idle: load the next routine
+        .endif
+        jmp main
+@go:
+        .if CHAIN && ENDF
+        inc runf                ; frames shown: on to the next routine after ENDF
+        bne :+
+        inc runf+1
+:       lda runf
+        cmp #<ENDF
+        bne :+
+        lda runf+1
+        cmp #>ENDF
+        bne :+
+        jmp BGSWITCH            ; (it calls the tune)
+:
+        .endif
         lda #0
         sta frame
         jsr update
-:       lda frameb              ; bar B has been drawn: build the next bar B
-        beq :-
+@wb:    lda frameb              ; bar B has been drawn: build the next bar B
+        bne @gb
+        .if CHAIN
+        jsr BGSTEP
+        .endif
+        jmp @wb
+@gb:
         lda #0
         sta frameb
         jsr updateb
@@ -1404,7 +1432,7 @@ irqtop: pha
         lda y0
         sec
         sbc #2                  ; 2 lines above bar A
-        sta VIC_RASTER
+        SETIRQ
         asl VIC_IRQ
         pla
         rti
@@ -1479,7 +1507,7 @@ blockend:
         lda #>irqb1
         sta $ffff
         lda #BTOP - 2
-        sta VIC_RASTER
+        SETIRQ
         asl VIC_IRQ
         inc frame               ; main loop: build the next sprite + bar A
         lda save_a
@@ -1555,7 +1583,7 @@ blockbend:
         lda #>irqtop
         sta $ffff
         lda #DENLINE
-        sta VIC_RASTER
+        SETIRQ
         asl VIC_IRQ
         inc frameb              ; main loop: build the next bar B
         lda save_a
@@ -1565,12 +1593,7 @@ blockbend:
 
 ; =============================================================================
 .segment "TABLES"
-
-        .include "tables.inc"   ; spectab etc. (page aligned, see gen_tables)
-        .include "light.inc"    ; lx4tab
-        .include "orbit.inc"    ; orby, orbz, orbsize, balls
         .include "handoff.inc"  ; goldfly's first bar (the replay)
-        .include "hlrun.inc"    ; hlo, hhi: the highlight runs
         .include "twin.inc"     ; bar B: height, clip, brightness, depth, steps
         .assert <spectab = 0, error, "spectab must be page aligned"
 
@@ -1621,3 +1644,7 @@ rsrc:   .res BCOLSIZE           ; source line of each bcol position
 rowscr: .res ROWSIZE            ; NTSC: the scratch row
 .endif
         .assert * <= VICBANK, error, "program runs into the VIC bank"
+
+.segment "HLRUN"                 ; CPU-only (the NTSC cartridge: $4000, shared)
+        .include "hlrun.inc"    ; hlo, hhi: the highlight runs
+        .include "goldshared.inc"
