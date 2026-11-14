@@ -68,6 +68,7 @@ INTRO     = CHAIN       ; the cartridge's start (intro.inc, gen_intro.py): goldf
 FADEBLK   = $88         ; intro.inc's sprite blocks ($A000-): the balls $80-$87 (goldfly's light: $87), the fading ship $88-$8B
 LIGHTBLK  = $87
 FSTEP     = 4           ; the front's speed: (d >> 8) a frame, from DFAR >> 8 to 0
+LOOPAT    = 600         ; INTRO: the frame of the full flight the teardrop loop starts on
 RUNFRAMES = 1800        ; INTRO: frames of full flight (30 s at 60 Hz) before the bars leave again
 APN       = 10          ; the autopilot looks this many rows ahead
 APSAFE    = 28          ; ... and keeps its heading while the clearance (units of 1/16 m) is at least this
@@ -275,6 +276,7 @@ nrec:    .res 1
 .if INTRO
 tmr:     .res 2         ; frames of full flight so far
 ending:  .res 1         ; the bars are leaving
+looping: .res 1         ; the teardrop loop: 0 not flying it, 1 on the way up, 2 past the top
 aptgh:   .res 1         ; the autopilot's target heading (high byte of the angle; its low byte is 0)
 apd:     .res 1
 apk:     .res 1
@@ -395,6 +397,7 @@ start:  sei
         sta tmr
         sta tmr+1
         sta ending
+        sta looping
         lda #<(DFAR >> 8)       ; no bars yet
         sta dfl
         lda #>(DFAR >> 8)
@@ -661,6 +664,14 @@ introtick:
 @run:   inc tmr                 ; full flight: RUNFRAMES vertical blanks
         bne :+
         inc tmr+1
+:       lda tmr+1               ; the teardrop loop at LOOPAT
+        cmp #>LOOPAT
+        bne :+
+        lda tmr
+        cmp #<LOOPAT
+        bne :+
+        lda #1
+        sta looping
 :       lda tmr+1
         cmp #>RUNFRAMES
         bne @out
@@ -970,7 +981,10 @@ build:  lda fcount               ; frames since the last build: move that far
         sta spnl
         sta spnh
         .if INTRO
+        lda looping             ; (not while it flies the loop)
+        bne :+
         jsr autopilot
+:
         .endif
 @st:    jsr controls
         lda spnl
@@ -1071,7 +1085,28 @@ controls:
         .if INTRO
         lda #0                  ; the autopilot flies (no joystick, no boost)
         sta joy
-        jsr aprate
+        lda looping
+        beq @auto
+        ldy angh                ; the teardrop loop: pitch up at ratetab's rate (slow at the bottom, quick over the top) until the angle has come round
+        cmp #1
+        bne @past
+        cpy #128
+        bcc @lp
+        cpy #192
+        bcs @lp
+        lda #2
+        sta looping
+        jmp @lp
+@past:  cpy #252
+        bcs @lpend
+        cpy #3
+        bcs @lp
+@lpend: lda #0
+        sta looping
+        beq @auto
+@lp:    ldx ratetab,y
+        jmp @tx
+@auto:  jsr aprate
         jmp @tx
         .endif
         lda $dc00
