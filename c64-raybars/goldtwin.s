@@ -335,6 +335,10 @@ start:  sei
         lda #PH_TW
         sta tw
 .endif
+.ifdef PH_LXF
+        lda #PH_LXF
+        sta lxf
+.endif
 .ifdef PH_BT
         lda #PH_BT
         sta bt
@@ -1593,7 +1597,6 @@ blockbend:
 
 ; =============================================================================
 .segment "TABLES"
-        .include "handoff.inc"  ; goldfly's first bar (the replay)
         .include "twin.inc"     ; bar B: height, clip, brightness, depth, steps
         .assert <spectab = 0, error, "spectab must be page aligned"
 
@@ -1629,6 +1632,8 @@ rowhi:  .repeat ROWSBT, RR
         .endrep
 
 ; =============================================================================
+        .include "handoff.inc"  ; goldfly's first bar (the replay)
+
 .segment "BSS"
 ; Bar A: 2 columns per segment (even / odd display rows), COLLEN entries
 ; each: PAD black, 24 gold-or-white, PAD black.
@@ -1643,7 +1648,7 @@ rsrc:   .res BCOLSIZE           ; source line of each bcol position
 .if ROWSB < ROWSBT
 rowscr: .res ROWSIZE            ; NTSC: the scratch row
 .endif
-        .assert * <= VICBANK, error, "program runs into the VIC bank"
+        .assert CHAIN || (* <= VICBANK), error, "program runs into the VIC bank"
 
 .segment "HLRUN"                 ; CPU-only (the NTSC cartridge: $4000, shared)
         .include "hlrun.inc"    ; hlo, hhi: the highlight runs

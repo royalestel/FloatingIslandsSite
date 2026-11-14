@@ -87,7 +87,9 @@ BAND1     = SPRY + 21   ;   lines are one later)
 SEP       = 6           ; bars closer than this (lines) share one IRQ block
 HLTHR     = 3           ; highlight: white from spec level 3 (+ segment drop)
 VICBANK   = $8000
-SPRBUF    = VICBANK + $0000
+.ifndef SPRBUF
+SPRBUF    = VICBANK + $0000   ; (the NTSC cartridge: $8080, clear of goldtwin's buffers)
+.endif
 SPRPTR    = VICBANK + $0400 + $03f8
 IDLEBYTE  = VICBANK + $3fff
 SPRX      = 184 - 12    ; ball centred on the screen
@@ -183,7 +185,7 @@ save_y:  .res 1
 .segment "CODE"
 
 start:  sei
-        .assert * = 2062, error, "SYS 2061 must land on start"
+        .assert CHAIN || * = 2062, error, "SYS 2061 must land on start"
         lda #$7f
         sta CIA1_ICR
         sta CIA2_ICR

@@ -9,7 +9,7 @@ frame of the one before it (no gap).  The tune (Alpha, $1000-$2A33) plays throug
 | area | contents |
 |---|---|
 | $0002-$007F | the running routine's zero page (restored from its image at the switch) |
-| $00F0-$00F6 | background loader state; $00EF `nirq`: the line the next raster IRQ is set for (every routine keeps it) |
+| $00E7-$00F7 | background loader state (the record $E7-$EE, job $F0, done $F2, pointers $F4/$F6); $00EF `nirq`: the line the next raster IRQ is set for (every routine keeps it) |
 | $00FE-$00FF | the tune |
 | $0200-$02FF | cart loader (`jmp $0200` = load the next part, the old way) |
 | $0300-$03FF | background loader (`bgstep`), the switch (`bgswitch`), the job list, the tune counter `mc` ($03FF) |

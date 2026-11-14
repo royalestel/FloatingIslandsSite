@@ -62,8 +62,10 @@ HTUNE     = 0           ; extra NOPs to line the first split up with hblank
 .ifndef STEAL
 STEAL     = 4 + NTSC    ; cycles a row is shortened by on sprite lines: 4 or 6 (PAL), 5 (NTSC: VICE 6567R8, no shift at all)
 .endif
-SPRBUF0   = $3e00       ; sprite double buffer (pointers $f8 / $fc)
+.ifndef SPRBUF0
+SPRBUF0   = $3e00       ; sprite double buffer (pointers $f8 / $fc; the NTSC cartridge: $0400 / $0440, clear of goldlight's sprites)
 SPRBUF1   = $3f00
+.endif
 SPRPTR    = $07f8       ; sprite 0 pointer (screen at $0400)
 
 ; padding: [bcs/bcc +SKIP] [inc $ea] [nop nop nop]
@@ -577,13 +579,14 @@ common:
         lda #<(SPRBUF0/64)      ; shown now: buffer 1 -> draw into buffer 0
         sta lptr
         lda #>SPRBUF0
+        ldx #<SPRBUF0
         bne setdst
 use1:   lda #<(SPRBUF1/64)
         sta lptr
         lda #>SPRBUF1
+        ldx #<SPRBUF1
 setdst: sta dst+1
-        lda #0
-        sta dst
+        stx dst
 
         ; rows hidden: only when behind (dz < 0).  The bar's lines for the
         ; segment under the ball are y0 + off .. y0 + off + 23; sprite row j
@@ -908,7 +911,7 @@ gold:   .byte 9,8,12,7,7,0,9,8,15,7,7,1,7,1,7,0,0,0,9,12,10,12,8,9
 ; 2 columns per segment (even / odd display rows), 36 entries each:
 ; 6 black, 24 gold-or-white, 6 black.
 cols:   .res 2*SEGS*(2*PAD+BARH)
-        .assert * <= SPRBUF0, error, "program overlaps the sprite buffers"
+        .assert * <= SPRBUF0 || SPRBUF0 < $0800, error, "program overlaps the sprite buffers"
 
 .segment "HIGHTAB"               ; CPU-only: above the VIC bank
         .include "hlrun.inc"    ; hlo, hhi: the highlight runs

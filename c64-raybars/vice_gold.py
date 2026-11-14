@@ -52,7 +52,7 @@ def vcmd(s, c, wait=0.4):
     return out.decode(errors="replace")
 
 def shots(crt, times, prefix):
-    proc = subprocess.Popen(["xvfb-run", "-a", "x64sc", "+sound", "-warp", "-VICIIfilter", "0", "-VICIIextpal", "-VICIIpalette", "colodore",
+    proc = subprocess.Popen(["xvfb-run", "-a", "x64sc", "+sound"] + (["-warp"] if os.environ.get("WARP", "1") == "1" else []) + [ "-VICIIfilter", "0", "-VICIIextpal", "-VICIIpalette", "colodore",
                              "-VICIImodel", os.environ.get("VICII", "6567"), "-remotemonitor", "-remotemonitoraddress", f"ip4://127.0.0.1:{PORT}", "-cartcrt", crt],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     files = []

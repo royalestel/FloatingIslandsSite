@@ -170,11 +170,12 @@ start:  sei
         sta GROWBASE,x
         inx
         bne @g0
-        ldx #191
+        ldx #191                ; (191 down to 0: X > 127, so not bpl)
 @g1:    lda grow+256,x
         sta GROWBASE+256,x
         dex
-        bpl @g1
+        cpx #$ff
+        bne @g1
         lda growptr             ; stage 0: a small yellow dot
         sta SPRPTR
         lda $dd02               ; VIC bank 0 ($0000-$3fff): the bank bits are outputs, both high
@@ -668,7 +669,7 @@ gold:   .byte 9,8,12,7,7,0,9,8,15,7,7,1,7,1,7,0,0,0,9,12,10,12,8,9
 ; 2 columns per segment (even / odd display rows), 36 entries each:
 ; 6 black, 24 gold-or-white, 6 black.
 cols:   .res 2*SEGS*(2*PAD+BARH)
-        .assert * <= GROWBASE, error, "program overlaps the sprite data"
+        .assert CHAIN || (* <= GROWBASE), error, "program overlaps the sprite data"
 
 .segment "HIGHTAB"               ; CPU-only: above the VIC bank
         .include "hlrun.inc"    ; hlo, hhi: the highlight runs

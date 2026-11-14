@@ -8,7 +8,7 @@
 ;     $FF, start lo, start hi                                     the next routine's swstart (bgswitch jumps there)
 ;
 ;  bgstep   ($0300, jsr): from a routine's idle loop.  Copies 32 bytes of the
-;           next routine's image if the next raster IRQ (NIRQ) is at least 13
+;           next routine's image if the next raster IRQ (NIRQ) is at least 20
 ;           lines away; with interrupts off, $01 = $37 (the cartridge visible).
 ;  bgswitch ($0303, jmp): at a routine's end, interrupts off: copies whatever
 ;           is left up to the barrier (the switch-time records: zero page,
@@ -17,14 +17,16 @@
 ;  tick     ($0306, jsr): the tune, 5 calls in 6 frames (the counter MC).
 ; =============================================================================
 NIRQ    = $ef           ; the line the next raster IRQ is set for (every chained routine keeps it)
-JOB     = $f0           ; record being copied
-DONE    = $f1           ; 2: bytes of it copied
-SRC     = $f3           ; 2
-DST     = $f5           ; 2
+JOB     = $f0           ; 2: the record being copied ($8000 + 8 x its index)
+DONE    = $f2           ; 2: bytes of it copied
+SRC     = $f4           ; 2
+DST     = $f6           ; 2
 MC      = $03ff
+rec     = $e7           ; 7: the record being copied
+n       = $ee           ; bytes this chunk
 MUSIC_PLAY = $1003
-CHUNK   = 32            ; bytes per bgstep: 32 x 16 cycles + ~170 = ~11 lines
-MINLINES = 13
+CHUNK   = 24            ; bytes per bgstep: 24 x 18 cycles + ~170 = ~600 cycles, 9-10 lines
+MINLINES = 20          ; ... started only this far from the next raster IRQ (a late irq1 breaks the double IRQ)
 
 .segment "BGLOAD"
 bgstep:   jmp step
@@ -38,20 +40,24 @@ tick:     inc MC
         rts
 :       jmp MUSIC_PLAY
 
-step:   php
+step:   jsr far             ; (checked with interrupts on: polling near an IRQ line must not delay it)
+        bcc @out
+        php
         sei
-        lda $d011
-        bmi @go                 ; raster >= 256: the next IRQ (always < 256) is next frame
+        jsr far                 ; (again: an IRQ may have come in between)
+        bcc :+
+        jsr chunk
+:       plp
+@out:   rts
+far:    lda $d011               ; C = 1: the next raster IRQ is MINLINES or more lines away
+        bmi @y                  ; raster >= 256: the next IRQ (always < 256) is next frame
         lda NIRQ
         sec
         sbc $d012
-        bcc @go                 ; it has passed: next frame
+        bcc @y                  ; it has passed: next frame
         cmp #MINLINES
-        bcs @go
-        plp
         rts
-@go:    jsr chunk
-        plp
+@y:     sec
         rts
 
 switch: sei
@@ -62,34 +68,24 @@ switch: sei
         lda rec
         cmp #$ff
         beq @start
-        inc JOB                 ; the $FD marker: on
+        jsr next                ; the $FD marker: on
         jmp @l
-@start: inc JOB
+@start: jsr next
+        lda MC
+        cmp #$ff                ; (goldboot: no tune yet)
+        beq :+
         jsr tick
-        jmp (rec+1)
+:       jmp (rec+1)
 
 ; chunk: C = 1 (nothing copied) at a marker, else up to CHUNK bytes of record JOB
-chunk:  lda #0                  ; the record: bank 0, $8000 + 8 * JOB
+chunk:  lda #0                  ; the record: bank 0, at JOB
         sta $de00
-        lda JOB
-        asl
-        asl
-        asl
-        sta @fs+1
-        lda JOB
-        lsr
-        lsr
-        lsr
-        lsr
-        lsr
-        ora #$80
-        sta @fs+2
         lda #$37
         sta $01
-        ldx #6
-@fs:    lda $8000,x
-        sta rec,x
-        dex
+        ldy #6
+@fs:    lda (JOB),y
+        sta rec,y
+        dey
         bpl @fs
         lda #$35
         sta $01
@@ -145,13 +141,18 @@ chunk:  lda #0                  ; the record: bank 0, $8000 + 8 * JOB
         lda DONE+1
         cmp rec+6
         bne @more
-        inc JOB                 ; record done
-        lda #0
-        sta DONE
-        sta DONE+1
+        jsr next                ; record done
 @more:  clc
         rts
+next:   lda JOB
+        clc
+        adc #8
+        sta JOB
+        bcc :+
+        inc JOB+1
+:       lda #0
+        sta DONE
+        sta DONE+1
+        rts
 
-rec:    .res 7
-n:      .res 1
         .assert * <= $03ff, error, "bgload runs into MC ($03ff)"
