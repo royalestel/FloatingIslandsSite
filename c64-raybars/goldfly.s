@@ -587,13 +587,6 @@ slot:   stx s
 :       jmp hidden
 @go:    inc st,x
         lda st,x
-        .if ::FLYOFF
-        ldy stopping            ; (FLYOFF: the last bars are gone before the near-clip frame: it is a torn, ragged one)
-        beq :+
-        cmp #FLYD - 2
-        bcs @end
-:
-        .endif
         cmp #FLYD
         bcc alive
 @end:
