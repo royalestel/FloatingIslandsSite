@@ -68,6 +68,14 @@ INTRO     = CHAIN       ; the cartridge's start (intro.inc, gen_intro.py): goldf
 FADEBLK   = $88         ; intro.inc's sprite blocks ($A000-): the balls $80-$87 (goldfly's light: $87), the fading ship $88-$8B
 LIGHTBLK  = $87
 FSTEP     = 4           ; the front's speed: (d >> 8) a frame, from DFAR >> 8 to 0
+RUNFRAMES = 1800        ; INTRO: frames of full flight (30 s at 60 Hz) before the bars leave again
+APN       = 10          ; the autopilot looks this many rows ahead
+APSAFE    = 28          ; ... and keeps its heading while the clearance (units of 1/16 m) is at least this
+.if INTRO
+BANDL     = 150         ; window lines 0..BANDL-1 show bars: the rest (raster line 62 + BANDL on) stays black
+.else
+BANDL     = NLINES
+.endif
 .ifndef STEAL
 STEAL     = 7           ; cycles the ship's two sprites take from a line (VICE check for NTSC)
 .endif
@@ -264,6 +272,20 @@ bss:     .res NBLKMAX
 dline:   .res NBLKMAX   ; blocks shown
 dss:     .res NBLKMAX
 nrec:    .res 1
+.if INTRO
+tmr:     .res 2         ; frames of full flight so far
+ending:  .res 1         ; the bars are leaving
+aptgh:   .res 1         ; the autopilot's target heading (high byte of the angle; its low byte is 0)
+apd:     .res 1
+apk:     .res 1
+apci:    .res 1
+apj:     .res 1
+apmag:   .res 1
+apsgn:   .res 1
+apmin:   .res 1
+apdz:    .res APN       ; z distance of the rows ahead
+apsc:    .res 17        ; clearance on each candidate heading
+.endif
 
 ; =============================================================================
 .segment "LOADADDR"
@@ -369,6 +391,10 @@ start:  sei
         lda #LIGHTBLK
         sta SPRPTR
         sta SPRPTR+1
+        lda #0
+        sta tmr
+        sta tmr+1
+        sta ending
         lda #<(DFAR >> 8)       ; no bars yet
         sta dfl
         lda #>(DFAR >> 8)
@@ -400,7 +426,159 @@ main:   lda copied
 nmi:    rti
 
 .if INTRO
-; introtick (the vertical blank): the intro's sprites for the next frame, then the front
+        .segment "CODE2"
+; ----------------------------------------------------------------------------
+;  The autopilot (the cartridge's cosmicstrings): keeps the ship clear of the bars.  17 headings (-8..8 steps of $0300 = 4.2 degrees):
+;  for each, the ship's height at each of the next APN rows (cyi + slope * distance) against that row's bar (hy): the heading's score is
+;  its smallest gap.  The heading nearest the current one is kept while its score is at least APSAFE, else the best one is taken.
+;  aprate: the pitch rate that turns toward the chosen heading.
+autopilot:
+        lda #ROWSP              ; z distance of rows kc+1 ..
+        sec
+        sbc czi
+        ldx #0
+@dz:    sta apdz,x
+        clc
+        adc #ROWSP
+        inx
+        cpx #APN
+        bcc @dz
+        ldy #0
+@cand:  sty apk
+        tya
+        sec
+        sbc #8                  ; i = k - 8
+        sta apsgn
+        bpl :+
+        eor #$ff
+        clc
+        adc #1
+:       tax
+        lda apslope,x
+        sta apmag
+        jsr apscore
+        ldy apk
+        sta apsc,y
+        iny
+        cpy #17
+        bcc @cand
+        lda #$ff                ; the candidate nearest the current heading
+        sta apd
+        ldy #16
+@n:     lda angh
+        sec
+        sbc apch,y
+        bpl :+
+        eor #$ff
+        clc
+        adc #1
+:       cmp apd
+        bcs :+
+        sta apd
+        sty apci
+:       dey
+        bpl @n
+        ldy apci
+        lda apsc,y
+        cmp #APSAFE
+        bcs @keep
+        lda #0                  ; else the best score
+        sta apd
+        ldy #16
+@b:     lda apsc,y
+        cmp apd
+        bcc :+
+        sta apd
+        sty apci
+:       dey
+        bpl @b
+        ldy apci
+@keep:  lda apch,y
+        sta aptgh
+        rts
+
+; the smallest gap on the path with slope apmag (sign in apsgn bit 7)
+apscore:
+        lda #$7f
+        sta apmin
+        ldx #0
+@j:     stx apj
+        lda apdz,x
+        sta ma
+        lda apmag
+        sta mb
+        jsr mul8                ; m1 = slope * distance (units)
+        lda apsgn
+        bmi @neg
+        lda cyi
+        clc
+        adc m1
+        jmp @y
+@neg:   lda cyi
+        sec
+        sbc m1
+@y:     sta t0                  ; the path's height at this row
+        lda kc
+        clc
+        adc apj
+        tax
+        lda hy+1,x              ; row kc + 1 + j
+        sec
+        sbc t0
+        bpl :+
+        eor #$ff
+        clc
+        adc #1
+:       cmp apmin
+        bcs :+
+        sta apmin
+:       ldx apj
+        inx
+        cpx #APN
+        bcc @j
+        lda apmin
+        rts
+
+; X = the target pitch rate: toward the heading aptgh:0, (error >> 5) limited to +-RMAX
+aprate: lda #0
+        sec
+        sbc angl
+        sta t0
+        lda aptgh
+        sbc angh
+        sta t0+1
+        ldx #5
+@s:     cmp #$80
+        ror t0+1
+        ror t0
+        lda t0+1
+        dex
+        bne @s
+        lda t0+1                ; high byte: 0 or $ff means it fits
+        beq @pos
+        cmp #$ff
+        beq @neg
+        bmi @lo
+@hi:    ldx #RMAX
+        rts
+@lo:    ldx #<(-RMAX)
+        rts
+@pos:   lda t0
+        cmp #RMAX + 1
+        bcs @hi
+        tax
+        rts
+@neg:   lda t0
+        cmp #<(-RMAX)
+        bcc @lo
+        tax
+        rts
+
+apslope: .byte 0,19,38,57,78,99,121,145,171
+apch:    .byte 232,235,238,241,244,247,250,253,0,3,6,9,12,15,18,21,24
+
+        .segment "CODE"
+; introtick (the vertical blank): the intro's sprites for the next frame, then the front, then the 30 s of flight and the bars leaving
 introtick:
         ldy intro
         bne :+
@@ -464,9 +642,11 @@ introtick:
         lda #4
         sta $d025
 @out:   rts
-@front: lda dfl                 ; the bars come in: the front moves toward the camera
+@front: lda ending
+        bne @recede
+        lda dfl                 ; the bars come in: the front moves toward the camera
         ora dfh
-        beq @out
+        beq @run
         lda dfl
         sec
         sbc #FSTEP
@@ -476,6 +656,36 @@ introtick:
         bpl @out
         lda #0
         sta dfl
+        sta dfh
+        rts
+@run:   inc tmr                 ; full flight: RUNFRAMES vertical blanks
+        bne :+
+        inc tmr+1
+:       lda tmr+1
+        cmp #>RUNFRAMES
+        bne @out
+        lda tmr
+        cmp #<RUNFRAMES
+        bne @out
+        lda #1
+        sta ending
+        rts
+@recede:                        ; the bars leave: the front moves out again (the nearest first), the ship flies on alone
+        lda dfl
+        clc
+        adc #FSTEP
+        sta dfl
+        bcc :+
+        inc dfh
+:       lda dfh
+        cmp #>(DFAR >> 8)
+        bcc @out
+        lda dfl
+        cmp #<(DFAR >> 8)
+        bcc @out
+        lda #<(DFAR >> 8)
+        sta dfl
+        lda #>(DFAR >> 8)
         sta dfh
         rts
         .include "intro.inc"
@@ -759,6 +969,9 @@ build:  lda fcount               ; frames since the last build: move that far
         lda #0                  ; the distance: speed summed over the frames
         sta spnl
         sta spnh
+        .if INTRO
+        jsr autopilot
+        .endif
 @st:    jsr controls
         lda spnl
         clc
@@ -843,25 +1056,26 @@ shl1:   clc
         bit shift
         bmi @n
         bcs @hi                 ; past 255
-        cmp #NLINES
+        cmp #BANDL
         bcc @x
-@hi:    lda #NLINES
+@hi:    lda #BANDL
 @x:     rts
 @n:     bcs :+                  ; below 0
         lda #0
-:       cmp #NLINES
+:       cmp #BANDL
         bcs @hi
         rts
 
 ; joystick: pitch rate and speed, eased
 controls:
         .if INTRO
-        lda #$ff                ; (no steering in the intro)
-        ldx intro
-        bne :+
+        lda #0                  ; the autopilot flies (no joystick, no boost)
+        sta joy
+        jsr aprate
+        jmp @tx
         .endif
         lda $dc00
-:       eor #$ff
+        eor #$ff
         and #$1f
         sta joy
         ldx #0                  ; target rate
@@ -871,7 +1085,8 @@ controls:
 :       lsr a                   ; bit 1 down: nose up
         bcc :+
         ldx #RMAX
-:       stx t0
+:
+@tx:    stx t0
         lda t0                  ; ease toward the target (signed: biased)
         eor #$80
         sta t0+1
@@ -1693,15 +1908,15 @@ project:
         bmi @tneg
         bne @off2
         lda tl                  ; 0 <= top
-        cmp #NLINES
+        cmp #BANDL
         bcs @off2
         sta aa
         clc
         adc hh
         bcs @full
-        cmp #NLINES
+        cmp #BANDL
         bcc @eok
-@full:  lda #NLINES
+@full:  lda #BANDL
 @eok:   sta ee
         jmp @store
 @off2:  rts
@@ -1714,9 +1929,9 @@ project:
         bne @off2
         tya
         beq @off2
-        cmp #NLINES
+        cmp #BANDL
         bcc :+
-        lda #NLINES
+        lda #BANDL
 :       sta ee
         lda #0
         sta aa
@@ -1971,7 +2186,7 @@ sw_loop:
         sta cur
         jmp sw_loop
 sw_done:
-        lda #NLINES             ; the far layer's lines after the last bar
+        lda #BANDL              ; the far layer's lines after the last bar
         jsr heldto
         lda inb
         beq :+
