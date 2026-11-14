@@ -64,6 +64,13 @@ MC        = $03ff       ; the tune's frame counter, shared by all the parts that
 .ifndef ENDF
 ENDF      = 0           ; CHAIN: frames to show before the switch to the next routine (0: for ever)
 .endif
+.ifndef FLYOFF
+FLYOFF    = 0           ; CHAIN: -DFLYOFF=1: ENDF is when the bars stop coming back; the last ones fly off, then the light is alone HOLDF
+.endif                  ;   frames and is handed on (LIGHT2: copied to where cosmicstrings keeps the same ball, the pointer moved there)
+.ifndef LIGHT2
+LIGHT2    = $A1C0
+.endif
+HOLDF     = 10        ; (LIGHT2 not in $9000-$9FFF: the VIC sees the character ROM there)
 MUSIC_PLAY = $1003
 XL        = 2*NTSC      ; extra cycles a row
 ; (NTSC: the frame build + the tune fit in the 360 frames goldfly runs in the cartridge, 97 % at worst with the dearest
@@ -120,6 +127,8 @@ theta2    = theta2_12
 ; =============================================================================
 .segment "ZEROPAGE"
 runf:    .res 2         ; CHAIN: frames shown
+stopping: .res 1        ; FLYOFF: no more bars
+holdf:   .res 1         ; FLYOFF: frames the light has been alone
 ptr:     .res NSLOT*SEGS*2      ; live column pointers (read by the bars)
 frameflag: .res 1               ; top IRQ: start building the next frame
 ready:   .res 1                 ; main loop: next frame is built
@@ -296,7 +305,43 @@ main:   lda frameflag           ; the top IRQ has swapped in the last frame
         .endif
         jmp main
 @go:
-        .if CHAIN && ENDF
+        .if CHAIN && ENDF && FLYOFF
+        inc runf                ; frames shown: from ENDF on no bar comes back
+        bne :+
+        inc runf+1
+:       lda runf+1
+        cmp #>ENDF
+        bcc @run
+        bne @off
+        lda runf
+        cmp #<ENDF
+        bcc @run
+@off:   lda #1
+        sta stopping
+        lda wt                  ; all gone (wt = $ff)?
+        and wt+1
+        and wt+2
+        cmp #$ff
+        bne @run
+        lda holdf
+        bne @h
+        ldx #63                 ; the light alone: its sprite moves to where cosmicstrings has the same ball
+:       lda SPRBUF,x
+        sta LIGHT2,x
+        dex
+        bpl :-
+        lda #<((LIGHT2 - VICBANK)/64)
+        sta SPRPTR
+@h:     inc holdf
+        lda holdf
+        cmp #HOLDF
+        bne @run
+        sei
+        lda #$7b                ; the light stays on through the switch: the display on (VICE shows no sprites with DEN off all
+        sta VIC_CTRL1           ;   frame) in an invalid mode (ECM + BMM: all black)
+        jmp BGSWITCH            ; (it calls the tune)
+@run:
+        .elseif CHAIN && ENDF
         inc runf                ; frames shown: on to the next routine after ENDF
         bne :+
         inc runf+1
@@ -534,14 +579,26 @@ slot:   stx s
         ldx s
         lda wt,x
         beq @go
+        .if ::FLYOFF
+        cmp #$ff                ; (FLYOFF: gone for good)
+        beq :+
+        .endif
         dec wt,x                ; not started yet
-        jmp hidden
+:       jmp hidden
 @go:    inc st,x
         lda st,x
         cmp #FLYD
         bcc alive
         lda #0
         sta st,x
+        .if ::FLYOFF
+        lda stopping
+        beq :+
+        lda #$ff                ; no more bars: this one is gone
+        sta wt,x
+        jmp hidden
+:
+        .endif
         jsr respawn
 alive:
 

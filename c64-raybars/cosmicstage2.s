@@ -10,17 +10,16 @@ last    = $f9
 tix     = $fa
 ptr     = $fb                   ; 2
 
-s2:     lda #$0b                ; screen off, black, no sprites, no interrupts (the register lists come at the end)
-        sta $d011
+s2:     lda #$7b                ; black, no interrupts (the register lists come at the end); goldfly's light stays: the display stays on
+        sta $d011               ; (VICE shows no sprites with DEN off all frame) in an invalid mode (ECM + BMM: all black)
         lda #0
-        sta $d015
         sta $d01a
         sta $d020
         sta $d021
         lda #$0f
         sta $d019
         sta tix                 ; (0 below)
-        lda $d012
+        jsr rast
         sta last
         lda #0
         sta tix
@@ -49,7 +48,7 @@ s2:     lda #$0b                ; screen off, black, no sprites, no interrupts (
         bne @ld
         inc @ld + 2
         inc @st + 2
-        lda $d012               ; the tune once a frame: the raster has wrapped since the last page
+        jsr rast                ; the tune once a frame: the raster has wrapped since the last page
         cmp last
         sta last
         bcs @np
@@ -73,5 +72,12 @@ s2:     lda #$0b                ; screen off, black, no sprites, no interrupts (
 @fin:   lda #$35
         sta $01
         jmp RESUME
+
+rast:   lda $d011               ; the raster line, lines 256.. as 255 (their low byte would look like a wrap)
+        bmi :+
+        lda $d012
+        rts
+:       lda #$ff
+        rts
 
         .include "cs2tab.inc"   ; tbl, late (generated)

@@ -43,10 +43,13 @@ SEQ = [
         "C3": (0x8000, 0x8400, ["BSS"]),
         "C4": (0x8400, 0x87F8, ["DISP"]),
         "C5": (0x8800, 0x9100, ["SPRITES"]),
-        "C6": (0x9100, 0xA600, ["TABLES2"]),
+        "C6": (0x9100, 0x9E00, ["TABLES2"]),
+        "C9": (0x9E00, 0xA000, ["INTROTAB"]),                   # (the intro: gen_intro.py; its sprites not in $9000-$9FFF: the VIC sees the character ROM there)
+        "CA": (0xA000, 0xA300, ["INTROSPR"]),
+        "CB": (0xA300, 0xA600, ["INTROTAB2"]),
         "C7": (0xA600, 0xBFFF, ["TABLES"]),
         "C8": (0xC800, 0xD000, ["CODE2"])}),
-    ("goldfly", ["SPRBUF=$8080"], 360, {
+    ("goldfly", ["SPRBUF=$8080", "FLYOFF=1", "LIGHT2=$A1C0"], 270, {     # (FLYOFF: from frame 270 the bars fly off, then the light is handed on)
         "F1": (0x5000, 0x6E00, ["RAMPS"]),
         "F2": (0x6E00, 0x8000, ["CODE", "RASTER", "BSS"]),
         "F3": (0x2B00, 0x4000, ["TABLES"]),
@@ -60,7 +63,7 @@ RUNTIME = {
     "goldlight": [(0x3D40, 0x4000), (0x07F8, 0x07F9)],
     "goldorbit": [(0x0400, 0x0480), (0x07F8, 0x07F9), (0x3FFF, 0x4000)],
     "goldtwin": [(0x8000, 0x8080), (0x87F8, 0x87F9), (0xBFFF, 0xC000)],
-    "goldfly": [(0x8080, 0x80C0), (0x87F8, 0x87F9), (0xBFFF, 0xC000)],
+    "goldfly": [(0x8080, 0x80C0), (0x87F8, 0x87F9), (0xBFFF, 0xC000), (0xA1C0, 0xA200)],
 }
 VIC = (0xD000, 0xD02F)
 CIA2 = (0xDD00, 0xDD03)

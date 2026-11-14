@@ -62,6 +62,12 @@ CHAIN     = 0           ; -Wa -DCHAIN=1: a link of the cartridge's gold sequence
 .endif
 MC        = $03ff       ; the tune's frame counter, shared by all the parts that play it
 MUSIC_PLAY = $1003
+.ifndef INTRO
+INTRO     = CHAIN       ; the cartridge's start (intro.inc, gen_intro.py): goldfly's light shrinks and splits into the ship's engine
+.endif                  ;   lights, the ship fades in, then the bars come in from the distance (a depth front: bars nearer are not shown)
+FADEBLK   = $88         ; intro.inc's sprite blocks ($A000-): the balls $80-$87 (goldfly's light: $87), the fading ship $88-$8B
+LIGHTBLK  = $87
+FSTEP     = 4           ; the front's speed: (d >> 8) a frame, from DFAR >> 8 to 0
 .ifndef STEAL
 STEAL     = 7           ; cycles the ship's two sprites take from a line (VICE check for NTSC)
 .endif
@@ -130,6 +136,9 @@ mb:      .res 1
 m0:      .res 1
 m1:      .res 1
 joy:     .res 1
+intro:   .res 1         ; INTRO: the intro's next frame + 1 (0: over)
+dfl:     .res 1         ; INTRO: the front: bars with (d >> 8) below it are not shown
+dfh:     .res 1
 rate:    .res 1         ; pitch rate (signed, x 4 angle units a frame)
 angl:    .res 1         ; view angle (16 bits, 65536 a turn; 0 level)
 angh:    .res 1
@@ -345,6 +354,26 @@ start:  sei
         sta SPRPTR
         lda #SPRBLK + 17
         sta SPRPTR+1
+        .if INTRO
+        lda #1                  ; goldfly's light, as goldfly left it
+        sta intro
+        sta $d015
+        lda #184 - 12
+        sta $d000
+        lda #7
+        sta $d027
+        lda #8
+        sta $d025
+        lda #1
+        sta $d026
+        lda #LIGHTBLK
+        sta SPRPTR
+        sta SPRPTR+1
+        lda #<(DFAR >> 8)       ; no bars yet
+        sta dfl
+        lda #>(DFAR >> 8)
+        sta dfh
+        .endif
         lda #$0b
         sta $d011
         lda #DENLINE
@@ -367,6 +396,89 @@ main:   lda copied
         jmp main
 
 nmi:    rti
+
+.if INTRO
+; introtick (the vertical blank): the intro's sprites for the next frame, then the front
+introtick:
+        ldy intro
+        bne :+
+        jmp @front
+:       dey
+        lda it_p0,y
+        cmp #FADEBLK
+        bcc @ball
+        lda fcount              ; the fading ship: the next frame's parity
+        and #1
+        eor #1
+        asl a
+        adc it_p0,y
+        sta SPRPTR
+        adc #1
+        sta SPRPTR+1
+        jmp @regs
+@ball:  sta SPRPTR
+        sta SPRPTR+1
+@regs:  lda it_x0,y
+        sta $d000
+        lda it_x1,y
+        sta $d002
+        lda it_y,y
+        sta $d001
+        sta $d003
+        lda it_en,y
+        sta $d015
+        lda it_c,y
+        sta $d027
+        sta $d028
+        lda it_m0,y
+        sta $d025
+        lda it_m1,y
+        cmp #$ff
+        bne :+
+        lda fcount
+        and #1
+        eor #1
+        tax
+        lda glow,x
+:       sta $d026
+        inc intro
+        lda intro
+        cmp #INTRON + 1
+        bcc @out
+        lda #0                  ; over: the ship (irqtop sets its frames from now on)
+        sta intro
+        lda #160
+        sta $d000
+        lda #184
+        sta $d002
+        lda #SPRY
+        sta $d001
+        sta $d003
+        lda #3
+        sta $d015
+        lda #14
+        sta $d027
+        sta $d028
+        lda #4
+        sta $d025
+@out:   rts
+@front: lda dfl                 ; the bars come in: the front moves toward the camera
+        ora dfh
+        beq @out
+        lda dfl
+        sec
+        sbc #FSTEP
+        sta dfl
+        bcs @out
+        dec dfh
+        bpl @out
+        lda #0
+        sta dfl
+        sta dfh
+        rts
+        .include "intro.inc"
+        .segment "CODE"
+.endif
 
 ; -----------------------------------------------------------------------------
 ;  quarter squares: SQL/SQH[x] = x*x/4 (x 0..511), NSL/NSH[i] = (i-255)^2/4
@@ -741,8 +853,13 @@ shl1:   clc
 
 ; joystick: pitch rate and speed, eased
 controls:
+        .if INTRO
+        lda #$ff                ; (no steering in the intro)
+        ldx intro
+        bne :+
+        .endif
         lda $dc00
-        eor #$ff
+:       eor #$ff
         and #$1f
         sta joy
         ldx #0                  ; target rate
@@ -1233,6 +1350,13 @@ hi:     cmp #^DFAR
         cmp #>DFAR
         bcs no
 vis:
+        .if ::INTRO
+        lda dd+1                ; nearer than the front: not yet
+        cmp dfl
+        lda dd+2
+        sbc dfh
+        bcc no
+        .endif
 .endmacro
 
 ; 128 log2 of a 24-bit value -> dl dh (7-bit mantissa, by shift tables)
@@ -2245,6 +2369,10 @@ irqtop: sta sav_a
         sta g_be+2
         sta c_bo+2
         sta g_bo+2
+        .if INTRO
+        lda intro               ; (the intro sets the sprites itself)
+        bne @nosh
+        .endif
         lda glow,x
         sta $d026
         txa
@@ -2259,6 +2387,7 @@ irqtop: sta sav_a
         sta SPRPTR
         adc #1
         sta SPRPTR+1
+@nosh:
         lda #0
         sta blk
         lda nblkd
@@ -2328,6 +2457,9 @@ irqvbl: sta sav_a
         lda #1
         sta copied
 @no:
+        .if INTRO
+        jsr introtick
+        .endif
         .if MUSIC
         lda $d012               ; the tune (up to ~1650 cycles) only if the top IRQ at line 44 is still far enough away
         cmp #DENLINE - 26
