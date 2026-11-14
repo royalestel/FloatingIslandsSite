@@ -33,7 +33,15 @@
 ROWS      = 29          ; display rows: 24 bar lines + 4 lines of slant + 1
 SEGS      = 5           ; horizontal segments per row
 SEGSIZE   = 8           ; bytes per segment: lda #c (2) sta $d020 (3) sta $d021 (3)
-PADSIZE   = 7           ; bytes of padding per row (see below)
+.ifndef NTSC
+NTSC      = 0           ; -Wa -DNTSC=1: 6567R8, 65-cycle lines (one more nop a row, and in irq2's wait)
+.endif
+.ifndef MUSIC
+MUSIC     = NTSC        ; call the tune (resident at $1000, play $1003) 5 frames in 6: the cartridge
+.endif
+MC        = $03ff       ; the tune's frame counter, shared by all the parts that play it
+MUSIC_PLAY = $1003
+PADSIZE   = 7 + NTSC    ; bytes of padding per row (see below)
 ROWSIZE   = SEGS*SEGSIZE + PADSIZE  ; 47 bytes
 BARH      = 24          ; gold lines
 PAD       = 6           ; black rows above and below the gold
@@ -48,7 +56,7 @@ LZ        = 100         ; (unused here: the light's depth comes from the orbit)
 DENLINE   = 44          ; top IRQ: clear DEN before raster line $30
 HTUNE     = 0           ; extra NOPs to line the first split up with hblank
 .ifndef STEAL
-STEAL     = 4           ; cycles a row is shortened by on sprite lines: 4 or 6
+STEAL     = 4 + NTSC    ; cycles a row is shortened by on sprite lines: 4 or 6 (PAL), 5 (NTSC: VICE 6567R8, no shift at all)
 .endif
 SPRBUF0   = $3e00       ; sprite double buffer (pointers $f8 / $fc)
 SPRBUF1   = $3f00
@@ -59,12 +67,15 @@ SPRPTR    = $07f8       ; sprite 0 pointer (screen at $0400)
 ;   bcc, taken:     3 + (skip)    = 13 - STEAL
 .if STEAL = 4
 SKIP      = 2           ; skip inc $ea:            3 + 6 = 9  cycles
+.elseif STEAL = 5 && NTSC
+SKIP      = 3           ; NTSC: skip three nops:   3 + 5 + 2 = 10 cycles
 .elseif STEAL = 6
 SKIP      = 3           ; skip inc $ea and a nop:  3 + 4 = 7  cycles
 .else
 .error "STEAL must be 4 or 6"
 .endif
 OP_BCS    = $b0
+
 OP_BCC    = $90
 
 VIC_SPR0X  = $d000
@@ -200,6 +211,31 @@ start:  sei
         lda #$01
         sta VIC_IRQEN           ; raster IRQ only
         sta VIC_IRQ
+; start phases (-Wa -DPH_ORBIT=n ...: the hand-overs of the gold sequence, the VICE checks)
+.ifdef PH_ORBIT
+        lda #PH_ORBIT
+        sta orbit
+.endif
+.ifdef PH_TILT
+        lda #PH_TILT
+        sta tilt
+.endif
+.ifdef PH_LXA
+        lda #PH_LXA
+        sta lxa
+.endif
+.ifdef PH_LYA
+        lda #PH_LYA
+        sta lya
+.endif
+.ifdef PH_Q
+        lda #PH_Q
+        sta q
+.endif
+.ifdef PH_TW
+        lda #PH_TW
+        sta tw
+.endif
         jsr update              ; first frame
         cli
 main:   lda frame               ; the bar has been drawn: build the next frame
@@ -207,6 +243,9 @@ main:   lda frame               ; the bar has been drawn: build the next frame
         lda #0
         sta frame
         jsr update
+        .if MUSIC
+        jsr musicplay           ; the tune, 5 frames in 6 (it was written for 50 Hz)
+        .endif
         jmp main
 
 nmi:    rti                     ; RESTORE key does nothing
@@ -286,6 +325,18 @@ done:   rts
         bne :--
         rts
 .endproc
+
+.if MUSIC
+musicplay:                      ; 5 calls in 6 frames (NTSC: the tune was written for 50 Hz)
+        inc MC
+        lda MC
+        cmp #6
+        bne :+
+        lda #0
+        sta MC
+        rts
+:       jmp MUSIC_PLAY
+.endif
 
 ; goldfill: the columns' bar lines all gold (once: the highlight runs are drawn over them)
 .proc goldfill
@@ -423,6 +474,7 @@ blend:
 steady:
         ; ---- 1. animate ------------------------------------------------------
         inc fcount
+.ifndef FREEZE                  ; (-Wa -DFREEZE=1: a still picture, for the VICE checks)
         inc orbit               ; bar bobs up and down
         inc tilt                ; and rocks
         inc q                   ; light orbits the bar
@@ -433,6 +485,7 @@ steady:
         bcc :+
         inc lxa
 :
+.endif
 
         ; ---- 2. the bar ---------------------------------------------------------
         ldy orbit
@@ -743,6 +796,9 @@ irq1:   sta save_a
         .endrep
 
 irq2:   txs                     ; throw away irq2's stack frame
+        .if NTSC
+        nop                     ; (NTSC: the compare falls on the line change 2 cycles later)
+        .endif
         ldx #8
 @w:     dex
         bne @w
@@ -764,10 +820,21 @@ block:                          ; ---- the slanted bar ---------------------
         sta VIC_BG              ; 4   display-window part
           .endrep               ;     = 10 cycles = 80 pixels per segment
         .byte OP_BCS, SKIP      ; 2   (bcc: 3, skipping ahead)
+        .if NTSC && STEAL = 5
+        nop                     ; 6   (skipped: bcc 3 + 7 = 15 - 5)
+        nop
+        nop
+        inc $ea                 ; 5
+        nop                     ; 2   NTSC: 5*10 + 15 = 65 cycles = 1 NTSC line
+        .else
         inc $ea                 ; 5
         nop                     ; 6
         nop
         nop                     ; 5*10 + 13 = 63 cycles = 1 PAL line
+        .if NTSC
+        nop                     ; + 2 = 65 cycles = 1 NTSC line
+        .endif
+        .endif
         .assert >(block + RR*ROWSIZE + SEGS*SEGSIZE + 2) = >(block + RR*ROWSIZE + SEGS*SEGSIZE + 2 + SKIP), error, "row branch crosses a page"
         .endrep
 blockend:

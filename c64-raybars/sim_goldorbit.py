@@ -16,8 +16,11 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = 512
-ROWS, SEGS, SEGSIZE, ROWSIZE = 29, 5, 8, 47
-SEGW, DENLINE, STEAL = 80, 44, 4
+NTSC = int(os.environ.get("GOLD_NTSC", 0))            # 1: the NTSC build (goldorbit_ntsc.prg: 65-cycle rows, 263 lines)
+NAME = "goldorbit_ntsc" if NTSC else "goldorbit"
+LINE = 65 if NTSC else 63
+ROWS, SEGS, SEGSIZE, ROWSIZE = 29, 5, 8, 47 + NTSC
+SEGW, DENLINE, STEAL = 80, 44, int(os.environ.get("STEAL", 4 + NTSC))
 TOP, BOTTOM = 50, 250
 OP_BCS, OP_BCC = 0xB0, 0x90
 
@@ -27,10 +30,10 @@ PAL = [0x000000, 0xFFFFFF, 0x894036, 0x7ABFC7, 0x8A46AE, 0x68A941, 0x3E31A2,
 RGB = [((c >> 16) & 255, (c >> 8) & 255, c & 255) for c in PAL]
 
 labels = {}
-for ln in open(os.path.join(HERE, "goldorbit.lbl")):
+for ln in open(os.path.join(HERE, NAME + ".lbl")):
     _, addr, name = ln.split()
     labels[name.lstrip(".")] = int(addr, 16)
-prg = open(os.path.join(HERE, "goldorbit.prg"), "rb").read()
+prg = open(os.path.join(HERE, NAME + ".prg"), "rb").read()
 mpu = MPU()
 load = prg[0] | prg[1] << 8
 mpu.memory[load:load + len(prg) - 2] = list(prg[2:])
@@ -49,14 +52,14 @@ def time_rows():
             mpu.step()
         out.append(mpu.processorCycles - s)
     return out
-ok = all(c == 63 for c in time_rows())
+ok = all(c == LINE for c in time_rows())
 for r in range(ROWS):
     mem[block + r * ROWSIZE + SEGS * SEGSIZE] = OP_BCC
 short = time_rows()
-ok &= all(c == 63 - STEAL for c in short)
+ok &= all(c == LINE - STEAL for c in short)
 for r in range(ROWS):
     mem[block + r * ROWSIZE + SEGS * SEGSIZE] = OP_BCS
-print(f"rows: 63 cycles normal, {short[0]} with the sprite branch "
+print(f"rows: {LINE} cycles normal, {short[0]} with the sprite branch "
       f"({'OK' if ok else 'WRONG'})")
 
 # --- 2. update() frame by frame ---------------------------------------------------
@@ -77,7 +80,7 @@ def run_update():
 # The frame's timeline (the update runs in the main loop since the bar's IRQ, the top IRQ cuts in):
 # the sprite part must be ready before the top IRQ (it reads y0, ly, lx4, lptr), the whole update before the bar's IRQ,
 # and the tune (MUSIC cycles, NTSC cartridge) after it before the next bar has been drawn.  LINES / LINEC: PAL 312 / 63, NTSC 263 / 65.
-LINES, LINEC, MUSIC = int(os.environ.get("LINES", 312)), int(os.environ.get("LINEC", 63)), int(os.environ.get("MUSIC", 0))
+LINES, LINEC, MUSIC = int(os.environ.get("LINES", 263 if NTSC else 312)), int(os.environ.get("LINEC", 65 if NTSC else 63)), int(os.environ.get("MUSIC", 0))
 IRQTOP_LINES = 6
 def advance(line, cycles, blocked):
     lines = (cycles + 150) / LINEC
@@ -151,6 +154,8 @@ def render(y, grid, ly, lx, spr):
                         px[xx, yy] = MC[v]
     return im.resize((W * SCALE, H * SCALE), Image.NEAREST)
 
+if NTSC or os.environ.get("NOPREVIEW"):
+    sys.exit(0 if ok else 1)
 imgs = [render(*fr[:5]) for fr in frames[::3]]
 imgs[0].save(os.path.join(HERE, "preview_goldorbit.gif"), save_all=True,
              append_images=imgs[1:], duration=50, loop=0)
