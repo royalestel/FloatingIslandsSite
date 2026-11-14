@@ -15,7 +15,9 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = 256
-ROWS, SEGS, SEGSIZE, ROWSIZE = 29, 5, 8, 47
+NTSC = int(os.environ.get("GOLD_NTSC", 0))            # 1: the NTSC build (goldlight_ntsc.prg: 65-cycle rows, 263 lines)
+NAME = "goldlight_ntsc" if NTSC else "goldlight"
+ROWS, SEGS, SEGSIZE, ROWSIZE = 29, 5, 8, 47 + NTSC
 SEGW = 80                       # pixels per segment (10 cycles)
 DENLINE = 44
 TOP, BOTTOM = 50, 250           # raster lines shown in the preview
@@ -27,11 +29,11 @@ PAL = [0x000000, 0xFFFFFF, 0x894036, 0x7ABFC7, 0x8A46AE, 0x68A941, 0x3E31A2,
 RGB = [((c >> 16) & 255, (c >> 8) & 255, c & 255) for c in PAL]
 
 labels = {}
-for ln in open(os.path.join(HERE, "goldlight.lbl")):
+for ln in open(os.path.join(HERE, NAME + ".lbl")):
     _, addr, name = ln.split()
     labels[name.lstrip(".")] = int(addr, 16)
 
-prg = open(os.path.join(HERE, "goldlight.prg"), "rb").read()
+prg = open(os.path.join(HERE, NAME + ".prg"), "rb").read()
 mpu = MPU()
 load = prg[0] | prg[1] << 8
 mpu.memory[load:load + len(prg) - 2] = list(prg[2:])
@@ -48,9 +50,9 @@ for r in range(ROWS):
     start = mpu.processorCycles
     while mpu.pc != block + (r + 1) * ROWSIZE:
         mpu.step()
-    ok &= (mpu.processorCycles - start == 63)
+    ok &= (mpu.processorCycles - start == 63 + 2 * NTSC)
 print(f"speedcode: {ROWS} rows, {mpu.processorCycles - c0} cycles "
-      f"({'every row 63' if ok else 'ROW TIMING WRONG'})")
+      f"({'every row ' + str(63 + 2 * NTSC) if ok else 'ROW TIMING WRONG'})")
 
 # --- 2. update() frame by frame ------------------------------------------------
 TRAMP = 0xC000
@@ -71,7 +73,7 @@ def run_update():
 # The frame's timeline (the update runs in the main loop since the bar's IRQ, the top IRQ cuts in):
 # the sprite part must be ready before the top IRQ, the whole update before the bar's IRQ, and the tune (MUSIC cycles,
 # NTSC cartridge) after it before the next bar has been drawn.  LINES / LINEC: PAL 312 / 63, NTSC 263 / 65.
-LINES, LINEC, MUSIC = int(os.environ.get("LINES", 312)), int(os.environ.get("LINEC", 63)), int(os.environ.get("MUSIC", 0))
+LINES, LINEC, MUSIC = int(os.environ.get("LINES", 263 if NTSC else 312)), int(os.environ.get("LINEC", 65 if NTSC else 63)), int(os.environ.get("MUSIC", 0))
 IRQTOP_LINES = 6
 def advance(line, cycles, blocked):
     lines = (cycles + 150) / LINEC

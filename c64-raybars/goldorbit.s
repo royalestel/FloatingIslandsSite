@@ -172,6 +172,14 @@ start:  sei
 @col:   sta cols,x
         dex
         bpl @col
+        lda $dd02               ; VIC bank 0 ($0000-$3fff): the bank bits are outputs, both high
+        ora #$03
+        sta $dd02
+        lda $dd00
+        ora #$03
+        sta $dd00
+        lda #$15                ; screen at $0400 (sprite pointers at $07f8)
+        sta $d018
         lda #1
         sta VIC_SPREN
         sta VIC_SPRMC           ; multicolour

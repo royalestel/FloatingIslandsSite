@@ -175,10 +175,15 @@ start:  sei
         lda CIA2_ICR
         lda #$35
         sta $01
+        lda $dd02               ; (the bank bits are outputs: no KERNAL has set them up)
+        ora #$03
+        sta $dd02
         lda CIA2_PRA            ; VIC bank 2: $8000-$bfff
         and #$fc
         ora #$01
         sta CIA2_PRA
+        lda #$15                ; screen at bank + $0400 (sprite pointers at bank + $07f8)
+        sta $d018
         lda #<nmi
         sta $fffa
         lda #>nmi
