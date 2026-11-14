@@ -20,7 +20,10 @@ BMAXROWS = 48
 SEGW, DENLINE, STEAL, BTOP = 80, 44, 4, 231
 TOP, BOTTOM = 50, 300
 OP_BCS, OP_BCC = 0xB0, 0x90
-LINE = 63
+LINE = int(os.environ.get("LINEC", 63))
+LINES = int(os.environ.get("LINES", 312))         # PAL 312 / NTSC 263 (estimates: the code is PAL)
+MUSIC = int(os.environ.get("MUSIC", 0))          # the tune's cycles a frame (NTSC cartridge), after updateb
+BROWS = int(os.environ.get("BROWS", 0))          # bar B's rows actually run (0 = all ROWSB; NTSC: clipped at the window, ~20)
 IRQTOP_LINES = 6                # top IRQ: line 44 until DEN is back at 49
 SPRITE_DMA = 21 * 5             # worst case cycles the sprite takes per frame
 
@@ -101,7 +104,7 @@ call(labels["update"]); call(labels["updateb"])
 frames, worst = [], {"sprite": 0, "A": 0, "B": 0}
 pcA, pcS, pcB = [], [], []
 clear = True
-BSTART, BEND = BTOP - 2, BTOP + ROWSB + 1
+BSTART, BEND = BTOP - 2, BTOP + (BROWS or ROWSB) + 1
 NROWS = 33
 FLYT_ = 128
 labels_RSTART2 = 296 - 30 - 255        # = goldtwin.s RSTART2
@@ -122,14 +125,14 @@ for f in range(FRAMES):
     rows_new = arows()
     rows_prev = rows_new
     a_end = y_cur + rows_cur + 2
-    blocked = [(BSTART, BEND)] + [(312 + DENLINE, 312 + DENLINE + IRQTOP_LINES),
-               (312 + y - 2, 312 + y + rows_new + 2)]
+    blocked = [(BSTART, BEND)] + [(LINES + DENLINE, LINES + DENLINE + IRQTOP_LINES),
+               (LINES + y - 2, LINES + y + rows_new + 2)]
     t_ball = advance(a_end, cball, blocked)
     t_a = advance(a_end, ca, blocked)
-    t_b = advance(max(t_a, BEND), cb, blocked)
-    for k, t, start, dl in (("sprite", t_ball, a_end, 312 + DENLINE),
-                            ("A", t_a, a_end, 312 + y - 2),
-                            ("B", t_b, BEND, 312 + BTOP - 2)):
+    t_b = advance(max(t_a, BEND), cb + MUSIC, blocked)
+    for k, t, start, dl in (("sprite", t_ball, a_end, LINES + DENLINE),
+                            ("A", t_a, a_end, LINES + y - 2),
+                            ("B", t_b, BEND, LINES + BTOP - 2)):
         worst[k] = max(worst[k], 100 * (t - start) / (dl - start))
         if k == "A": pcA.append(100 * (t - start) / (dl - start))
         if k == "sprite": pcS.append(100 * (t - start) / (dl - start))

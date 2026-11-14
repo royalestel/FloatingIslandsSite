@@ -159,6 +159,11 @@ ldz:     .res 1         ; light depth (+ = toward the camera)
 dy:      .res 1         ; atan2 inputs
 dz:      .res 1
 sb:      .res 1         ; this line's specular level
+hlinit:  .res 1         ; the columns have been filled with gold
+nlo:     .res 1         ; this column's white run, lines nlo .. nhi-1
+nhi:     .res 1
+olo:     .res 2*SEGS    ; last frame's run per column
+ohi:     .res 2*SEGS
 jstart:  .res 1         ; first sprite row hidden behind bar A
 src:     .res 2         ; ball frame being copied
 dst:     .res 2         ; sprite buffer being written
@@ -334,6 +339,18 @@ front:  bit dy
         clc
         adc #1
 done:   rts
+.endproc
+
+; goldfill: bar A's columns' 24 lines all gold (once: the highlight runs are drawn over them)
+.proc goldfill
+        ldy #::BARH-1
+:       lda gold,y
+        .repeat 2*::SEGS, C
+        sta cols + C*::COLLEN + ::PAD,y
+        .endrep
+        dey
+        bpl :-
+        rts
 .endproc
 
 ; =============================================================================
@@ -672,7 +689,67 @@ evenrows:
         cmp #::AGONE
         bcc :+
         jmp goneblk
-:       ldy ha
+:
+        lda fo                  ; the hold: the highlight as runs of white lines (the fly-out builds every row: it scales and clips the bar)
+        beq :+
+        jmp fullbuild
+:       lda hlinit
+        bne :+
+        jsr goldfill            ; (first frame: the columns all gold)
+        inc hlinit
+:
+        .repeat 2*::SEGS, C
+        .if (C .mod 2) = 0
+        lda thr0 + C/2
+        .else
+        lda thr1 + C/2
+        .endif
+        cmp #9
+        bcs :+                  ; (above 8: never white)
+        adc #>hlo - 1           ; carry clear: table t
+        sta .ident(.sprintf("hla%d", C)) + 2
+        adc #(>hhi) - (>hlo)
+        sta .ident(.sprintf("hlb%d", C)) + 2
+        ldx spe_op              ; (the highlight operand q, patched into the full build's loop)
+.ident(.sprintf("hla%d", C)):
+        lda hlo,x
+        sta nlo
+.ident(.sprintf("hlb%d", C)):
+        lda hhi,x
+        jmp :++
+:       lda #0
+        sta nlo
+:       sta nhi
+        cmp ohi + C             ; the same run as last frame: nothing to do
+        bne :+
+        lda nlo
+        cmp olo + C
+        bne :+
+        jmp .ident(.sprintf("hlz%d", C))
+:       ldy olo + C             ; last frame's run back to gold
+        cpy ohi + C
+        bcs :++
+:       lda gold,y
+        sta cols + C*::COLLEN + ::PAD,y
+        iny
+        cpy ohi + C
+        bcc :-
+:       ldy nlo                 ; this frame's run white
+        sty olo + C
+        cpy nhi
+        bcs :++
+        lda #1
+:       sta cols + C*::COLLEN + ::PAD,y
+        iny
+        cpy nhi
+        bcc :-
+:       lda nhi
+        sta ohi + C
+.ident(.sprintf("hlz%d", C)):
+        .endrep
+        jmp patch
+fullbuild:
+        ldy ha
         dey
 line:   cpy clo_a               ; near-clipped rows are black
         bcc @keep
@@ -1378,6 +1455,7 @@ blockbend:
         .include "light.inc"    ; lx4tab
         .include "orbit.inc"    ; orby, orbz, orbsize, balls
         .include "handoff.inc"  ; goldfly's first bar (the replay)
+        .include "hlrun.inc"    ; hlo, hhi: the highlight runs
         .include "twin.inc"     ; bar B: height, clip, brightness, depth, steps
         .assert <spectab = 0, error, "spectab must be page aligned"
 

@@ -147,6 +147,7 @@ hh:      .res 1
 lb:      .res 1         ; highlight brightness base
 rsp:     .res 2         ; rowstart row for this bar height
 si:      .res 1         ; source row
+ovlo:    .res 1         ; the first lit source row
 rend:    .res 1
 hidx:    .res 1         ; hltab row
 save_a:  .res 1
@@ -738,7 +739,14 @@ zdone:  lda h
         sta rsp
         lda rsh,x
         sta rsp+1
-        ldy #BARH-1
+        ldx spe_op              ; the lit source rows (spec level >= HLTHR) are one run, hlo .. hhi-1 (hlrun.inc): visit only those
+        lda hhi + (HLTHR - 1) * 256,x
+        bne :+
+        jmp ovdone              ; (none)
+:       tay
+        dey
+        lda hlo + (HLTHR - 1) * 256,x
+        sta ovlo
 ovi:    ldx theta2,y            ; this source row's spec level
 spe_op = * + 1
         lda spectab,x
@@ -772,7 +780,10 @@ rowl:   hlrow 0, ov0
         bne rowl
 ovnext: ldy si
 ovskip: dey
-        bpl ovi
+        bmi ovdone
+        cpy ovlo
+        bcs ovi
+ovdone:
 
         ; ---- near clip: the middle rows go first ---------------------------
         lda fcl
@@ -1503,6 +1514,9 @@ n2elo:  .lobytes n2e_0, n2e_1, n2e_2
 n2ehi:  .hibytes n2e_0, n2e_1, n2e_2
 
 ; =============================================================================
+.segment "TABLES"
+        .include "hlrun.inc"    ; hlo, hhi: the highlight runs
+
 .segment "BSS"
 tbag:   .res NTILT              ; tilt ring, oldest shown first
 save_t: .res 1

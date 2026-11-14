@@ -104,6 +104,7 @@ msg:     .res 1
 tilt:    .res 1         ; see-saw angle
 lxa:     .res 1         ; light sideways drift angle
 q:       .res 1         ; light orbit angle
+frame:   .res 1         ; set by the bar's IRQ: time to build the next frame
 fcount:  .res 1         ; frame counter
 y0:      .res 1         ; raster line of the bar's top row (next frame)
 ly:      .res 1         ; sprite Y register (next frame)
@@ -193,7 +194,12 @@ start:  sei
         sta VIC_IRQ
         jsr update              ; first frame
         cli
-@idle:  jmp @idle               ; everything happens in the IRQs
+main:   lda frame               ; the bar has been drawn: build the next frame
+        beq main
+        lda #0
+        sta frame
+        jsr update
+        jmp main
 
 nmi:    rti                     ; RESTORE key does nothing
 
@@ -462,6 +468,95 @@ common:
         adc #1                  ; -p
         sta spe_op
 
+        ; ---- 9. the ball: pick its size, hide what is behind the bar -----------
+        ; frame = balls + 64 * size; draw into the buffer not on screen now
+        lda sz
+        lsr
+        lsr                     ; size * 64 = (size >> 2) * 256 + (size & 3) * 64
+        clc
+        adc #>balls
+        sta src+1
+        lda sz
+        and #3
+        lsr
+        ror
+        ror                     ; (size & 3) * 64
+        clc
+        adc #<balls
+        sta src
+        bcc :+
+        inc src+1
+:       lda lptr
+        cmp #<(SPRBUF0/64)
+        beq use1
+        lda #<(SPRBUF0/64)      ; shown now: buffer 1 -> draw into buffer 0
+        sta lptr
+        lda #>SPRBUF0
+        bne setdst
+use1:   lda #<(SPRBUF1/64)
+        sta lptr
+        lda #>SPRBUF1
+setdst: sta dst+1
+        lda #0
+        sta dst
+
+        ; rows hidden: only when behind (dz < 0).  The bar's lines for the
+        ; segment under the ball are y0 + off .. y0 + off + 23; sprite row j
+        ; is on line ly + 1 + j.  Hidden if 0 <= j - jstart < 24 with
+        ; jstart = y0 + off - ly - 1.
+        lda #$80                ; in front: jstart far away, nothing hidden
+        bit hz
+        bpl front
+        lda lx4                 ; segment under the ball: (lx4 + 5) / 20
+        clc
+        adc #5
+        ldx #0
+:       cmp #20
+        bcc :+
+        sbc #20
+        inx
+        cpx #::SEGS-1
+        bne :-
+:       lda #6
+        sec
+        sbc kb,x                ; off = 6 - kb
+        clc
+        adc y0
+        sec
+        sbc ly
+        sec
+        sbc #1
+front:  sta jstart
+
+        ldx #0                  ; sprite row j
+        ldy #0                  ; byte offset 3j
+row:    txa
+        sec
+        sbc jstart
+        cmp #24
+        bcc hide
+        lda (src),y
+        sta (dst),y
+        iny
+        lda (src),y
+        sta (dst),y
+        iny
+        lda (src),y
+        sta (dst),y
+        iny
+        jmp nextrow
+hide:   lda #0
+        sta (dst),y
+        iny
+        sta (dst),y
+        iny
+        sta (dst),y
+        iny
+nextrow:
+        inx
+        cpx #21
+        bne row
+::ballready:                    ; the sprite is ready: what irqtop reads (y0, ly, lx4, lptr) is set; the rest only has to be done before the bar
         ; ---- 5. per segment: distance from the light -> highlight threshold ----
         ; ball centre x/4 = lx4 + 3; segment k centre x/4 = 8 + 20k.
         .repeat ::SEGS, K
@@ -579,94 +674,6 @@ patch:
 :       sta block + RR*::ROWSIZE + ::SEGS*::SEGSIZE
         .endrep
 
-        ; ---- 9. the ball: pick its size, hide what is behind the bar -----------
-        ; frame = balls + 64 * size; draw into the buffer not on screen now
-        lda sz
-        lsr
-        lsr                     ; size * 64 = (size >> 2) * 256 + (size & 3) * 64
-        clc
-        adc #>balls
-        sta src+1
-        lda sz
-        and #3
-        lsr
-        ror
-        ror                     ; (size & 3) * 64
-        clc
-        adc #<balls
-        sta src
-        bcc :+
-        inc src+1
-:       lda lptr
-        cmp #<(SPRBUF0/64)
-        beq use1
-        lda #<(SPRBUF0/64)      ; shown now: buffer 1 -> draw into buffer 0
-        sta lptr
-        lda #>SPRBUF0
-        bne setdst
-use1:   lda #<(SPRBUF1/64)
-        sta lptr
-        lda #>SPRBUF1
-setdst: sta dst+1
-        lda #0
-        sta dst
-
-        ; rows hidden: only when behind (dz < 0).  The bar's lines for the
-        ; segment under the ball are y0 + off .. y0 + off + 23; sprite row j
-        ; is on line ly + 1 + j.  Hidden if 0 <= j - jstart < 24 with
-        ; jstart = y0 + off - ly - 1.
-        lda #$80                ; in front: jstart far away, nothing hidden
-        bit hz
-        bpl front
-        lda lx4                 ; segment under the ball: (lx4 + 5) / 20
-        clc
-        adc #5
-        ldx #0
-:       cmp #20
-        bcc :+
-        sbc #20
-        inx
-        cpx #::SEGS-1
-        bne :-
-:       lda #6
-        sec
-        sbc kb,x                ; off = 6 - kb
-        clc
-        adc y0
-        sec
-        sbc ly
-        sec
-        sbc #1
-front:  sta jstart
-
-        ldx #0                  ; sprite row j
-        ldy #0                  ; byte offset 3j
-row:    txa
-        sec
-        sbc jstart
-        cmp #24
-        bcc hide
-        lda (src),y
-        sta (dst),y
-        iny
-        lda (src),y
-        sta (dst),y
-        iny
-        lda (src),y
-        sta (dst),y
-        iny
-        jmp nextrow
-hide:   lda #0
-        sta (dst),y
-        iny
-        sta (dst),y
-        iny
-        sta (dst),y
-        iny
-nextrow:
-        inx
-        cpx #21
-        bne row
         rts
 .endproc
 
@@ -769,7 +776,7 @@ blockend:
         sta VIC_RASTER
         asl VIC_IRQ
 
-        jsr update              ; build the next frame
+        inc frame               ; main loop: build the next frame (irqtop may cut in)
 
         lda save_a
         ldx save_x

@@ -57,26 +57,52 @@ TRAMP = 0xC000
 upd = labels["update"]
 mem[TRAMP:TRAMP + 4] = [0x20, upd & 255, upd >> 8, 0x00]
 
+BALL = labels["ballready"]
 def run_update():
+    """update's cycles, and the cycles to the point where the sprite registers are set (ballready)"""
     mpu.pc, mpu.sp = TRAMP, 0xFF
-    c = mpu.processorCycles
+    c, ball = mpu.processorCycles, None
     while mpu.pc != TRAMP + 3:
+        if mpu.pc == BALL and ball is None:
+            ball = mpu.processorCycles - c
         mpu.step()
-    return mpu.processorCycles - c
+    return mpu.processorCycles - c, ball
+
+# The frame's timeline (the update runs in the main loop since the bar's IRQ, the top IRQ cuts in):
+# the sprite part must be ready before the top IRQ, the whole update before the bar's IRQ, and the tune (MUSIC cycles,
+# NTSC cartridge) after it before the next bar has been drawn.  LINES / LINEC: PAL 312 / 63, NTSC 263 / 65.
+LINES, LINEC, MUSIC = int(os.environ.get("LINES", 312)), int(os.environ.get("LINEC", 63)), int(os.environ.get("MUSIC", 0))
+IRQTOP_LINES = 6
+def advance(line, cycles, blocked):
+    lines = (cycles + 150) / LINEC
+    while lines > 0:
+        for lo, hi in blocked:
+            if lo <= line < hi:
+                line = hi
+                break
+        step = min(lines, 1)
+        line += step
+        lines -= step
+    return line
 
 # initial phases, e.g. GOLD_INIT="orbit=178,tilt=178,lxa=196" (the hand-over from goldtilt: its last frame's phase - 1; frame 0 is the second update)
 for kv in filter(None, os.environ.get("GOLD_INIT", "").split(",")):
     k, v = kv.split("="); mem[labels[k]] = int(v)
 run_update()
 frames, worst, clear = [], 0, True
+worstw = {"sprite": 0, "bar": 0, "tune": 0}
 for f in range(FRAMES):
     y_cur = mem[Y0]
-    cyc = run_update()
-    # starts after this frame's bar, must end before the next top IRQ
-    budget = ((312 - (y_cur + ROWS + 2)) + DENLINE) * 63 - 150
-    worst = max(worst, 100 * cyc / budget)
-    ok &= cyc <= budget
+    cyc, cball = run_update()
     y, ly, lx = mem[Y0], mem[LY], mem[LX4] * 4
+    a_end = y_cur + ROWS + 2
+    blocked = [(LINES + DENLINE, LINES + DENLINE + IRQTOP_LINES), (LINES + y - 2, LINES + y + ROWS + 2)]
+    t_ball, t_all = advance(a_end, cball, blocked), advance(a_end, cyc, blocked)
+    t_mus = advance(t_all, MUSIC, blocked) if MUSIC else t_all
+    for k, t, dl in (("sprite", t_ball, LINES + DENLINE), ("bar", t_all, LINES + y - 2), ("tune", t_mus, LINES + y + ROWS + 2)):
+        worstw[k] = max(worstw[k], 100 * (t - a_end) / (dl - a_end))
+        ok &= t <= dl
+    worst = max(worstw.values())
     # sprite lines (ly+1 .. ly+21) must end above the IRQ line y-2
     clear &= ly + 22 < y - 2
     grid = [[mem[block + r * ROWSIZE + k * SEGSIZE + 1] for k in range(SEGS)]
@@ -85,8 +111,9 @@ for f in range(FRAMES):
     spr = ball if p == SPRITE // 64 else mem[labels["grow"] + (p - labels["growptr"] * 0 - 0xF5) * 64:][:63]
     frames.append((y, grid, ly, lx, cyc, spr))
 ok &= clear
-print(f"update(): {min(fr[4] for fr in frames)}-{max(fr[4] for fr in frames)} "
-      f"cycles, worst {worst:.0f}% of the time before the top IRQ")
+print(f"update(): {min(fr[4] for fr in frames)}-{max(fr[4] for fr in frames)} cycles; worst use of each deadline window"
+      f" ({LINES} lines of {LINEC} cycles, tune {MUSIC}): sprite before the top IRQ {worstw['sprite']:.0f}%, the update before the bar {worstw['bar']:.0f}%,"
+      f" the tune after it {worstw['tune']:.0f}%")
 print("sprite never shares a line with the bar:", clear)
 
 # --- 3. render ---------------------------------------------------------------------

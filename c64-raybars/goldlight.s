@@ -78,6 +78,7 @@ theta2    = theta2_12   ; per-line reflection angle of a 24-line bar
 ; =============================================================================
 .segment "ZEROPAGE"
 orbit:   .res 1         ; vertical bob angle
+frame:   .res 1         ; set by the bar's IRQ: time to build the next frame
 hup:     .res 1         ; frames of the highlight's hand-over so far (up to HSLACK)
 hsl:     .res 1         ; slack: the light's reach shrinks from everywhere (goldtilt's even highlight) to its own
 gsz:     .res 1         ; frames of the light's grow-in so far (up to GROWN)
@@ -185,7 +186,12 @@ start:  sei
         sta VIC_IRQ
         jsr update              ; first frame
         cli
-@idle:  jmp @idle               ; everything happens in the IRQs
+main:   lda frame               ; the bar has been drawn: build the next frame
+        beq main
+        lda #0
+        sta frame
+        jsr update
+        jmp main
 
 nmi:    rti                     ; RESTORE key does nothing
 
@@ -309,6 +315,7 @@ done:   rts
         rol
         sta VIC_SPRXHI
 
+::ballready:                    ; the sprite registers and y0 (read by irqtop) are set; the rest only has to be done before the bar
         ; ---- 4. the light seen from the bar: vertical angle ------------------
         ; light centre ly+10, bar centre about y0+20
         lda ly
@@ -558,7 +565,7 @@ blockend:
         sta VIC_RASTER
         asl VIC_IRQ
 
-        jsr update              ; build the next frame
+        inc frame               ; main loop: build the next frame (irqtop may cut in)
 
         lda save_a
         ldx save_x
