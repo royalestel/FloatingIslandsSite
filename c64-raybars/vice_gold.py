@@ -37,7 +37,7 @@ def cart(name, defs, out):
         chip(1 + b, 0x8000, d[:0x2000]); chip(1 + b, 0xA000, d[0x2000:])
     hdr = b"C64 CARTRIDGE   " + struct.pack(">IHHBB6x", 0x40, 0x0100, 32, 1, 0) + b"GOLD TEST".ljust(32, b"\0")
     open(out, "wb").write(hdr + b"".join(chips))
-    subprocess.run(["git", "checkout", "-q", "cartparts.inc"])
+    subprocess.run(["git", "checkout", "-q", "cartparts.inc", "cartboot_all.bin"])
     return lbl
 
 def vcmd(s, c, wait=0.4):
