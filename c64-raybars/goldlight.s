@@ -91,6 +91,13 @@ lx4:     .res 1         ; light sprite x / 4
 dy:      .res 1         ; light - bar, vertical (signed)
 dz:      .res 1         ; light - bar, depth
 sb:      .res 1         ; this line's specular level
+spe_op:  .res 1         ; the highlight operand q = -p (spectab + q + theta2[y])
+hlinit:  .res 1         ; the columns have been filled with gold
+nlo:     .res 1         ; this column's white run, lines nlo .. nhi-1
+nhi:     .res 1
+lim:     .res 1         ; (a run's end)
+olo:     .res 2*SEGS    ; last frame's run per column
+ohi:     .res 2*SEGS
 kb:      .res SEGS      ; start index into the column for each segment
 thr0:    .res SEGS      ; white on even display rows if sb >= thr0
 thr1:    .res SEGS      ; white on odd display rows if sb >= thr1
@@ -211,6 +218,18 @@ sign:   bit dy
         clc
         adc #1
 done:   rts
+.endproc
+
+; goldfill: the columns' bar lines all gold (once: the highlight runs are drawn over them)
+.proc goldfill
+        ldy #::BARH-1
+:       lda gold,y
+        .repeat 2*::SEGS, C
+        sta cols + C*36 + ::PAD,y
+        .endrep
+        dey
+        bpl :-
+        rts
 .endproc
 
 ; =============================================================================
@@ -346,41 +365,99 @@ done:   rts
         .endrep
 evenrows:
 
-        ; ---- 6. the columns: gold + traced highlight per segment ---------------
-        ldy #::BARH-1
-line:   ldx theta2,y
-spe_op = * + 1
-        lda spectab,x           ; specular 0..8
-        cmp #1
-        bcc dark
-        jmp lit
-dark:   lda gold,y              ; no highlight anywhere on this line
-        .repeat ::SEGS, K
-        sta cols + (2*K)*36 + ::PAD,y
-        sta cols + (2*K+1)*36 + ::PAD,y
-        .endrep
-        dey
-        bmi :+
-        jmp line
-:       jmp patch
-lit:    sta sb
-        .repeat ::SEGS, K
-        lda sb
-        cmp thr0+K
-        lda #1                  ; white (flags from cmp kept)
+        ; ---- 6. the columns: gold with the traced highlight as runs of white ------------
+        ; A column with threshold t is white where the line's specular level spectab[q + theta2[y]] >= t (q = spe_op):
+        ; always one run of lines, hlo_t[q] .. hhi_t[q]-1 (hlrun.inc).  The columns keep their gold between frames:
+        ; each restores last frame's run to gold and paints this frame's white (nothing when the run is unchanged).
+        lda hlinit
+        bne :+
+        jsr goldfill            ; (first frame: the columns all gold)
+        inc hlinit
+:
+        .repeat 2*::SEGS, C
+        .if (C .mod 2) = 0
+        lda thr0 + C/2
+        .else
+        lda thr1 + C/2
+        .endif
+        cmp #9
+        bcs :+                  ; (above 8: never white)
+        adc #>hlo - 1           ; carry clear: table t
+        sta .ident(.sprintf("hla%d", C)) + 2
+        adc #(>hhi) - (>hlo)
+        sta .ident(.sprintf("hlb%d", C)) + 2
+        ldx spe_op
+.ident(.sprintf("hla%d", C)):
+        lda hlo,x
+        sta nlo
+.ident(.sprintf("hlb%d", C)):
+        lda hhi,x
+        jmp :++
+:       lda #0
+        sta nlo
+:       sta nhi                 ; new run [nlo, nhi), old run [olo, ohi)
+        cmp ohi + C
+        bne :+
+        lda nlo
+        cmp olo + C
+        bne :+
+        jmp .ident(.sprintf("hlz%d", C))     ; unchanged
+:       ; gold again: [olo, min(ohi, nlo)) and [max(olo, nhi), ohi)
+        lda ohi + C
+        cmp nlo
+        bcc :+
+        lda nlo
+:       sta lim
+        ldy olo + C
+        cpy lim
+        bcs :++
+:       lda gold,y
+        sta cols + C*36 + ::PAD,y
+        iny
+        cpy lim
+        bcc :-
+:       ldy nhi
+        cpy olo + C
         bcs :+
-        lda gold,y
-:       sta cols + (2*K)*36 + ::PAD,y
-        lda sb
-        cmp thr1+K
+        ldy olo + C
+:       cpy ohi + C
+        bcs :++
+:       lda gold,y
+        sta cols + C*36 + ::PAD,y
+        iny
+        cpy ohi + C
+        bcc :-
+:       ; white: [nlo, min(nhi, olo)) and [max(nlo, ohi), nhi)
+        lda nhi
+        cmp olo + C
+        bcc :+
+        lda olo + C
+:       sta lim
+        ldy nlo
+        cpy lim
+        bcs :++
         lda #1
+:       sta cols + C*36 + ::PAD,y
+        iny
+        cpy lim
+        bcc :-
+:       ldy ohi + C
+        cpy nlo
         bcs :+
-        lda gold,y
-:       sta cols + (2*K+1)*36 + ::PAD,y
+        ldy nlo
+:       cpy nhi
+        bcs :++
+        lda #1
+:       sta cols + C*36 + ::PAD,y
+        iny
+        cpy nhi
+        bcc :-
+:       lda nlo
+        sta olo + C
+        lda nhi
+        sta ohi + C
+.ident(.sprintf("hlz%d", C)):
         .endrep
-        dey
-        bmi patch
-        jmp line
 
         ; ---- 7. patch the 145 colours into the speedcode ---------------------
         ;  row r, segment k = column_k[r + kb_k], kb_k = 6 - off_k
@@ -507,3 +584,6 @@ gold:   .byte 9,8,12,7,7,0,9,8,15,7,7,1,7,1,7,0,0,0,9,12,10,12,8,9
 ; 6 black, 24 gold-or-white, 6 black.
 cols:   .res 2*SEGS*(2*PAD+BARH)
         .assert * <= GROWBASE, error, "program overlaps the sprite data"
+
+.segment "HIGHTAB"               ; CPU-only: above the VIC bank
+        .include "hlrun.inc"    ; hlo, hhi: the highlight runs
