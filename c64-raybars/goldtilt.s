@@ -33,7 +33,15 @@
 ROWS      = 30          ; display rows: 24 bar lines + 5 lines of slant + 1
 SEGS      = 6           ; horizontal segments per row
 SEGSIZE   = 6           ; bytes per segment: lda #c (2) sta $d020 (3) nop (1)
-ROWSIZE   = SEGS*SEGSIZE + 8    ; + bit $ea (2) + 6 nops = 44 bytes
+.ifndef NTSC
+NTSC      = 0           ; -Wa -DNTSC=1: 6567R8, 65-cycle lines (one more nop a row, and in irq2's wait)
+.endif
+.ifndef MUSIC
+MUSIC     = NTSC        ; call the tune (resident at $1000, play $1003) 5 frames in 6: the cartridge
+.endif
+MC        = $03ff       ; the tune's frame counter, shared by all the parts that play it
+MUSIC_PLAY = $1003
+ROWSIZE   = SEGS*SEGSIZE + 8 + NTSC ; + bit $ea (2) + 6 nops (+ 1 on NTSC) = 44 / 45 bytes
 BARH      = 24          ; gold lines
 PAD       = 6           ; black rows above and below the gold
 YBASE     = 135         ; raster line of the bar's top row when centred
@@ -113,6 +121,18 @@ start:  sei
         lda #$01
         sta VIC_IRQEN           ; raster IRQ only
         sta VIC_IRQ
+.ifdef PH_ORBIT                 ; start phases (-Wa -DPH_ORBIT=n ...: the hand-overs of the gold sequence, the VICE checks)
+        lda #PH_ORBIT
+        sta orbit
+.endif
+.ifdef PH_TILT
+        lda #PH_TILT
+        sta tilt
+.endif
+.ifdef PH_LANG
+        lda #PH_LANG
+        sta lang
+.endif
         jsr update              ; first frame; also sets the IRQ line
         cli
 @idle:  jmp @idle               ; everything happens in the IRQ
@@ -150,17 +170,31 @@ sign:   bit dy
 done:   rts
 .endproc
 
+.if MUSIC
+musicplay:                      ; 5 calls in 6 frames (NTSC: the tune was written for 50 Hz)
+        inc MC
+        lda MC
+        cmp #6
+        bne :+
+        lda #0
+        sta MC
+        rts
+:       jmp MUSIC_PLAY
+.endif
+
 ; =============================================================================
 ;  update: build the next frame.  Runs after the bar has been drawn.
 ; =============================================================================
 .proc update
         ; ---- 1. animate ------------------------------------------------------
+.ifndef FREEZE                  ; (-Wa -DFREEZE=1: a still picture, for the VICE checks)
         inc orbit               ; bob up and down
         lda lang
         clc
         adc #3                  ; light bobs at a different speed
         sta lang
         inc tilt                ; rock the slant
+.endif
 
         ; ---- 2. where the bar is and how it slants ----------------------------
         ldy orbit
@@ -263,6 +297,9 @@ irq1:   sta save_a
         .endrep
 
 irq2:   txs                     ; throw away irq2's stack frame
+        .if NTSC
+        nop                     ; (NTSC: the compare falls on the line change 2 cycles later)
+        .endif
         ldx #8
 @w:     dex
         bne @w
@@ -289,6 +326,9 @@ block:                          ; ---- the slanted bar ---------------------
         nop
         nop
         nop                     ; 6*8 + 3 + 12 = 63 cycles = 1 PAL line
+        .if NTSC
+        nop                     ; + 2 = 65 cycles = 1 NTSC line
+        .endif
         .endrep
 blockend:
         .assert blockend - block = ROWS*ROWSIZE, error, "row size mismatch"
@@ -302,6 +342,9 @@ blockend:
         asl VIC_IRQ
 
         jsr update              ; build the next frame
+        .if MUSIC
+        jsr musicplay           ; the tune, 5 frames in 6 (it was written for 50 Hz)
+        .endif
 
         lda save_a
         ldx save_x

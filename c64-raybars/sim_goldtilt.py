@@ -14,7 +14,10 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = 256
-ROWS, SEGS, SEGSIZE, ROWSIZE = 30, 6, 6, 44
+NTSC = int(os.environ.get("GOLD_NTSC", 0))            # 1: the NTSC build (goldtilt_ntsc.prg: 65-cycle rows, 263 lines)
+NAME = "goldtilt_ntsc" if NTSC else "goldtilt"
+LINEC, LINES = (65, 263) if NTSC else (63, 312)
+ROWS, SEGS, SEGSIZE, ROWSIZE = 30, 6, 6, 44 + NTSC
 SEGW = 64                       # pixels per segment (8 cycles)
 TOP, BOTTOM = 40, 270           # raster lines shown in the preview
 
@@ -25,11 +28,11 @@ PAL = [0x000000, 0xFFFFFF, 0x894036, 0x7ABFC7, 0x8A46AE, 0x68A941, 0x3E31A2,
 RGB = [((c >> 16) & 255, (c >> 8) & 255, c & 255) for c in PAL]
 
 labels = {}
-for ln in open(os.path.join(HERE, "goldtilt.lbl")):
+for ln in open(os.path.join(HERE, NAME + ".lbl")):
     _, addr, name = ln.split()
     labels[name.lstrip(".")] = int(addr, 16)
 
-prg = open(os.path.join(HERE, "goldtilt.prg"), "rb").read()
+prg = open(os.path.join(HERE, NAME + ".prg"), "rb").read()
 mpu = MPU()
 load = prg[0] | prg[1] << 8
 mpu.memory[load:load + len(prg) - 2] = list(prg[2:])
@@ -44,9 +47,9 @@ for r in range(ROWS):
     start = mpu.processorCycles
     while mpu.pc != block + (r + 1) * ROWSIZE:
         mpu.step()
-    rows_ok &= (mpu.processorCycles - start == 63)
+    rows_ok &= (mpu.processorCycles - start == LINEC)
 print(f"speedcode: {ROWS} rows, {mpu.processorCycles - c0} cycles "
-      f"({'every row 63' if rows_ok else 'ROW TIMING WRONG'})")
+      f"({'every row ' + str(LINEC) if rows_ok else 'ROW TIMING WRONG'})")
 
 # --- 2. run update() frame by frame -----------------------------------------
 TRAMP = 0xC000
@@ -70,7 +73,7 @@ for f in range(FRAMES):
     cyc = run_update()
     y_next = mem[y0addr]
     # starts after the bar (y_cur + ROWS + ~2), must end before y_next - 2
-    budget = ((312 - (y_cur + ROWS + 2)) + (y_next - 2)) * 63 - 150
+    budget = ((LINES - (y_cur + ROWS + 2)) + (y_next - 2)) * LINEC - 150 - int(os.environ.get("MUSIC", 0))
     worst_pct = max(worst_pct, 100 * cyc / budget)
     ok &= cyc <= budget
     grid = [[mem[block + r * ROWSIZE + k * SEGSIZE + 1] for k in range(SEGS)]
