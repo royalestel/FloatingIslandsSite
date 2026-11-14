@@ -720,6 +720,9 @@ visible:
         ldy stilt,x
         .repeat ::SEGS, K
         lda .ident(.sprintf("tilt%d", K)),y
+        .ifdef FLATTILT
+        lda #4
+        .endif
         sta kb+K
         .endrep
 
@@ -1512,13 +1515,18 @@ dly_op = * + 1
   .endif
 .endmacro
 
-; one row: 5 x (lda (pK),y / sta $d021) = 45 cycles, iny: 47
+; one row: 5 x (lda (pK),y / sta $d021) = 45 cycles, iny: 47.  The row's first write lands where segment 1 starts (x = 81): the cycles
+; before it, up to the window's left edge, still show the last write of the row above.  So the writes are segments 1..4 of this row, then
+; segment 0 of the NEXT row (iny first), which is what the left segment shows on the next line (VICE: with the writes in segment order, the
+; leftmost segment was the row above's last one: a line low and the wrong tilt).
 .macro row SL
-  .repeat SEGS, K
-        lda (ptr + (SL*SEGS + K)*2),y
+  .repeat SEGS - 1, K
+        lda (ptr + (SL*SEGS + K + 1)*2),y
         sta VIC_BG
   .endrep
         iny
+        lda (ptr + (SL*SEGS)*2),y
+        sta VIC_BG
 .endmacro
 
 ; Three loops per slot, rows in screen order: normal rows above the light

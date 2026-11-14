@@ -90,7 +90,7 @@ def link(name, defs, areas):
     cfg = f"{TMP}/{name}.cfg"
     open(cfg, "w").write("MEMORY {\n" + "\n".join(mem) + "\n}\nSEGMENTS {\n" + "\n".join(seg) + "\n}\n")
     flags = []
-    for d in ["CHAIN=1", f"ENDF={dict(SEQ_ENDF)[name]}"] + defs:
+    for d in ["CHAIN=1", f"ENDF={dict(SEQ_ENDF)[name]}"] + defs + ([os.environ["GOLD_DEF"]] if os.environ.get("GOLD_DEF") else []):
         flags += ["-Wa", f"-D{d}"]
     run(["cl65", "-g", "-t", "none", *flags, "-C", cfg, "-m", f"{TMP}/{name}.map", "-Ln", f"{TMP}/{name}.lbl", "-o", f"{TMP}/{name}.out", f"{name}_ntsc.s"])
     for f in os.listdir(HERE):
