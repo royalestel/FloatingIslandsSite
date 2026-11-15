@@ -22,7 +22,7 @@ import mock_scroller as ms
 OUT = sys.argv[1] if len(sys.argv) > 1 else "mock_greets.mp4"
 BTOP, BBOT = ms.BANDL, ms.WTOP + 189                          # the black band: raster lines 212..250
 XC = 32 + 160                                                 # the window's centre (screen x)
-SPEED = 3                                                     # scroll: pixels a frame
+SPEED = 2                                                     # scroll: pixels a frame
 PMAX = (BBOT - BTOP - 16) // 2                                # the pitch's room for one text row: 11 lines each way
 
 def strip(text):
