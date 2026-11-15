@@ -7,7 +7,8 @@
     bank right   that leaves to the left, "CREST  RAISTLIN" comes on from the right
     level        half a second, the text still
     bank right   that leaves to the right, "HAMMERFIST  T0M3000" comes on from the left (as asked: bank right, text moving right)
-    half loop    the text scrolls down out of the band, "ANDY  SHINE" / "GUINEA PIG" (two rows: one row is wider than the window)
+    half loop    the text scrolls down out of the band, "ANDY  SHINE" / "GUINEA PIG" (two rows, one black line
+                 between them: one row is wider than the window)
                  scrolls down into it
     hard down    that scrolls up out of the band, gone at the band's top edge
   all the while: the side-scrolling text moves down as the ship pitches up and up as it pitches down, inside the band.
@@ -27,13 +28,16 @@ PMAX = (BBOT - BTOP - 16) // 2                                # the pitch's room
 def strip(text):
     return np.concatenate([ms.tile(ms.CODE.get(ch, 0x19)) for ch in text.upper()], axis=1)
 
+GAP = 1                                                       # black raster lines between the rows of a block
+
 def block(*rows):
     s = [strip(r) for r in rows]
     w = max(x.shape[1] for x in s)
-    out = np.zeros((16 * len(s), w), int)
+    out = np.zeros((16 * len(s) + GAP * (len(s) - 1), w), int)
     for i, x in enumerate(s):
         o = (w - x.shape[1]) // 2
-        out[16 * i:16 * i + 16, o:o + x.shape[1]] = x
+        y = (16 + GAP) * i
+        out[y:y + 16, o:o + x.shape[1]] = x
     return out
 
 class Flight(ms.Flight):
@@ -79,6 +83,7 @@ def main():
         fl.step()
     texts = {"greets": block("GREETS TO"), "dm": block("DESIRE  MOONSHINE"), "cr": block("CREST  RAISTLIN"),
              "ht": block("HAMMERFIST  T0M3000"), "asg": block("ANDY  SHINE", "GUINEA PIG")}
+    H2 = texts["asg"].shape[0]                                # the two-row block: 16 + GAP + 16 lines
     # the horizontal phases: (roll target, direction the text moves: -1 left / +1 right, leaving text, arriving text)
     hphases = [(8, -1, None, "greets"), (-8, 1, "greets", "dm"), (8, -1, "dm", "cr"), ("hold", 0, "cr", None),
                (8, 1, "cr", "ht")]
@@ -125,13 +130,13 @@ def main():
                 if hi == len(hphases):
                     phase, rolltgt = "half", 0
                     fl.mode = "half"
-                    blocks["asg"] = [XC, BTOP - 32]
+                    blocks["asg"] = [XC, BTOP - H2]
                     start_ht = blocks["ht"][1]
         elif phase == "half":
             angh = (fl.alpha >> 8) & 255
             p = min(1.0, angh / 128) if fl.mode == "half" else 1.0
             blocks["ht"][1] = start_ht + p * (BBOT - start_ht)
-            blocks["asg"][1] = (BTOP - 32) + p * ((BBOT - BTOP - 32) // 2 + 32)
+            blocks["asg"][1] = (BTOP - H2) + p * ((BBOT - BTOP - H2) // 2 + H2)
             if fl.mode == "top":
                 pf += 1
                 if pf > 20:
@@ -140,8 +145,8 @@ def main():
         elif phase == "down":
             angh = (fl.alpha >> 8) & 255
             q = 1.0 if fl.mode == "auto" else min(1.0, max(0.0, (128 - angh) / 128))
-            top0 = BTOP + (BBOT - BTOP - 32) // 2
-            blocks["asg"][1] = top0 + q * (BTOP - 32 - top0)
+            top0 = BTOP + (BBOT - BTOP - H2) // 2
+            blocks["asg"][1] = top0 + q * (BTOP - H2 - top0)
             if fl.mode == "auto":
                 phase, tail = "tail", 0
         elif phase == "tail":
