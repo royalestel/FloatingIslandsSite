@@ -54,4 +54,11 @@ IDLE state (graphics = the idle byte at $3fff = $bfff, the ghost byte the line c
   Rule: after an exit the next IRQ must be >= 3 lines away (GAPMIN = 8 gives that between blocks); the bars now end at raster 202 (BANDL = 141) so the
   last exit is at line 203 and d >= 8 for the band too.  Found with the monitor: `watch store d011` + `r` per write (LIN/CYC) and `io d000`
   (VIC internal state: RC / Idle) per step, on frames synchronised by a trap.
+* Tilted-row timing (stage 4's first test, vtest2.s / gen_vtest2.py, NTSC, VICE): GOLDship's row -- 5 x (lda colK,y / sta $d021),
+  iny, the next row's segment 0 (lda / sta $d021,x in the right border) -- plus the dodge write (lda #Y / sta $d011) is 57 cycles: a normal
+  row has 8 to spare (65), enough for a loop's cpy / beq / jmp.  On the ship's 21 sprite-DMA rows (two sprites: 7 cycles stolen) it is
+  58 of 58 (sta $d011,x): no room for a loop test, so the ship band is straight-line code (or the dodge goes to every other row).
+  Checked: 120 rows, no badline, every row's six segments at the same pixels (sprite x 56 + 64k) above, through and below the ship.
+  Details that matter: the row's dodge write lands in the next raster line (cycle ~13), so it carries that line's Y; the first ship row
+  is the one starting on the sprite's first line (SPRY - ROW0: one off either way and the band's rows jog 7 cycles); HTUNE 3.
 * Next: top masking, the scroll (xscroll + column shifts), vertical follow, the choreography.
