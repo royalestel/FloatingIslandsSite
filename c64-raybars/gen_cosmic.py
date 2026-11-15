@@ -24,7 +24,6 @@ import glow_video as gv
 import loop_video as lv
 import swatch_loop_video as sv
 import big_ship, ship_aa
-import flat_ladder
 
 OUT = "cosmic.inc"
 UNIT = 1 / 16                      # world unit, metres
@@ -311,6 +310,7 @@ def v10_swatch_tables():
             for r in (0, 1):
                 b[32 * r + i] = v10.colour(k, r, p)
                 b[64 + 32 * r + i] = v10.ghost(k, r, p) & 255
+        import flat_ladder                              # (here: preview_v7 imports this module)
         for off, v in flat_ladder.tables()[p].items():   # the tilted segments' flat colours (no ghost byte): +128 / +160
             b[off] = v
         pages.append(bytes(b))

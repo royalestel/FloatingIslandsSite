@@ -69,4 +69,11 @@ IDLE state (graphics = the idle byte at $3fff = $bfff, the ghost byte the line c
   further from the bar's centre and flickering (on even frames): a quarter of the colour.  That needs the row's half of the bar, so the
   table is there twice: +128 / +160 the upper half, +192 / +224 the lower half (the compose step knows which half a row is in).
   19 of 25 steps match the real light exactly; step 1 2x, step 5 1.14x, two upper steps 1.2-1.4x (white for cyan|white).
+* The 81-attitude ship (gen_ship81.py: big_ship.pair at ship_aa's 9 rolls x 9 pitches, 256 bytes an angle, ship81.bin, 20736 bytes) is in
+  the cartridge's ROML halves, banks 60-62 (32 angles a bank; both cartridge builders add them).  cosmicstrings (SHIP81) keeps two slots
+  of four sprite blocks ($8800 / $8900); when roll * 9 + pitch differs from the shown slot's angle, the band IRQ copies it into the
+  other slot, 128 bytes a frame ($01 = $37 maps ROML in for reads only inside that IRQ; the writes go to the RAM under it), then
+  irqtop shows that slot: a new attitude 2-3 frames after it is asked for.  `shipr` (0..8, 4 level) is the roll; TESTROLL=1 sweeps it.
+  Checked in VICE: the slots hold the wanted angles, the ship rolls, no garbage frames, the band text intact.  The old 36 pitch-only
+  blocks are still loaded at $8800-$90FF (only the first 8 used): $8A00-$90FF can be freed for the tilt's colour columns.
 * Next: top masking, the scroll (xscroll + column shifts), vertical follow, the choreography.

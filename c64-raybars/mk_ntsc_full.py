@@ -48,6 +48,8 @@ def main():
     chip(0, 0x8000, joblist.ljust(0x2000, b"\xff")); chip(0, 0xA000, boot)
     for b, d in body: chip(b, 0x8000, d[:0x2000]); chip(b, 0xA000, d[0x2000:])
     for b in sorted(gbanks): chip(b, 0x8000, gbanks[b][:0x2000]); chip(b, 0xA000, gbanks[b][0x2000:])
+    assert nbanks <= g.SHIP81BANK
+    g.ship81_chips(chip)                # the ship's 81 attitudes, banks 60..62 (cosmicstrings streams them)
     hdr = b"C64 CARTRIDGE   " + struct.pack(">IHHBB6x", 0x40, 0x0100, 32, 1, 0) + b"FLOATING ISLANDS".ljust(32, b"\0")
     open(out, "wb").write(hdr + b"".join(chips))
     print(out, len(chips) // 2 if False else len({c[10:12] for c in chips}), "banks used of 64 (highest bank %d)" % (nbanks - 1))

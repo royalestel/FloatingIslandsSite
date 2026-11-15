@@ -274,6 +274,12 @@ def layout(jobs, first_bank):
         banks.setdefault(b, bytearray(b"\xff" * 0x4000))[o:o + len(d)] = d
     return joblist, banks, bank + (1 if off else 0), sum(len(d) for _, _, d in data), len(recbytes)
 
+SHIP81BANK = 60                      # cosmicstrings.s: the ship's 81 attitudes (gen_ship81.py), 32 a ROML half
+def ship81_chips(chip):
+    d = open(os.path.join(HERE, "ship81.bin"), "rb").read()
+    for i in range(-(-len(d) // 0x2000)):
+        chip(SHIP81BANK + i, 0x8000, d[i * 0x2000:(i + 1) * 0x2000].ljust(0x2000, b"\xff"))
+
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "gold_ntsc.crt")
     import music_ntsc_patch
@@ -307,6 +313,8 @@ def main():
     chip(1, 0x8000, b1[:0x2000]); chip(1, 0xA000, b1[0x2000:])
     for b in sorted(banks):
         chip(b, 0x8000, banks[b][:0x2000]); chip(b, 0xA000, banks[b][0x2000:])
+    assert max(banks) < SHIP81BANK
+    ship81_chips(chip)
     hdr = b"C64 CARTRIDGE   " + struct.pack(">IHHBB6x", 0x40, 0x0100, 32, 1, 0) + b"GOLD NTSC".ljust(32, b"\0")
     open(out, "wb").write(hdr + b"".join(chips))
     for r in report: print(r)

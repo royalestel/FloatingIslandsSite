@@ -63,6 +63,11 @@ CHAIN     = 0           ; -Wa -DCHAIN=1: a link of the cartridge's gold sequence
 MC        = $03ff       ; the tune's frame counter, shared by all the parts that play it
 MUSIC_PLAY = $1003
 .ifndef INTRO
+SHIP81    = CHAIN       ; the ship at 81 attitudes (gen_ship81.py): streamed from the cartridge (banks SHIP81BANK..) into two sprite slots
+SHIP81BANK = 60
+.ifndef TESTROLL
+TESTROLL  = 0           ; -Wa -DTESTROLL=1: the roll sweeps 0..8 (a step every 32 frames): to check the 81 frames in VICE
+.endif
 INTRO     = CHAIN       ; the cartridge's start (intro.inc, gen_intro.py): goldfly's light shrinks and splits into the ship's engine
 .endif                  ;   lights, the ship fades in, then the bars come in from the distance (a depth front: bars nearer are not shown)
 .ifndef SCROLL
@@ -291,7 +296,16 @@ dss:     .res NBLKMAX
 nrec:    .res 1
 .if INTRO
 tmr:     .res 2         ; frames of full flight so far
-nbuilds: .res 2         ; frames taken from the builder (a debugging counter: scene updates)
+nbuilds: .res 2
+shipr:   .res 1         ; SHIP81: the roll wanted, 0..8 (4: level)
+shiprd:  .res 1         ; ... taken with the frame (irqvbl), like shippd
+slot:    .res 1         ; the sprite slot shown (0 / 1: blocks SPRBLK + 4 * slot ..)
+slang:   .res 2         ; the angle (roll * 9 + pitch) in each slot ($ff: none)
+cpst:    .res 1         ; shipcopy: 0 idle, 1 the first half copied
+cpang:   .res 1
+cpslot:  .res 1
+trc:     .res 1         ; TESTROLL
+trd:     .res 1         ; frames taken from the builder (a debugging counter: scene updates)
 ending:  .res 1         ; the bars are leaving
 looping: .res 1         ; the teardrop loop: 0 not flying it, 1 on the way up, 2 past the top
 .if SCROLL
@@ -454,6 +468,9 @@ start:  sei
 resume:                         ; (CHAIN: the image is a snapshot taken here)
         .if SCROLL
         jsr bandinit            ; (colour RAM is I/O space: the snapshot cannot hold it)
+        .if SHIP81
+        jsr ship81init          ; (the cartridge: the snapshot cannot hold it either)
+        .endif
         .endif
         cli
 main:   lda copied
@@ -2712,7 +2729,11 @@ irqtop: sta sav_a
         txa
         asl a
         sta it1
+        .if SHIP81
+        lda slot
+        .else
         lda shippd
+        .endif
         asl a
         asl a
         clc
@@ -2874,8 +2895,122 @@ irqband:
         lda #>irqvbl
         sta $ffff
         asl $d019
+        .if SHIP81
+        stx sav_x
+        sty sav_y
+        .if TESTROLL
+        inc trc
+        lda trc
+        and #31
+        bne @tr
+        lda shipr
+        clc
+        adc trd
+        sta shipr
+        beq @up
+        cmp #8
+        bcc @tr
+        lda #$ff
+        .byte $2c
+@up:    lda #1
+        sta trd
+@tr:
+        .endif
+        jsr shipcopy            ; (lines ~210..240: the band, no bars; done well before irqvbl at 251)
+        ldx sav_x
+        ldy sav_y
+        .endif
         lda sav_a
         rti
+
+.if SHIP81
+; ---- the 81-attitude ship (gen_ship81.py): angle a = roll * 9 + pitch, 256 bytes in the cartridge's ROML (bank SHIP81BANK + a / 32,
+; $8000 + (a mod 32) * 256): frame * 128 + side * 64.  Two slots of four sprite blocks ($8800 / $8900); a new angle is copied into the
+; slot not shown, 128 bytes a frame from the band IRQ, then shown (irqtop reads `slot`).  The cartridge is mapped in ($01 = $37:
+; ROML at $8000 for reads, writes still go to the RAM under it) only inside this IRQ: nothing else runs meanwhile.
+mul9:   .byte 0, 9, 18, 27, 36, 45, 54, 63, 72
+shipcopy:
+        lda cpst
+        bne @second
+        ldx shiprd
+        lda mul9,x
+        clc
+        adc shippd
+        ldx slot
+        cmp slang,x
+        beq @out
+        sta cpang
+        txa
+        eor #1
+        sta cpslot
+        lda #0
+        jsr shiphalf
+        inc cpst
+@out:   rts
+@second:
+        lda #128
+        jsr shiphalf
+        lda #0
+        sta cpst
+        ldx cpslot
+        lda cpang
+        sta slang,x
+        stx slot                ; shown from the next frame's irqtop
+        rts
+; A = 0 / 128: that half of angle cpang into slot cpslot
+shiphalf:
+        sta @ld + 1
+        sta @st + 1
+        lda cpang
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        lsr a
+        clc
+        adc #SHIP81BANK
+        sta $de00
+        lda cpang
+        and #31
+        ora #$80
+        sta @ld + 2
+        lda cpslot
+        clc
+        adc #>($8000 + SPRBLK * 64)     ; (VIC bank 2)
+        sta @st + 2
+        lda #$37
+        sta $01
+        ldx #127
+@ld:    lda $8000,x
+@st:    sta $8800,x
+        dex
+        bpl @ld
+        lda #$35
+        sta $01
+        rts
+; at resume (interrupts off): the level ship, pitch shipp, into slot 0
+ship81init:
+        lda #4
+        sta shipr
+        sta shiprd
+        lda #1
+        sta trd
+        lda #0
+        sta slot
+        sta cpst
+        sta cpslot
+        lda #$ff
+        sta slang + 1
+        lda #36
+        clc
+        adc shipp
+        sta cpang
+        sta slang
+        lda #0
+        jsr shiphalf
+        lda #128
+        jmp shiphalf
+.endif
 .endif
 
 ; vertical blank: take the built frame (records into page 1, blocks)
@@ -2913,6 +3048,10 @@ irqvbl: sta sav_a
         bne @cb
 @nb:    lda shipp
         sta shippd
+        .if SHIP81
+        lda shipr
+        sta shiprd
+        .endif
         lda #0
         sta ready
         lda #1
