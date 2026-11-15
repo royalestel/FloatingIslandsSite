@@ -65,6 +65,15 @@ MUSIC_PLAY = $1003
 .ifndef INTRO
 SHIP81    = CHAIN       ; the ship at 81 attitudes (gen_ship81.py): streamed from the cartridge (banks SHIP81BANK..) into two sprite slots
 SHIP81BANK = 60
+.ifndef TILT
+TILT      = SHIP81
+.endif
+;TILT: the tilted bars (SCROLLER_PLAN.md: tilted display design; gen_tilt.py): when the roll is not level
+TMARG     = 8           ; column margin (the largest segment offset)
+TCOLPG    = $8a         ; column pages: $8a00 + c * 256, c = 2 * buffer + frame parity (the old pitch-only ship blocks)
+.ifndef TDELAY
+TDELAY    = 25          ; the entry stubs' delay: a tilted block's first row starts at cycle 21 of its line (VICE: stub at cycle 48 of the line before)
+.endif
 .ifndef TESTROLL
 TESTROLL  = 0           ; -Wa -DTESTROLL=1: the roll sweeps 0..8 (a step every 32 frames): to check the 81 frames in VICE
 .endif
@@ -137,7 +146,10 @@ SPRBLK    = $20         ; $8800 / 64 in bank 2
 
 ; =============================================================================
 .segment "ZEROPAGE"
-src:     .res 2         ; display: span source
+src:     .res 2         ; display: span source (a tilted block: its end line)
+tb0v:    .res 1         ; TILT: BAND0, BAND1 (the rows' cpy zp)
+tb1v:    .res 1
+tptr:    .res 2
 sav_a:   .res 1
 sav_x:   .res 1
 sav_y:   .res 1
@@ -305,6 +317,19 @@ cpst:    .res 1         ; shipcopy: 0 idle, 1 the first half copied
 cpang:   .res 1
 cpslot:  .res 1
 trc:     .res 1         ; TESTROLL
+bshipr:  .res 1         ; TILT: the roll of the frame being built
+tpair:   .res 1         ; the column buffer the next tilted build fills
+tnext:   .res 1         ; ... the last tilted build's (taken by irqvbl)
+tfront:  .res 1         ; ... the one shown
+ttilt:   .res 2         ; the roll each buffer's code copies are patched for ($ff: none)
+tw0:     .res NBLKMAX   ; tiltpost: the level blocks' first and end window lines
+tw1:     .res NBLKMAX
+tcnt:    .res 1
+tlast:   .res 1
+tcopyb:  .res 2
+tvs:     .res 1
+tcs:     .res 1
+tce:     .res 1
 trd:     .res 1         ; frames taken from the builder (a debugging counter: scene updates)
 ending:  .res 1         ; the bars are leaving
 looping: .res 1         ; the teardrop loop: 0 not flying it, 1 on the way up, 2 past the top
@@ -477,7 +502,18 @@ main:   lda copied
         beq main
         lda #0
         sta copied
+        .if TILT
+        lda shipr
+        sta bshipr
+        .endif
         jsr build
+        .if TILT
+        lda bshipr
+        cmp #4
+        beq :+
+        jsr tiltpost
+:
+        .endif
         lda #1
         sta ready
         jmp main
@@ -2990,6 +3026,21 @@ shiphalf:
         rts
 ; at resume (interrupts off): the level ship, pitch shipp, into slot 0
 ship81init:
+        .if TILT
+        lda #BAND0
+        sta tb0v
+        lda #BAND1
+        sta tb1v
+        lda #$ff
+        sta ttilt
+        sta ttilt + 1
+        lda #0
+        sta tpair
+        sta tnext
+        sta tfront
+        lda #4
+        sta bshipr
+        .endif
         lda #4
         sta shipr
         sta shiprd
@@ -3049,8 +3100,16 @@ irqvbl: sta sav_a
 @nb:    lda shipp
         sta shippd
         .if SHIP81
+        .if TILT
+        lda bshipr
+        .else
         lda shipr
+        .endif
         sta shiprd
+        .endif
+        .if TILT
+        lda tnext
+        sta tfront
         .endif
         lda #0
         sta ready
@@ -3063,6 +3122,14 @@ irqvbl: sta sav_a
 :
         .endif
 @no:
+        .if TILT
+        lda fcount              ; the stubs' vectors for the next frame (irqtop counts it: its parity is fcount + 1)
+        clc
+        adc #1
+        and #1
+        tax
+        jsr tvecset
+        .endif
         .if INTRO
         jsr introtick
         .endif
@@ -3163,6 +3230,10 @@ blkgo:  pla
   .endif
 .endmacro
 
+.macro bnenear T
+        bne T
+        .assert >* = >(T), error, "branch crosses a page"
+.endmacro
 .macro beqnear T
         beq T
         .assert >* = >(T), error, "branch crosses a page"
@@ -3372,3 +3443,355 @@ exitd:  ldx sav_s
         jsr setvbl
         jmp irqout
         .endif
+
+.if TILT
+; =============================================================================
+;  The tilted bars (SCROLLER_PLAN.md: tilted display design)
+; =============================================================================
+        .segment "TILT"
+        .align 256
+dodtab:                         ; the ship band's dodge (every other row): Y for landing line M = WTOPR + y, safe for M .. M + 2
+        .repeat 256, I
+        .byte DODGE0 + ((WTOPR + I + 3) .mod 8)
+        .endrep
+        .include "ctilt.inc"
+texit:  jmp exit
+
+; irqvbl: the stubs' vectors for the next frame, copy c = 2 * tfront + parity (x = that parity; kept): tent + 8i + 2c (one page: low bytes only)
+tvecset:
+        stx tvs
+        lda tfront
+        asl a
+        ora tvs
+        asl a                   ; 2c
+        .repeat 9, I
+        ora #<(tent + 8 * I)
+        sta .ident(.sprintf("tsop%d", I))
+        and #6
+        .endrep
+        rts
+
+; the entry stubs (a record's entry - 1): x = 0, the dodge for the block's first line, the delay, the copy's row
+.macro tstub I, W
+        ldx #0
+        lda #DODGE0 + ((((WTOPR + (W)) .mod 4) + 2) .mod 8)
+        sta $d011
+        fill TDELAY
+.ident(.sprintf("tsop%d", I)) := * + 1
+        jmp (tent + 8 * (I))
+.endmacro
+tsN0:   tstub 0, 0
+tsN1:   tstub 1, 1
+tsN2:   tstub 2, 2
+tsN3:   tstub 3, 3
+tsA0:   tstub 4, 0
+tsA1:   tstub 5, 1
+tsA2:   tstub 6, 2
+tsA3:   tstub 7, 3
+tsB:    tstub 8, BAND0
+tstl:   .byte <(tsN0-1), <(tsN1-1), <(tsN2-1), <(tsN3-1), <(tsA0-1), <(tsA1-1), <(tsA2-1), <(tsA3-1), <(tsB-1)
+tsth:   .byte >(tsN0-1), >(tsN1-1), >(tsN2-1), >(tsN3-1), >(tsA0-1), >(tsA1-1), >(tsA2-1), >(tsA3-1), >(tsB-1)
+        .assert <tent = 0, error, "tent: one page from offset 0 (the low-byte patch uses ora)"
+
+; ---- after a level build, when the roll is not level: the columns, the tilted blocks, the offsets ----------------------------
+tiltpost:
+        ; the offsets into the buffer's two code copies, if they changed
+        ldx tpair
+        lda bshipr
+        cmp ttilt,x
+        bne :+
+        jmp @noff
+:       sta ttilt,x
+        txa                     ; copies 2 * tpair, 2 * tpair + 1: patch rows (c * 6 + k) * TNPATCH
+        asl a
+        sta tcnt                ; c
+        ldx #2
+@cp:    lda #0
+        sta tlast               ; k
+@kk:    lda bshipr              ; the value: toff[roll * 6 + k]
+        asl a
+        adc bshipr
+        asl a
+        adc tlast
+        tay
+        lda toff,y
+        pha
+        pla
+        sta tce                 ; the value
+        ldy tcnt                ; the copy's start
+        lda tcopyl,y
+        sta tcopyb
+        lda tcopyh,y
+        sta tcopyb+1
+        lda tlast               ; k * TNPATCH: the segment's relative addresses
+        asl a
+        adc tlast
+        asl a                   ; k * 6
+        sta tcs
+        lda #0
+        ldy tlast
+:       cpy #0
+        beq :+
+        clc
+        adc #TNPATCH
+        dey
+        jmp :-
+:       tay
+        lda #TNPATCH
+        sta tcs
+:       lda trell,y
+        clc
+        adc tcopyb
+        sta tptr
+        lda trelh,y
+        adc tcopyb+1
+        sta tptr+1
+        sty tw0                 ; (scratch)
+        ldy #0
+        lda tce
+        sta (tptr),y
+        ldy tw0
+        iny
+        dec tcs
+        bne :-
+        inc tlast
+        lda tlast
+        cmp #6
+        bne @kk
+        inc tcnt
+        dex
+        bne @cp
+@noff:
+        ; clear the buffer's two columns
+        lda tpair
+        asl a
+        clc
+        adc #TCOLPG
+        sta @c0 + 2
+        adc #1
+        sta @c1 + 2
+        lda #0
+        ldx #BANDL + 2 * TMARG
+@c0:    sta $ff00,x
+@c1:    sta $ff00,x
+        dex
+        bpl @c0
+        ; compose: every level block's records, line by line
+        lda tpair
+        asl a
+        clc
+        adc #TCOLPG
+        sta @w0 + 2
+        adc #1
+        sta @w1 + 2
+        ldx #0
+@blk:   cpx nblk
+        bcc :+
+        jmp @comp
+:       lda bline,x
+        sec
+        sbc #WTOPR - 2
+        sta tw0,x
+        sta tcs                 ; w
+        lda bss,x
+        clc
+        adc #1
+        sta tce                 ; record index
+@rec:   ldy tce
+        lda recbuf+3,y
+        cmp #<(exit-1)
+        bne @span
+        lda recbuf+4,y
+        cmp #>(exit-1)
+        beq @bend
+@span:  lda recbuf,y
+        sta tptr
+        lda recbuf+1,y
+        sta tptr+1
+        lda recbuf+2,y
+        sta tcnt                ; n: lines read at (src),n .. (src),1
+        tya
+        clc
+        adc #5
+        sta tce
+        stx tlast
+@line:  ldy tcnt
+        lda (tptr),y            ; the swatch
+        sta tw1 + NBLKMAX - 1   ; (scratch: the swatch)
+        tax
+        lda #128                ; half: upper unless the line below is no brighter (the EDGE steps differ by half)
+        cpy #1
+        beq @lower
+        dey
+        txa
+        cmp (tptr),y
+        bcc @half
+@lower: lda #192
+@half:  sta tw1 + NBLKMAX - 2   ; (scratch: the table base)
+        lda tcs                 ; row parity: (w + 1) & 1
+        clc
+        adc #1
+        and #1
+        beq :+
+        lda #32
+:       clc
+        adc tw1 + NBLKMAX - 2
+        adc tw1 + NBLKMAX - 1
+        tay
+        lda swtab,y
+        ldx tcs
+@w0:    sta $ff00 + TMARG,x
+        lda swtab + 256,y
+@w1:    sta $ff00 + TMARG,x
+        inc tcs
+        dec tcnt
+        bne @line
+        ldx tlast
+        jmp @rec
+@bend:  lda tcs
+        sta tw1,x
+        inx
+        jmp @blk
+        ; the tilted blocks: widened by TMARG, over the whole ship band when they reach it, merged when closer than GAPMIN
+@comp:  lda #0
+        sta tptr                ; record index
+        sta tptr+1              ; new block count
+        lda #$ff
+        sta tlast               ; no block open
+        ldx #0
+@nb:    cpx nblk
+        bcs @flush
+        lda tw0,x               ; s = max(0, w0 - TMARG)
+        sec
+        sbc #TMARG
+        bcs :+
+        lda #0
+:       sta tcs
+        lda tw1,x               ; e = min(BANDL, w1 + TMARG)
+        clc
+        adc #TMARG
+        cmp #BANDL
+        bcc :+
+        lda #BANDL
+:       sta tce
+        jsr tband
+        lda tlast
+        cmp #$ff
+        beq @new
+        lda tw1 + NBLKMAX - 3   ; close to the open block (or overlapping it: the band stretch): merge
+        clc
+        adc #GAPMIN
+        cmp tcs
+        bcc @emit
+        beq @emit
+        lda tcs                 ; (the merged block starts at the lower start)
+        cmp tlast
+        bcs :+
+        sta tlast
+:       lda tce
+        cmp tw1 + NBLKMAX - 3
+        bcc :+
+        sta tw1 + NBLKMAX - 3
+:       inx
+        jmp @nb
+@emit:  jsr temit
+@new:   lda tcs
+        sta tlast               ; the open block: tlast .. tw1[NBLKMAX-3]
+        lda tce
+        sta tw1 + NBLKMAX - 3
+        inx
+        jmp @nb
+@flush: lda tlast
+        cmp #$ff
+        beq :+
+        jsr temit
+:       lda tptr+1
+        sta nblk
+        lda tptr
+        sta nrec
+        lda tpair
+        sta tnext
+        eor #1
+        sta tpair
+tiltdone:
+        rts
+
+; the band rule for tcs .. tce: a block that reaches the ship band starts at or above it and ends below it; so does one that
+; starts just below it (its IRQs would fall on the sprite DMA lines: the block 7 cycles late)
+tband:  lda tcs
+        cmp #BAND1 + 3
+        bcs @x
+        lda tce
+        cmp #BAND0 + 1
+        bcc @x
+        lda tcs
+        cmp #BAND0
+        bcc :+
+        lda #BAND0
+        sta tcs
+:       lda tce
+        cmp #BAND1 + 1
+        bcs @x
+        lda #BAND1 + 1
+        sta tce
+@x:     rts
+
+; the open block (tlast .. tw1[NBLKMAX-3]) as a record: [end, 0, first line, entry - 1]
+temit:  stx tcnt
+        lda tcs                 ; (the caller's next block: kept)
+        pha
+        lda tce
+        pha
+        lda tlast
+        sta tcs
+        lda tw1 + NBLKMAX - 3
+        sta tce
+        jsr tband               ; (again: a merge may have reached the band)
+        ldx tptr+1
+        lda tcs
+        clc
+        adc #WTOPR - 2
+        sta bline,x
+        lda tptr
+        sec
+        sbc #1
+        sta bss,x
+        inc tptr+1
+        ldy tptr
+        lda tce
+        sta recbuf,y
+        lda #0
+        sta recbuf+1,y
+        lda tcs
+        sta recbuf+2,y
+        cmp #BAND0              ; the entry: the band / loopA (above it, reaching it) / loopN, by phase
+        bne :+
+        ldx #8
+        bne @ent
+:       and #3
+        tax
+        lda tcs
+        cmp #BAND0
+        bcs @ent
+        lda tce
+        cmp #BAND0 + 1
+        bcc @ent
+        inx
+        inx
+        inx
+        inx
+@ent:   lda tstl,x
+        sta recbuf+3,y
+        lda tsth,x
+        sta recbuf+4,y
+        tya
+        clc
+        adc #5
+        sta tptr
+        pla
+        sta tce
+        pla
+        sta tcs
+        ldx tcnt
+        rts
+.endif

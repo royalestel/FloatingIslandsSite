@@ -49,7 +49,8 @@ SEQ = [
         "CB": (0xA300, 0xA600, ["INTROTAB2"]),
         "C7": (0xA600, 0xBFFF, ["TABLES"]),
         "C8": (0xC800, 0xD000, ["CODE2"]),
-        "CF": (0x0800, 0x1000, ["FONT"])}),                     # (the band scroller's font: VIC bank 0)
+        "CF": (0x0800, 0x1000, ["FONT"]),                       # (the band scroller's font: VIC bank 0)
+        "CT": (0xF100, 0xFFF0, ["TILT"])}),                     # (the tilted bars: gen_tilt.py; above NLZ $F000)
     ("goldfly", ["SPRBUF=$8080", "FLYOFF=1", "LIGHT2=$A1C0"], 270, {     # (FLYOFF: from frame 270 the bars fly off, then the light is handed on)
         "F1": (0x5000, 0x6E00, ["RAMPS"]),
         "F2": (0x6E00, 0x8000, ["CODE", "RASTER", "BSS"]),

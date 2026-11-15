@@ -76,4 +76,22 @@ IDLE state (graphics = the idle byte at $3fff = $bfff, the ghost byte the line c
   irqtop shows that slot: a new attitude 2-3 frames after it is asked for.  `shipr` (0..8, 4 level) is the roll; TESTROLL=1 sweeps it.
   Checked in VICE: the slots hold the wanted angles, the ship rolls, no garbage frames, the band text intact.  The old 36 pitch-only
   blocks are still loaded at $8800-$90FF (only the first 8 used): $8A00-$90FF can be freed for the tilt's colour columns.
+* Tilted display design (step 3d).  A tilted frame is the level frame with each of six segments shifted by off_k lines (k = 0..5,
+  from the roll): segment k of window line w shows the level picture's line w - off_k, in flat colours (no ghost byte).
+  - Columns: per window line, the flat colour (flat_ladder, by swatch, row parity, frame parity, bar half) for frame parity 0 and 1:
+    two pages per buffer, two buffers (the builder fills one while the other is shown): $8A00-$8DFF (the old pitch-only ship blocks).
+    Index w + MARG (8), so segment k reads its page at MARG - off_k + y with y = w.
+  - Row code (gen_tilt.py -> ctilt.inc, four copies: buffer x frame parity, each reading its own page; irqtop points nine entry
+    vectors at the copy of the front buffer for this frame's parity): GOLDship's row (5 x lda col,y / sta $d021, iny, the next row's
+    segment 0 in the right border) + the dodge write + an end test:
+      normal rows (loopN, 4 phases): 51 + 6 + cpy src / beq = 62 + jmp = 65; the test ends the block (src = its end line).
+      rows above the ship band (loopA): no test except the row just above it (w = TB0 - 1 is always phase 0): cpy #TB0 -> the band.
+      the ship band (21 rows, 58 cycles each): E, then X / Y alternating (X: dodge from a table by line, 3-line safe; Y: the test
+      for the band's end, then on into loopN): no cycles for a dodge and a test in one row.
+    A block that overlaps the band starts at or above it and ends below it (the builder stretches it): blocks only end in loopN.
+  - Records: a tilted block is one record [end, 0, first line, entry] (the existing pop: src = end, y = first line), entry a stub
+    by phase / loopA / band: ldx #0, the first dodge write, a delay, jmp (vector).
+  - Builder (after the level build, when the roll is not level): compose the columns from the level records, then replace the blocks:
+    each widened by MARG lines, stretched over the band if it overlaps it, merged when closer than GAPMIN; patch the segment offsets
+    into the buffer's two copies when the tilt changed.
 * Next: top masking, the scroll (xscroll + column shifts), vertical follow, the choreography.
