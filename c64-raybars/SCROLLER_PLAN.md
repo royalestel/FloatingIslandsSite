@@ -61,4 +61,9 @@ IDLE state (graphics = the idle byte at $3fff = $bfff, the ghost byte the line c
   Checked: 120 rows, no badline, every row's six segments at the same pixels (sprite x 56 + 64k) above, through and below the ship.
   Details that matter: the row's dodge write lands in the next raster line (cycle ~13), so it carries that line's Y; the first ship row
   is the one starting on the sprite's first line (SPRY - ROW0: one off either way and the band's rows jog 7 cycles); HTUNE 3.
+* Flat colours for the tilted segments (flat_ladder.py, in gen_cosmic.py's swatch pages at +128 even rows / +160 odd rows, per frame
+  parity, indexed by ladder position like the colour entries; flat_ladder.png: real swatch | flat, both frames averaged): each ladder
+  step becomes one colour or a pair on alternate rows swapped every frame, chosen in CIELAB; flicker beyond the real swatch's own is
+  penalised; no step dimmer than 0.8x (0.95x for the upper half: the bars' centres); the faintest steps (< 0.03) black + one colour.
+  18 of 25 steps match the real light exactly; the faintest come out 2-4x (but visible), two upper steps 1.2-1.4x (white for cyan|white).
 * Next: top masking, the scroll (xscroll + column shifts), vertical follow, the choreography.
