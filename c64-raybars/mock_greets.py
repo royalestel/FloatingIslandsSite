@@ -6,7 +6,7 @@
     bank left    it leaves to the right, "DESIRE  MOONSHINE" comes on from the left
     bank right   that leaves to the left, "CREST  RAISTLIN" comes on from the right
     level        half a second, the text still
-    bank right   that leaves to the right, "HAMMERFIST  T0M3000" comes on from the left (as asked: bank right, text moving right)
+    bank left    that leaves to the right, "HAMMERFIST  T0M3000" comes on from the left
     half loop    the text scrolls down out of the band, "ANDY  SHINE" / "GUINEA PIG" (two rows, one black line
                  between them: one row is wider than the window)
                  scrolls down into it
@@ -86,7 +86,7 @@ def main():
     H2 = texts["asg"].shape[0]                                # the two-row block: 16 + GAP + 16 lines
     # the horizontal phases: (roll target, direction the text moves: -1 left / +1 right, leaving text, arriving text)
     hphases = [(8, -1, None, "greets"), (-8, 1, "greets", "dm"), (8, -1, "dm", "cr"), ("hold", 0, "cr", None),
-               (8, 1, "cr", "ht")]
+               (-8, 1, "cr", "ht")]
     blocks = {}                                               # visible text: name -> [x centre, top]
     roll, layer = 0, None
     S = 3
@@ -134,7 +134,8 @@ def main():
                     start_ht = blocks["ht"][1]
         elif phase == "half":
             angh = (fl.alpha >> 8) & 255
-            p = min(1.0, angh / 128) if fl.mode == "half" else 1.0
+            sang = angh - 256 if angh >= 192 else angh          # (signed: a ship still pitched down at the start reads as < 0, not ~ a turn)
+            p = min(1.0, max(0.0, sang / 128)) if fl.mode == "half" else 1.0
             blocks["ht"][1] = start_ht + p * (BBOT - start_ht)
             blocks["asg"][1] = (BTOP - H2) + p * ((BBOT - BTOP - H2) // 2 + H2)
             if fl.mode == "top":
