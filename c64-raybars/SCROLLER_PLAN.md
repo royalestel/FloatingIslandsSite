@@ -65,5 +65,8 @@ IDLE state (graphics = the idle byte at $3fff = $bfff, the ghost byte the line c
   parity, indexed by ladder position like the colour entries; flat_ladder.png: real swatch | flat, both frames averaged): each ladder
   step becomes one colour or a pair on alternate rows swapped every frame, chosen in CIELAB; flicker beyond the real swatch's own is
   penalised; no step dimmer than 0.8x (0.95x for the upper half: the bars' centres); the faintest steps (< 0.03) black + one colour.
-  18 of 25 steps match the real light exactly; the faintest come out 2-4x (but visible), two upper steps 1.2-1.4x (white for cyan|white).
+  By eye (user): ladder steps 1, 2 (dark blue) and 4 (purple) are one coloured row and one black row, the coloured row always the one
+  further from the bar's centre and flickering (on even frames): a quarter of the colour.  That needs the row's half of the bar, so the
+  table is there twice: +128 / +160 the upper half, +192 / +224 the lower half (the compose step knows which half a row is in).
+  19 of 25 steps match the real light exactly; step 1 2x, step 5 1.14x, two upper steps 1.2-1.4x (white for cyan|white).
 * Next: top masking, the scroll (xscroll + column shifts), vertical follow, the choreography.

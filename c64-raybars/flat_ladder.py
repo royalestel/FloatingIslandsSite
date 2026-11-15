@@ -6,9 +6,10 @@ ghost byte's 1-bits black, averaged over both row parities and both frame pariti
 colour, or a pair A / B on alternate rows that swaps every frame (row 0: A on even frames, B on odd; row 1 the other way), whichever
 is closest in CIELAB (linear RGB distance picked brown for a dark blue); flicker (the pair's lightness difference) is penalised; the upper half of the ladder (the bars' centres) may not come out
 dimmer than 95% of its target.  The table goes into the swatch pages at +128 (even rows) / +160 (odd rows), per frame parity,
-indexed like the colour entries by ladder position.
+indexed like the colour entries by ladder position; the same again at +192 / +224 for rows in the bar's lower half (they differ only
+for the EDGE steps).
 
-    python3 flat_ladder.py [preview.png]        (prints the table, writes a side-by-side preview)
+    python3 flat_ladder.py [preview.png]        (prints the table, writes a preview: real | flat frame A | frame B | flat averaged)
 """
 import sys
 import numpy as np
@@ -77,43 +78,57 @@ def flat_pairs():
     n = len(v10.LAD)
     return [choose(target(k), i >= CENTRE_FROM * n, i > 0, real_flicker(k)) for i, k in enumerate(v10.LAD)]
 
-def flat_colour(pair, rp, p):
+# By eye (the user's call): the faintest steps as one coloured row and one black row, the coloured row always the one further from
+# the bar's centre and flickering (on even frames, black on odd): a quarter of the colour.  Ladder position -> colour.
+EDGE = {1: 6, 2: 6, 4: 4}             # dark blue, dark blue, purple
+
+def flat_colour(pair, rp, p, i=None, lower=False):
+    """step i's flat colour on row parity rp, frame parity p; lower: the row is in the bar's lower half"""
+    if i in EDGE:
+        outer = (rp == 1) if lower else (rp == 0)        # upper half: the even row of a pair is the outer one; lower half: the odd
+        return EDGE[i] if outer and p == 0 else 0
     a, b = pair
     return a if (rp + p) % 2 == 0 else b
 
 def tables():
-    """{(p): {offset: byte}}: +128 + 32 * rp + ladder position"""
+    """{p: {offset: byte}}: the bar's upper half at +128 + 32 * rp + ladder position, its lower half at +192 + 32 * rp + position"""
     pairs = flat_pairs()
-    return {p: {128 + 32 * rp + i: flat_colour(pr, rp, p) for i, pr in enumerate(pairs) for rp in (0, 1)} for p in (0, 1)}
+    return {p: {base + 32 * rp + i: flat_colour(pr, rp, p, i, base == 192)
+                for i, pr in enumerate(pairs) for rp in (0, 1) for base in (128, 192)} for p in (0, 1)}
+
+def flat_light(i, pr):
+    if i in EDGE:
+        return LUM[EDGE[i]] / 4
+    return (LUM[pr[0]] + LUM[pr[1]]) / 2
 
 def main(out=None):
     pairs = flat_pairs()
     print(" pos swatch  target   flat     (A,B)   flicker (real swatch's)")
     for i, (k, pr) in enumerate(zip(v10.LAD, pairs)):
         t = target(k) @ LW
-        f = (LUM[pr[0]] + LUM[pr[1]]) / 2
-        print(f" {i:3} {k:5}  {t:.4f}  {f:.4f} {f / max(t, 1e-6):5.2f}x  {pr}  {abs(LUM[pr[0]] - LUM[pr[1]]):.3f} ({real_flicker(k):.3f})")
+        f = flat_light(i, pr)
+        sw = LUM[EDGE[i]] if i in EDGE else abs(LUM[pr[0]] - LUM[pr[1]])
+        lab_ = f"edge {EDGE[i]}" if i in EDGE else str(pr)
+        print(f" {i:3} {k:5}  {t:.4f}  {f:.4f} {f / max(t, 1e-6):5.2f}x  {lab_:8}  {sw:.3f} ({real_flicker(k):.3f})")
     if out:
         from PIL import Image
-        S, W = 4, 24
-        img = np.zeros((len(pairs) * 10 * S, 3 * W * S, 3), np.uint8)
+        S, W, G = 4, 24, 8
         un = lambda l: (np.clip(l, 0, 1) ** (1 / 2.2) * 255).astype(np.uint8)
+        img = np.zeros((len(pairs) * 10 * S, (4 * W + 3 * G) * S, 3), np.uint8)
         for i, (k, pr) in enumerate(zip(v10.LAD, pairs)):
             y = i * 10 * S
-            for p in (0, 1):                               # the real swatch, frame p (left: averaged over the two)
-                pass
-            real = np.zeros((8, W, 3)); flat = np.zeros((8, W, 3))
+            real = np.zeros((8, W, 3)); fa = np.zeros((8, W, 3)); fb_ = np.zeros((8, W, 3))
             for p in (0, 1):
                 rows = real_rows(k, p)
                 for r in range(8):
                     for x in range(W):
                         real[r, x] += LP[rows[r & 1][x % 8]] / 2
-                        flat[r, x] += LP[flat_colour(pr, r & 1, p)] / 2
-            for j, blk in enumerate((real, flat)):
-                im = np.repeat(np.repeat(un(blk), S, 0), S, 1)
-                img[y:y + 8 * S, j * (W + W // 2) * S:j * (W + W // 2) * S + W * S] = im
+                    (fa if p == 0 else fb_)[r, :] = LP[flat_colour(pr, r & 1, p, i)]
+            for j, blk in enumerate((real, fa, fb_, (fa + fb_) / 2)):
+                x0 = j * (W + G) * S
+                img[y:y + 8 * S, x0:x0 + W * S] = np.repeat(np.repeat(un(blk), S, 0), S, 1)
         Image.fromarray(img).save(out)
-        print("wrote", out)
+        print("wrote", out, "(columns: real swatch averaged | flat frame A | flat frame B | flat averaged; upper half of a bar: outer row on top)")
 
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else None)
