@@ -48,4 +48,10 @@ IDLE state (graphics = the idle byte at $3fff = $bfff, the ghost byte the line c
   in display state).  Pitfalls found: the cartridge hides the ROM font from the VIC (a RAM font is needed even for tests); a line-code variant must
   jump over the span-end path that follows it (first build ran into it: garbage rows from the third line of every block).
 * Stage 2 moved to $0700 (255 bytes) to leave $0800-$0fff to the font.
+* Garbage frames (found and fixed): a gap IRQ is set up by `nextirq` from the block `exit` code, whose handler takes ~155 cycles (from cycle 2 of the exit line);
+  with d = 7 (last bar line 203, band at 211) the gap IRQ fell only 2 lines after the exit, the raster IRQ came while the handler was still running and
+  its `asl $d019` acknowledged it: the IRQ chain was lost for a frame (no dodge writes: text garbage, bars black, the next frame's irqtop late too).
+  Rule: after an exit the next IRQ must be >= 3 lines away (GAPMIN = 8 gives that between blocks); the bars now end at raster 202 (BANDL = 141) so the
+  last exit is at line 203 and d >= 8 for the band too.  Found with the monitor: `watch store d011` + `r` per write (LIN/CYC) and `io d000`
+  (VIC internal state: RC / Idle) per step, on frames synchronised by a trap.
 * Next: top masking, the scroll (xscroll + column shifts), vertical follow, the choreography.

@@ -76,7 +76,7 @@ RUNFRAMES = 1800        ; INTRO: frames of full flight (30 s at 60 Hz) before th
 APN       = 10          ; the autopilot looks this many rows ahead
 APSAFE    = 28          ; ... and keeps its heading while the clearance (units of 1/16 m) is at least this
 .if SCROLL
-BANDL     = 142         ; window lines 0..BANDL-1 show bars (raster lines 62..203): the rest stays black, the band's text starts at 212
+BANDL     = 141         ; window lines 0..BANDL-1 show bars (raster lines 62..202): the rest stays black, the band's text starts at 212
 BANDY0    = 212         ; the band's first text line (the first badline)
 BLANKCH   = 4 * $19     ; the font's space tile: its first character is blank
 BANDQ     = BANDY0 - 4  ; the band IRQ's line: in (BANDY0 - 8, BANDY0)
@@ -291,6 +291,7 @@ dss:     .res NBLKMAX
 nrec:    .res 1
 .if INTRO
 tmr:     .res 2         ; frames of full flight so far
+nbuilds: .res 2         ; frames taken from the builder (a debugging counter: scene updates)
 ending:  .res 1         ; the bars are leaving
 looping: .res 1         ; the teardrop loop: 0 not flying it, 1 on the way up, 2 past the top
 .if SCROLL
@@ -2890,7 +2891,7 @@ irqvbl: sta sav_a
         sta $d018
         lda #$c8
         sta $d016
-        lda #$1b
+        lda #$0b                ; DEN off until irqtop (line 44) turns it on: if irqtop is ever late the frame has no badlines (black) instead of garbage
         sta $d011
         .endif
         lda ready
@@ -2916,6 +2917,12 @@ irqvbl: sta sav_a
         sta ready
         lda #1
         sta copied
+        .if INTRO
+        inc nbuilds
+        bne :+
+        inc nbuilds+1
+:
+        .endif
 @no:
         .if INTRO
         jsr introtick
@@ -2924,8 +2931,13 @@ irqvbl: sta sav_a
         lda $d012               ; the tune (up to ~1650 cycles) only if the top IRQ at line 44 is still far enough away
         cmp #DENLINE - 26
         bcc :+
+        .if SCROLL
+        cmp #VBLLINE            ; (this IRQ starts at line 251: lines 18..250 here mean the copy ran into the next frame: too late)
+        bcc @nomus
+        .else
         cmp #DENLINE
         bcc @nomus              ; (lines 18..43: too late: this frame has no tune call)
+        .endif
 :       jsr musicplay
 @nomus:
         .endif
