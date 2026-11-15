@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
-"""Flicker clip (a simulation, not VICE): for a bright and a dim bar, three stacked rows: the real VICE bar (static ghost byte),
+"""Flicker clip (a simulation, not VICE): for a bright and a dim bar, three stacked rows: the real VICE bar (ghost byte, flipping with frame parity: two consecutive captured frames),
 the tilted hybrid flat version with its row pairs swapped every frame at 60 Hz, and the steady average of the two frames.
 python3 mock_flicker.py out.mp4 [seconds]"""
 import sys, subprocess
 import numpy as np
 OUTV = sys.argv[1] if len(sys.argv) > 1 else "mock_flicker.mp4"
 SECS = float(sys.argv[2]) if len(sys.argv) > 2 else 4
-sys.argv = [sys.argv[0], "/tmp/sa_19.png", "0", "1", "/tmp/_x.png"]
+sys.argv = [sys.argv[0], "/tmp/fl_08.png,/tmp/fl_09.png", "0", "1", "/tmp/_x.png"]
 import importlib.util, io, contextlib
 def build(y0, y1):
     sys.argv[2], sys.argv[3] = str(y0), str(y1)
     spec = importlib.util.spec_from_file_location("mth", "mock_tilt_hybrid.py"); m = importlib.util.module_from_spec(spec)
     with contextlib.redirect_stdout(io.StringIO()): spec.loader.exec_module(m)
-    return m.real, m.A, m.B, m.avg
-bars = [build(57, 89), build(106, 118)]
+    return m.realA, m.realB, m.A, m.B, m.avg
+bars = [build(91, 128), build(147, 159)]
 S = 2
 def frame(f):
     rows = []
-    for real, A, B, avg in bars:
-        for a in (real, A if f % 2 == 0 else B, avg):
+    for rA, rB, A, B, avg in bars:
+        real = rA
+        for a in (rA if f % 2 == 0 else rB, A if f % 2 == 0 else B, avg):
             rows.append(a); rows.append(np.zeros((4, a.shape[1], 3)))
         rows.append(np.zeros((10, real.shape[1], 3)))
     im = np.concatenate(rows).astype(np.uint8)

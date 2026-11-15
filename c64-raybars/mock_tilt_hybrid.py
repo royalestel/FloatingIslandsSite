@@ -12,10 +12,13 @@ PAL = np.array([[int(h[i:i + 2], 16) for i in (0, 2, 4)] for h in
 lin = lambda c: (np.asarray(c, float) / 255) ** 2.2
 unl = lambda l: np.clip(l, 0, 1) ** (1 / 2.2) * 255
 LW = np.array([0.2126, 0.7152, 0.0722]); LP = lin(PAL); LUM = LP @ LW
-img = np.array(Image.open(SRC).convert("RGB")).astype(float)
+def load(p):                                   # (the ship's columns are filled from the left: they would pollute the rows)
+    im = np.array(Image.open(p).convert("RGB")).astype(float); im[:, 150:230] = im[:, 70:150]; return im
+FRAMES = [load(p) for p in SRC.split(",")]       # one frame, or two consecutive VICE frames (the ghost byte pattern flips with frame parity)
+img = FRAMES[0]
 X0, X1 = 40, 344
 H = Y1 - Y0
-target = np.array([lin(img[y, X0:X1]).mean(axis=0) for y in range(Y0, Y1)])
+target = np.array([np.mean([lin(f[y, X0:X1]).mean(axis=0) for f in FRAMES], axis=0) for y in range(Y0, Y1)])   # what the eye integrates
 cand = [(a, b) for a in range(16) for b in range(a, 16)]
 def pick(t, centre):
     lt = t @ LW; best, bc = None, 1e9
@@ -37,7 +40,8 @@ def tilted(f):
             a, b = rows[j]
             out[off + j, xa:xb] = PAL[a if (j + f) % 2 == 0 else b]
     return out
-real = np.zeros((H + 24, W, 3)); real[12:12 + H] = img[Y0:Y1, X0:X1]
+def panel(f): r = np.zeros((H + 24, W, 3)); r[12:12 + H] = f[Y0:Y1, X0:X1]; return r
+realA = panel(FRAMES[0]); realB = panel(FRAMES[-1]); real = realA
 A, B = tilted(0), tilted(1); avg = unl((lin(A) + lin(B)) / 2)
 LT = target @ LW                                         # (measured on the rows themselves: the tilt shifts each segment's rows)
 LM = np.array([(LUM[a] + LUM[b]) / 2 for a, b in rows])
