@@ -22,7 +22,24 @@ import mock_scroller as ms
 OUT = sys.argv[1] if len(sys.argv) > 1 else "mock_greets.mp4"
 BTOP, BBOT = ms.BANDL, ms.WTOP + 189                          # the black band: raster lines 212..250
 XC = 32 + 160                                                 # the window's centre (screen x)
-SPEED = 1                                                     # scroll: pixels a frame
+SPEED = 1                                                     # scroll: pixels a frame at full bank
+LAG = 15                                                      # the scroll trails the bank by a quarter second
+
+def brake():
+    """pixels the text still travels after the bank starts to reverse (full bank, then easing to 0 a step every other frame)"""
+    r, dist = [8] * LAG, 0.0
+    roll = 8
+    for f in range(200):
+        if f % 2 == 0 and roll > 0:
+            roll -= 1
+        r.append(roll)
+        u = r[-1 - LAG] / 8
+        v = SPEED * u * u * (3 - 2 * u)
+        if v == 0:
+            break
+        dist += v
+    return dist
+BRAKE = brake()
 PMAX = (BBOT - BTOP - 16) // 2                                # the pitch's room for one text row: 11 lines each way
 
 def strip(text):
@@ -95,6 +112,8 @@ def main():
                            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", OUT], stdin=subprocess.PIPE)
     phase, pf, prog, tail = "pre", 0, None, 0
     rolltgt = 0
+    rollhist = []
+    arriving = None
     f = 0
     while True:
         # ---- the script ----------------------------------------------------------------------------------------------------
@@ -103,28 +122,31 @@ def main():
         elif phase == "loop" and fl.mode == "auto":
             phase, hi = "h", 0
             pf = 0
+        # the side scroll trails the bank by LAG frames and eases with it: speed = SPEED * smoothstep(|roll| / 8), against the bank
+        rh = rollhist[-1 - LAG] if len(rollhist) > LAG else 0
+        u = abs(rh) / 8
+        vx = -SPEED * (u * u * (3 - 2 * u)) * ((rh > 0) - (rh < 0))
+        for b in blocks.values():
+            b[0] += vx
+        for nme in [n for n, b in blocks.items() if abs(b[0] - XC) > 160 + texts[n].shape[1] / 2 + 8 and (b[0] - XC) * vx > 0 and n != arriving]:
+            del blocks[nme]                                 # (gone off the side, still moving away)
         if phase == "h":
             tgt, d, old, new = hphases[hi]
             if pf == 0:
-                if tgt == "hold":
-                    dist = 30 * SPEED
-                else:
-                    wo = texts[old].shape[1] if old else 0
-                    wn = texts[new].shape[1]
-                    dist = 160 + max(wo, wn) // 2 + 8
-                    blocks[new] = [XC - d * dist, None]
-                nfr = math.ceil(dist / SPEED)
-            rolltgt = 0 if tgt == "hold" else tgt
-            if tgt != "hold":
-                for nme in (old, new):
-                    if nme:
-                        blocks[nme][0] += d * SPEED
-            pf += 1
-            if pf >= nfr:
-                if old and tgt != "hold":
-                    del blocks[old]
+                rolltgt = 0 if tgt == "hold" else tgt
+                arriving = new
                 if new:
-                    blocks[new][0] = XC
+                    wo = texts[old].shape[1] if old else 0
+                    dist = 160 + max(wo, texts[new].shape[1]) // 2 + 8
+                    blocks[new] = [XC - d * dist, None]
+                still = 0
+            pf += 1
+            if tgt == "hold":
+                still = still + 1 if vx == 0 else 0         # half a second with the text still
+                done = still >= 30
+            else:                                           # on to the next bank when the arriving text, slowing from here, stops at the centre
+                done = (XC - blocks[new][0]) * d <= BRAKE
+            if done:
                 hi += 1
                 pf = 0
                 if hi == len(hphases):
@@ -161,6 +183,7 @@ def main():
         fl.step()
         if f % 2 == 0:
             roll += (rolltgt > roll) - (rolltgt < roll)
+        rollhist.append(roll)
         rolli = roll + 8
         if f % 4 == 0:
             layer = ms.build(fl, rolli)
