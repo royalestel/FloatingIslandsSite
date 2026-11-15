@@ -1,4 +1,4 @@
-; cosmicstage2.s -- the second stage of the switch into cosmicstrings (mk_gold_ntsc.py assembles it at $0800 with its tables).
+; cosmicstage2.s -- the second stage of the switch into cosmicstrings (mk_gold_ntsc.py assembles it at $0700 with its tables: page $07, 256 bytes at most).
 ; Most of cosmicstrings's RAM ($2B00-$7FFF, the tables in $E000..) is where goldfly runs, so it can only be copied once goldfly is over.  bgswitch has cleared
 ; the zero page and written the early registers; this copies whole pages from the cartridge (~14 cycles a byte: the screen is black meanwhile), calls the tune
 ; once a frame (it polls the raster for a wrap), then writes the VIC / CIA registers and the vectors and goes on at cosmicstrings's `resume`.
@@ -10,19 +10,14 @@ last    = $f9
 tix     = $fa
 ptr     = $fb                   ; 2
 
-s2:     lda #$7b                ; black, no interrupts (the register lists come at the end); goldfly's light stays: the display stays on
+s2:     lda #$7b                ; black (interrupts are off: bgswitch did sei; the register lists come at the end); goldfly's light stays: the display stays on
         sta $d011               ; (VICE shows no sprites with DEN off all frame) in an invalid mode (ECM + BMM: all black)
         lda #0
-        sta $d01a
         sta $d020
         sta $d021
-        lda #$0f
-        sta $d019
-        sta tix                 ; (0 below)
+        sta tix
         jsr rast
         sta last
-        lda #0
-        sta tix
         lda #$37                ; the cartridge visible
         sta $01
 @blk:   ldy tix
@@ -57,6 +52,7 @@ s2:     lda #$7b                ; black, no interrupts (the register lists come 
         bne @pg
         beq @blk
 @done:  ldy #0
+        ldx #0
 @r:     lda late,y
         sta ptr
         iny
@@ -66,9 +62,8 @@ s2:     lda #$7b                ; black, no interrupts (the register lists come 
         iny
         lda late,y
         iny
-        ldx #0
         sta (ptr,x)
-        jmp @r
+        bne @r                  ; (the flags are iny's)
 @fin:   lda #$35
         sta $01
         jmp RESUME

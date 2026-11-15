@@ -48,7 +48,8 @@ SEQ = [
         "CA": (0xA000, 0xA300, ["INTROSPR"]),
         "CB": (0xA300, 0xA600, ["INTROTAB2"]),
         "C7": (0xA600, 0xBFFF, ["TABLES"]),
-        "C8": (0xC800, 0xD000, ["CODE2"])}),
+        "C8": (0xC800, 0xD000, ["CODE2"]),
+        "CF": (0x0800, 0x1000, ["FONT"])}),                     # (the band scroller's font: VIC bank 0)
     ("goldfly", ["SPRBUF=$8080", "FLYOFF=1", "LIGHT2=$A1C0"], 270, {     # (FLYOFF: from frame 270 the bars fly off, then the light is handed on)
         "F1": (0x5000, 0x6E00, ["RAMPS"]),
         "F2": (0x6E00, 0x8000, ["CODE", "RASTER", "BSS"]),
@@ -107,7 +108,7 @@ def link(name, defs, areas):
 SEQ.sort(key=lambda t: t[0] == "cosmicstrings")          # (cosmicstrings after goldfly)
 USES_SHARED = {"cosmicstrings": False}
 STAGE2 = {"cosmicstrings"}               # its RAM overlaps what the routine before it still runs in: the pages that do are copied at the switch by cosmicstage2.s (with the tune)
-STAGE2_AT = 0x0800
+STAGE2_AT = 0x0700                       # (page $07: cosmicstrings keeps its band font at $0800 and the stage-2 switch copies whole pages)
 if os.environ.get("GOLD_SEQ"):                                    # (a test cartridge of some of them: GOLD_SEQ=goldfly,cosmicstrings)
     SEQ[:] = [e for e in SEQ if e[0] in os.environ["GOLD_SEQ"].split(",")]
 SEQ_ENDF = [(n, e) for n, _, e, _ in SEQ]
@@ -249,7 +250,7 @@ def layout(jobs, first_bank):
             for f in os.listdir(HERE):
                 if f.endswith(".o"): os.remove(os.path.join(HERE, f))
             code = open(f"{TMP}/cs2.bin", "rb").read()
-            assert STAGE2_AT + len(code) <= 0x1000, "stage 2 over $0FFF"
+            assert STAGE2_AT + len(code) <= 0x0800, "stage 2 over $07FF"
             for b, src_, i_, n in place(code):
                 recbytes.append(struct.pack("<BHHHB", b, src_, STAGE2_AT + i_, n, 0))
             continue

@@ -65,6 +65,9 @@ MUSIC_PLAY = $1003
 .ifndef INTRO
 INTRO     = CHAIN       ; the cartridge's start (intro.inc, gen_intro.py): goldfly's light shrinks and splits into the ship's engine
 .endif                  ;   lights, the ship fades in, then the bars come in from the distance (a depth front: bars nearer are not shown)
+.ifndef SCROLL
+SCROLL    = INTRO       ; the band scroller (SCROLLER_PLAN.md): the display stays on and every bar line dodges the VIC's badline
+.endif
 FADEBLK   = $88         ; intro.inc's sprite blocks ($A000-): the balls $80-$87 (goldfly's light: $87), the fading ship $88-$8B
 LIGHTBLK  = $87
 FSTEP     = 4           ; the front's speed: (d >> 8) a frame, from DFAR >> 8 to 0
@@ -72,8 +75,13 @@ LOOPAT    = 600         ; INTRO: the frame of the full flight the teardrop loop 
 RUNFRAMES = 1800        ; INTRO: frames of full flight (30 s at 60 Hz) before the bars leave again
 APN       = 10          ; the autopilot looks this many rows ahead
 APSAFE    = 28          ; ... and keeps its heading while the clearance (units of 1/16 m) is at least this
-.if INTRO
-BANDL     = 150         ; window lines 0..BANDL-1 show bars: the rest (raster line 62 + BANDL on) stays black
+.if SCROLL
+BANDL     = 142         ; window lines 0..BANDL-1 show bars (raster lines 62..203): the rest stays black, the band's text starts at 212
+BANDY0    = 212         ; the band's first text line (the first badline)
+BLANKCH   = 4 * $19     ; the font's space tile: its first character is blank
+BANDQ     = BANDY0 - 4  ; the band IRQ's line: in (BANDY0 - 8, BANDY0)
+.elseif INTRO
+BANDL     = 150
 .else
 BANDL     = NLINES
 .endif
@@ -82,9 +90,17 @@ STEAL     = 7           ; cycles the ship's two sprites take from a line (VICE c
 .endif
 LINEN     = 63 + 2*NTSC ; cycles a line
 SHIPN     = LINEN - STEAL ; ... a ship line
+.if SCROLL
+GAPMIN    = 8           ; black gaps shorter than this stay inside a block (SCROLL: the gap IRQs need room, see nextirq)
+.else
 GAPMIN    = 6           ; black gaps shorter than this stay inside a block
+.endif
 DENLINE   = 44
+.if SCROLL
+VBLLINE   = 251         ; after the band (the window ends at line 250)
+.else
 VBLLINE   = 253
+.endif
 .ifndef HTUNE
 HTUNE     = (LINEN - 51) / 2   ; VICE: both writes (the colour, the idle byte) land before the window starts for 2..11 (NTSC): the middle.  A block starts one raster line early (setblk)
 .endif
@@ -277,6 +293,12 @@ nrec:    .res 1
 tmr:     .res 2         ; frames of full flight so far
 ending:  .res 1         ; the bars are leaving
 looping: .res 1         ; the teardrop loop: 0 not flying it, 1 on the way up, 2 past the top
+.if SCROLL
+gS:      .res 1         ; the next block's first raster line (the band's, after the last): the gap IRQs count toward it
+gvl:     .res 1         ; ... and the vector its IRQ (irq1 / irqband) goes to
+gvh:     .res 1
+gc:      .res 1         ; the line of the last dodge write
+.endif
 aptgh:   .res 1         ; the autopilot's target heading (high byte of the angle; its low byte is 0)
 apd:     .res 1
 apk:     .res 1
@@ -412,10 +434,26 @@ start:  sei
         lda #1
         sta $d01a
         sta $d019
+        .if SCROLL
+        ldx #0                  ; the band's screen RAM (rows 0..4): blank cells, the test text on rows 1 and 2
+        lda #BLANKCH
+:       sta $0400,x
+        inx
+        cpx #200
+        bne :-
+        ldx #bandtest_end - bandtest - 1
+:       lda bandtest,x
+        sta $0400 + 40,x
+        dex
+        bpl :-
+        .endif
         jsr build
         lda #1
         sta ready
 resume:                         ; (CHAIN: the image is a snapshot taken here)
+        .if SCROLL
+        jsr bandinit            ; (colour RAM is I/O space: the snapshot cannot hold it)
+        .endif
         cli
 main:   lda copied
         beq main
@@ -579,6 +617,16 @@ aprate: lda #0
 
 apslope: .byte 0,19,38,57,78,99,121,145,171
 apch:    .byte 232,235,238,241,244,247,250,253,0,3,6,9,12,15,18,21,24
+
+.include "band.inc"            ; the font (segment FONT) and the test text
+        .segment "CODE2"
+bandinit:                       ; colour RAM is I/O space: set here, after the snapshot
+        ldx #0
+        lda #$0f                ; multicolour, yellow (the font's %11)
+:       sta $d800,x
+        inx
+        bne :-
+        rts
 
         .segment "CODE"
 ; introtick (the vertical blank): the intro's sprites for the next frame, then the front, then the 30 s of flight and the bars leaving
@@ -2579,19 +2627,33 @@ genlines:
         lda #NLINES
         ldy #0
 @p:     sta BND,x
+        .if SCROLL
+        txa                     ; the line code: window line mod 4, +4 on the ship's lines
+        and #3
+        cpy #0
+        beq :+
+        ora #4
+:       sta VARX,x
+        .else
         txa                     ; mock row x + 11 odd -> O
         and #1
         eor #1
         sty t0
         ora t0
         sta VARX,x
+        .endif
         inx
         cpx #NLINES
         bne @l
         rts
 
+.if SCROLL
+entl:   .byte <(l_0-1), <(l_1-1), <(l_2-1), <(l_3-1), <(b_0-1), <(b_1-1), <(b_2-1), <(b_3-1)
+enth:   .byte >(l_0-1), >(l_1-1), >(l_2-1), >(l_3-1), >(b_0-1), >(b_1-1), >(b_2-1), >(b_3-1)
+.else
 entl:   .byte <(l_ne-1), <(l_no-1), <(l_be-1), <(l_bo-1)
 enth:   .byte >(l_ne-1), >(l_no-1), >(l_be-1), >(l_bo-1)
+.endif
 
 ; =============================================================================
 ;  IRQs (in the screen's RAM, which the VIC never fetches: no badlines)
@@ -2600,6 +2662,15 @@ enth:   .byte >(l_ne-1), >(l_no-1), >(l_be-1), >(l_bo-1)
 irqtop: sta sav_a
         stx sav_x
         sty sav_y
+        .if SCROLL
+        lda $d012               ; the display stays on (DEN at line $30 latches it): the yscroll dodges the badlines from here on
+        sta gc
+        sec
+        sbc #1
+        and #7
+        ora #$18
+        sta $d011
+        .else
         lda #$0b                ; DEN=0 across line $30: no badlines
         sta $d011
 :       lda $d012
@@ -2607,12 +2678,21 @@ irqtop: sta sav_a
         bcc :-
         lda #$1b
         sta $d011
+        .endif
         inc fcount
         lda fcount
         and #1
         tax
         clc
         adc #>swtab             ; the line code's tables: this frame's parity
+        .if SCROLL
+        .repeat 4, K
+        sta .ident(.sprintf("c_%d", K)) + 2
+        sta .ident(.sprintf("g_%d", K)) + 2
+        sta .ident(.sprintf("cb_%d", K)) + 2
+        sta .ident(.sprintf("gb_%d", K)) + 2
+        .endrep
+        .else
         sta c_ne+2
         sta g_ne+2
         sta c_no+2
@@ -2621,6 +2701,7 @@ irqtop: sta sav_a
         sta g_be+2
         sta c_bo+2
         sta g_bo+2
+        .endif
         .if INTRO
         lda intro               ; (the intro sets the sprites itself)
         bne @nosh
@@ -2642,12 +2723,24 @@ irqtop: sta sav_a
 @nosh:
         lda #0
         sta blk
+        .if SCROLL
+        lda nblkd
+        beq @band
+        ldx #0
+        jsr setblkg
+        jmp @nx
+@band:  jsr setbandg
+@nx:    ldx gc
+        jsr nextirq
+        jmp irqout
+        .else
         lda nblkd
         beq @vbl
         ldx #0
         jsr setblk
         jmp irqout
 @vbl:   jsr setvbl
+        .endif
 irqout: asl $d019
         lda sav_a
         ldx sav_x
@@ -2656,6 +2749,7 @@ irqout: asl $d019
 
 glow:   .byte 1, 3              ; %11: white, cyan
 
+.if !SCROLL
 setblk: lda dline,x
         sec
         sbc #1                  ; (one line early: see HTUNE)
@@ -2681,10 +2775,124 @@ setvbl: lda #VBLLINE
         sta $ffff
         rts
 
+.endif
+
+.if SCROLL
+        .segment "CODE2"           ; (the DISP segment is full: these need no particular place)
+.endif
+.if SCROLL
+; ---- the gap IRQs (SCROLLER_PLAN.md) ------------------------------------------------------------------------------------
+; The next block (or the band) starts at raster line gS; its IRQ (irq1 / irqband, vector gvl/gvh) comes at gS - 3.  The last dodge write was at
+; line X, Y = (X - 1) & 7, safe for lines X .. X + 6.  nextirq: d = gS - X; d <= 6: the block's IRQ now, else a gap IRQ at X + min(6, d - 5)
+; (d - 5 >= 2: time enough to set it up in this line), which writes the next dodge value and calls nextirq again.
+setblkg:                        ; X = the block
+        lda dline,x
+        clc
+        adc #2                  ; (dline: irq1 two lines before the block)
+        sta gS
+        lda dss,x
+        sta curs
+        lda #<irq1
+        sta gvl
+        lda #>irq1
+        sta gvh
+        rts
+setbandg:
+        lda #BANDQ + 3
+        sta gS
+        lda #<irqband
+        sta gvl
+        lda #>irqband
+        sta gvh
+        rts
+nextirq:
+        stx gc
+        lda gS
+        sec
+        sbc gc                  ; d
+        cmp #7
+        bcs @gap
+        lda gS                  ; the block's (or band's) IRQ
+        sec
+        sbc #3
+        sta $d012
+        lda gvl
+        sta $fffe
+        lda gvh
+        sta $ffff
+        rts
+@gap:   sec
+        sbc #5                  ; d - 5, at most 6
+        cmp #7
+        bcc :+
+        lda #6
+:       clc
+        adc gc
+        sta $d012
+        lda #<irqgap
+        sta $fffe
+        lda #>irqgap
+        sta $ffff
+        rts
+irqgap: sta sav_a
+        stx sav_x
+        lda $d012
+        tax
+        sec
+        sbc #1
+        and #7
+        ora #$18
+        sta $d011
+        jsr nextirq
+        asl $d019
+        lda sav_a
+        ldx sav_x
+        rti
+
+; the band (the Xenon font, multicolour text): VIC bank 0, screen $0400, charset $0800, the first badline at BANDY0
+irqband:
+        sta sav_a
+        lda $dd00
+        and #$fc
+        ora #$03
+        sta $dd00
+        lda #$12                ; screen $0400, charset $0800
+        sta $d018
+        lda #$d8                ; multicolour text
+        sta $d016
+        lda #11                 ; the font's %01 (the inverted data: %10 is $d023)
+        sta $d022
+        lda #10
+        sta $d023
+        lda #DODGE0 + (BANDY0 .mod 8)
+        sta $d011
+        lda #VBLLINE
+        sta $d012
+        lda #<irqvbl
+        sta $fffe
+        lda #>irqvbl
+        sta $ffff
+        asl $d019
+        lda sav_a
+        rti
+.endif
+
 ; vertical blank: take the built frame (records into page 1, blocks)
 irqvbl: sta sav_a
         stx sav_x
         sty sav_y
+        .if SCROLL
+        lda $dd00               ; VIC bank 2 again (the band used bank 0), the bars' screen and mode
+        and #$fc
+        ora #$01
+        sta $dd00
+        lda #$10
+        sta $d018
+        lda #$c8
+        sta $d016
+        lda #$1b
+        sta $d011
+        .endif
         lda ready
         beq @no
         ldx nrec
@@ -2739,6 +2947,9 @@ musicplay:                      ; 5 calls in 6 frames (NTSC: the tune was writte
         sta MC
         rts
 :       jmp MUSIC_PLAY
+.endif
+.if SCROLL
+        .segment "DISP"
 .endif
 
 ; =============================================================================
@@ -2811,6 +3022,99 @@ blkgo:  pla
 ; by irqtop).  27 cycles to the branch; padded to 63 (normal lines) or 56
 ; (the ship's lines: the VIC takes 7).  The span's last line branches to
 ; the next record (26 cycles, padded first: 63 / 56 in all).
+.if SCROLL
+; SCROLLER_PLAN.md: the display is on (DEN latched at line $30) and the VIC must never see a badline on a bar line: every line writes $d011's
+; yscroll, Y = ((L mod 4) + 2) & 7 for its raster line L (safe for L and L + 1, and for the write landing a line off).  Four phases (window
+; line mod 4) x normal / ship line = 8 line codes; a line's swatch tables follow the row parity as before (k odd: NE tables, k even: NO).
+DODGE0    = $18         ; $d011: RSEL, DEN (+ yscroll)
+.macro nline k
+        .local nn
+        .if (k .mod 2) = 1
+        SWC .set 0
+        SWG .set 64
+        .else
+        SWC .set 32
+        SWG .set 96
+        .endif
+        DOD .set DODGE0 + (((WTOPR + k) .mod 4) + 2) .mod 8
+.ident(.sprintf("l_%d", k)):
+        lda (src),y             ; 5
+        tax                     ; 7
+.ident(.sprintf("c_%d", k)):
+        lda swtab + SWC,x       ; 11
+        sta $d021               ; 15
+.ident(.sprintf("g_%d", k)):
+        lda swtab + SWG,x       ; 19
+        sta $bfff               ; 23
+        lda #DOD                ; 25
+        sta $d011               ; 29
+        dey                     ; 31
+        beqnear nn              ; 33 (34)
+        fill LINEN - 36
+        .if k = 3
+        jmp l_0                 ; 63: the next line's code (the span's last-line path below it is jumped over)
+        .else
+        jmp .ident(.sprintf("l_%d", k + 1))
+        .endif
+nn:     fill LINEN - 60         ; 34 + this + 26
+        pla                     ; 
+        sta src
+        pla
+        sta src+1
+        pla
+        tay
+        rts                     ; 63
+.endmacro
+.macro bline k
+        .local nn
+        .if (k .mod 2) = 1
+        SWC .set 0
+        SWG .set 64
+        .else
+        SWC .set 32
+        SWG .set 96
+        .endif
+        DOD .set DODGE0 + (((WTOPR + k) .mod 4) + 2) .mod 8
+.ident(.sprintf("b_%d", k)):
+        lda (src),y             ; 5
+        tax                     ; 7
+.ident(.sprintf("cb_%d", k)):
+        lda swtab + SWC,x       ; 11
+        sta $d021               ; 15
+        dey                     ; 17
+        beqnear nn              ; 19 (20): the span's last line skips the ghost byte (no cycles to spare)
+.ident(.sprintf("gb_%d", k)):
+        lda swtab + SWG,x       ; 23
+        sta $bfff               ; 27
+        lda #DOD                ; 29
+        sta $d011               ; 33
+        fill SHIPN - 36
+        .if k = 3
+        jmp b_0                 ; 56
+        .else
+        jmp .ident(.sprintf("b_%d", k + 1))
+        .endif
+nn:     lda #DOD                ; 22
+        sta $d011               ; 26
+        fill SHIPN - 52
+        pla
+        sta src
+        pla
+        sta src+1
+        pla
+        tay
+        rts                     ; 56
+.endmacro
+        .align 256
+        nline 0
+        nline 1
+        nline 2
+        nline 3
+        bline 0
+        bline 1
+        bline 2
+        bline 3
+.else
         .align 256
 l_ne:   lda (src),y             ; 5
         tax                     ; 7
@@ -2868,20 +3172,43 @@ bnext:  fill SHIPN - 54         ; 30
         tay
         rts                     ; 56
 
+.endif
+
 ; the block's end, reached like a line: black, then the next block's IRQ
 exit:   fill 9
         lda #0
         sta $d021
         sta $bfff
+        .if SCROLL
+        lda $d012               ; the gap rule: Y = (line - 1) & 7 is safe for this line and the next six (gap IRQs follow)
+        sta gc
+        sec
+        sbc #1
+        and #7
+        ora #$18
+        sta $d011
+        .endif
 exitd:  ldx sav_s
         txs
         inc blk
         ldx blk
         cpx nblkd
         bcs @last
+        .if SCROLL
+        jsr setblkg
+        ldx gc
+        jsr nextirq
+        jmp irqout
+        .else
         jsr setblk
         jmp irqout
-@last:  .if MUSIC
+        .endif
+@last:  .if SCROLL
+        jsr setbandg
+        ldx gc
+        jsr nextirq
+        jmp irqout
+        .elseif MUSIC
         lda $d012               ; the vertical-blank IRQ at once (this line + 3): the black screen below the last bar is time for the copy and the tune
         clc
         adc #3
@@ -2890,5 +3217,7 @@ exitd:  ldx sav_s
         jsr setvbl2
         jmp irqout
 :       .endif
+        .if !SCROLL
         jsr setvbl
         jmp irqout
+        .endif
