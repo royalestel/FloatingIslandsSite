@@ -42,6 +42,8 @@ GRID = [-NEAR, NEAR, -0.6, NEAR, -NEAR, 0.6]     # the older layout: bars pass t
 DODGE_SHAPES = [(1.0, 1.35, 3.9), (0.7, 0.0, 2.7)]
 DODGES = [(30.0, +1), (220.0, -1)]               # (camera yaw when the ship reaches the bar, up +1 / down -1)
 PITCH_STEP, PITCH_MAX = 7.5, 22.5                # the ship's pitch frames (degrees)
+# bar index -> height (m), overriding the layout: the bar just before the second dive, raised clear of the ship
+RAISED = {17: 0.6}                               # index 17 = 42.5 m, the bar the ship passes just before diving at 45 m
 _DZ = None
 _BARS = None
 
@@ -69,6 +71,8 @@ def bars():
             heights[kd] = 0.0
             for kn in (kd - 1, kd + 1):              # the neighbours lie on the side the ship is not moving to
                 heights[kn] = -d * NEAR
+        for k, h in RAISED.items():                  # bars that need more height above the ship's dive
+            heights[k] = h
         out = []
         for k in range(int(160 / SPACING)):
             out.append((k * SPACING, heights[k] if k in heights else GRID[k % len(GRID)]))
