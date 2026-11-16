@@ -77,9 +77,10 @@ def bar(yaw):
     band = np.clip(((YC + R - y) / (2 * R) * 48).astype(int), 0, 47)
     return np.where(hit, t, np.inf), GOLD48[band]
 
-def ship(yaw):
-    """Depth and colour of the ship (z-buffered, flat-shaded), per sample."""
-    dx, dy = fb.rays()
+def ship(yaw, rays=None):
+    """Depth and colour of the ship (z-buffered, flat-shaded), per sample
+    (of the whole window, or of the given rays (dx, dy))."""
+    dx, dy = fb.rays() if rays is None else rays
     s = 0.36 / 23.6
     Rm, o = rot(yaw), camera(yaw)
     zb = np.full(dx.shape, np.inf)
