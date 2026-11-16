@@ -36,8 +36,10 @@ W, H, F, CY, SS = fb.W, fb.H, fb.F, fb.CY, fb.SS
 SPEED, SPACING = 0.045, 2.5
 NEAR = 10 / F * o.ZS + o.R                       # 0.27 m: the near edge 10 lines off at 3 m
 GRID = [-NEAR, NEAR, -0.6, NEAR, -NEAR, 0.6]     # the older layout: bars pass the level flight line in its gaps
-DODGE = 0.7                                      # the ship's dodge: this far above or below the level line (m)
-HALF = 2.7                                       # a dodge lasts HALF m either side of its bar (wide enough to keep the pitch within +-22.5)
+# each dodge's shape: (height above / below the level line, m; half-width of the hold at the top, m;
+# width of each ramp up / down, m).  The ramps are wide enough to keep the pitch within +-22.5 degrees.
+# The first dodge holds high for about a second (1.35 m of flight each side of the bar at 0.045 m a frame).
+DODGE_SHAPES = [(1.0, 1.35, 3.9), (0.7, 0.0, 2.7)]
 DODGES = [(30.0, +1), (220.0, -1)]               # (camera yaw when the ship reaches the bar, up +1 / down -1)
 PITCH_STEP, PITCH_MAX = 7.5, 22.5                # the ship's pitch frames (degrees)
 _DZ = None
@@ -77,10 +79,15 @@ def ship_y(zship):
     """The ship's height: level, except for the two dodges, each a smooth
     rise (or fall) over its bar, back to level after it."""
     y = 0.0
-    for zc, d in dodge_z():
-        x = (zship - zc) / HALF
-        if abs(x) < 1:
-            y += d * DODGE * 0.5 * (1 + math.cos(math.pi * x))
+    for (zc, d), (height, hold, ramp) in zip(dodge_z(), DODGE_SHAPES):
+        dist = abs(zship - zc)
+        if dist <= hold:
+            f = 1.0
+        elif dist <= hold + ramp:
+            f = 0.5 * (1 + math.cos(math.pi * (dist - hold) / ramp))
+        else:
+            continue
+        y += d * height * f
     return y
 
 def ship_pitch(zship):
