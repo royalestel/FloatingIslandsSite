@@ -240,10 +240,13 @@ def frame(yaw, zship, p=0):
 
 FAST_FROM, FAST_TO = 21.0, 159.0                 # twice as fast from here to here (and mirrored: 201..339)
 
+PEAK_FROM, PEAK_TO, PEAK_RAMP = 70.0, 110.0, 20.0   # 3x speed from 70 to 110 degrees (and 250 to 290), ramped over 20
+
 def speedup(yaw):
     """The orbit's speed factor at this angle: 1 behind and in front of the
-    ship, 2 between FAST_FROM and FAST_TO degrees (and 180 + the same),
-    faded smoothly (a cosine) between the two."""
+    ship; 2 between FAST_FROM and FAST_TO degrees (and 180 + the same), faded
+    smoothly (a cosine) between the two; and 3 from PEAK_FROM to PEAK_TO
+    (and 180 + the same), faded smoothly back to 2 around it."""
     a = yaw % 180.0
     if a < FAST_FROM:
         k = 0.5 - 0.5 * math.cos(math.pi * a / FAST_FROM)
@@ -251,7 +254,15 @@ def speedup(yaw):
         k = 0.5 - 0.5 * math.cos(math.pi * (180.0 - a) / (180.0 - FAST_TO))
     else:
         k = 1.0
-    return 1.0 + k
+    if PEAK_FROM - PEAK_RAMP <= a < PEAK_FROM:
+        g = 0.5 - 0.5 * math.cos(math.pi * (a - (PEAK_FROM - PEAK_RAMP)) / PEAK_RAMP)
+    elif PEAK_FROM <= a <= PEAK_TO:
+        g = 1.0
+    elif PEAK_TO < a <= PEAK_TO + PEAK_RAMP:
+        g = 0.5 + 0.5 * math.cos(math.pi * (a - PEAK_TO) / PEAK_RAMP)
+    else:
+        g = 0.0
+    return 1.0 + k + g
 
 def yaw_table(turn=TURN, steps=40000):
     """frame (from the start of the turn) -> yaw: the eased orbit (a cosine
