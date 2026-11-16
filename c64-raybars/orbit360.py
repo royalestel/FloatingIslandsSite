@@ -14,8 +14,11 @@ C64 version only, CRT look, 60 fps, one C64 frame per video frame.
   screen; each of the 6 raster-split segments takes every bar's top and
   bottom at its centre column, the nearest bar in front, and colours from
   the gold gradient stretched over that height (ramp by height).
-* Ship: multicolour sprite frames rendered from the 3D model, one per
-  YAWSTEPS directions (as the C64 would store them).
+* Ship: big_ship.py's two-sprite ship (no nose light), only its two engine
+  pods' exhausts glowing, the glow colour white and cyan on alternate frames
+  so the engines flicker; antialiased with a pair of frames shown in turn
+  (big_ship.pair's rules).  One pair per YAWSTEPS directions, rendered in
+  perspective from the orbit camera (as the C64 would store them).
 
     python3 orbit360.py out.mp4
 """
@@ -74,31 +77,87 @@ def depth_at(e, xs):
     t = -(c0[0] - k * c0[2]) / den
     return (c0 + t * c1)[2]
 
+SHIPSCALE = 1.5                                  # the two-sprite ship (big_ship.py): 1.5 x the single one
+GLOW = (1, 3)                                    # the engines' colour ($D025) by frame: white, cyan
+
+def ship_model():
+    """big_ship.py's model (no nose light) with only the two engine pods'
+    exhausts glowing: the main nozzle's glow is dropped (trim)."""
+    import big_ship
+    out = []
+    for poly, kind in big_ship.model():
+        if kind == "glow" and abs(sum(p[0] for p in poly) / len(poly)) < 1.0:
+            kind = "trim"
+        out.append((poly, kind))
+    return out
+
+def counts(yaw, x0=96, x1=224, y0=78, y1=120):
+    """Sample counts per multicolour pixel (8 x 4 samples) of the ship seen
+    from the orbit camera, classes 0 none, 1 shadowed hull (and the dark
+    canopy), 2 lit hull and trim, 3 the engines' glow: (rows, cols, 4)."""
+    import ship3d
+    sxn, syn = ship3d.SX, ship3d.SY                  # 8 x 4 per multicolour pixel
+    w, h = (x1 - x0) // 2, y1 - y0
+    xs = np.arange(w * sxn) + 0.5
+    ys = np.arange(h * syn) + 0.5
+    px, py = np.meshgrid(x0 + xs * 2 / sxn, y0 + ys / syn)
+    zb = np.full(px.shape, np.inf)
+    cls = np.zeros(px.shape, int)
+    s = 0.36 / 23.6 * SHIPSCALE
+    Rm, cam = o.rot(yaw), o.camera(yaw)
+    L = Rm @ (np.array(ship3d.LIGHT, float) / np.linalg.norm(ship3d.LIGHT))
+    for poly, kind in ship_model():
+        Pw = np.array([(x * s, y * s, o.ZS + z * s) for x, y, z in poly])
+        P = (Pw - cam) @ Rm.T
+        n = np.cross(P[1] - P[0], P[2] - P[0])
+        if np.linalg.norm(n) < 1e-12:
+            continue
+        n /= np.linalg.norm(n)
+        if n @ P[0] > 0:
+            n = -n
+        c = 3 if kind == "glow" else 1 if kind == "dark" else \
+            2 if kind == "trim" or n @ L > 0.55 else 1
+        Q = np.column_stack([P[:, 0] / P[:, 2] * F + W / 2, CY + 0.5 - P[:, 1] / P[:, 2] * F, P[:, 2]])
+        for k in range(1, len(Q) - 1):
+            a, b, cc = Q[0], Q[k], Q[k + 1]
+            dd = (b[1] - cc[1]) * (a[0] - cc[0]) + (cc[0] - b[0]) * (a[1] - cc[1])
+            if abs(dd) < 1e-12:
+                continue
+            w0 = ((b[1] - cc[1]) * (px - cc[0]) + (cc[0] - b[0]) * (py - cc[1])) / dd
+            w1 = ((cc[1] - a[1]) * (px - cc[0]) + (a[0] - cc[0]) * (py - cc[1])) / dd
+            w2 = 1 - w0 - w1
+            inside = (w0 >= 0) & (w1 >= 0) & (w2 >= 0)
+            iz = w0 / a[2] + w1 / b[2] + w2 / cc[2]
+            z = np.where(inside, 1 / np.maximum(iz, 1e-9), np.inf)
+            m = z < zb
+            zb[m] = z[m]
+            cls[m] = c
+    out = np.zeros((h, w, 4), int)
+    for k in range(4):
+        out[..., k] = (cls == k).reshape(h, syn, w, sxn).sum(axis=(1, 3))
+    return out, (x0, y0)
+
 def sprite(yaw):
-    """The ship's sprite pixels at the nearest of YAWSTEPS directions:
-    {(row, col): colour}, from a cropped 3D render."""
+    """The ship's antialiased pair of sprite frames at the nearest of
+    YAWSTEPS directions (big_ship.pair's rules: covered pixels lit in both
+    frames, half covered ones in one frame in a checkerboard, pixels split
+    between shadowed and lit hull alternating), as [{(row, col): class}] x 2."""
+    import big_ship
     q = round(yaw / (360 / YAWSTEPS)) % YAWSTEPS
     if q not in _SPR:
-        x0, x1, y0, y1 = 128, 192, 84, 116
-        xs = np.arange(x0 * SS, x1 * SS)
-        ys = np.arange(y0 * SS, y1 * SS)
-        px, py = np.meshgrid((xs + 0.5) / SS, (ys + 0.5) / SS)
-        dx, dy = (px - W / 2) / F, (CY + 0.5 - py) / F
-        zs, sc = o.ship(q * 360 / YAWSTEPS, (dx, dy))
-        hs = np.isfinite(zs)
-        h, w = y1 - y0, (x1 - x0) // 2
-        m = hs.reshape(h, SS, w, 2 * SS).mean(axis=(1, 3))
-        sa = np.where(hs[..., None], sc, 0.0).reshape(h, SS, w, 2 * SS, 3).sum(axis=(1, 3))
-        sa = sa / np.maximum(hs.reshape(h, SS, w, 2 * SS).sum(axis=(1, 3)), 1)[..., None]
-        pal = fb.C64RGB[o.SPRCOL]
-        near = np.argmin(((sa[..., None, :] - pal) ** 2).sum(-1), -1)
-        out = {}
-        for r, c in zip(*np.nonzero(m >= 0.5)):
-            out[(y0 + r, x0 + 2 * c)] = o.SPRCOL[near[r, c]]
-        _SPR[q] = out
+        cn, (x0, y0) = counts(q * 360 / YAWSTEPS)
+        f0, f1 = big_ship.pair_from_counts(cn)
+        _SPR[q] = []
+        for fr in (f0, f1):
+            _SPR[q].append({(y0 + r, x0 + 2 * c): int(fr[r, c]) for r, c in zip(*np.nonzero(fr))})
+        cols = np.nonzero((f0 | f1).any(0))[0]
+        WIDTHS[q] = cols.max() - cols.min() + 1 if len(cols) else 0
     return _SPR[q]
 
-def frame(yaw, zship):
+WIDTHS = {}
+SHIPCOL = {1: 4, 2: 14}                          # %01 purple, %10 light blue; %11 GLOW by frame
+
+def frame(yaw, zship, p=0):
     img = np.zeros((H, W), int)
     k0 = math.floor((zship - 8) / SPACING)
     bars = []
@@ -125,8 +184,8 @@ def frame(yaw, zship):
             rp = ramp(min(h, 2000), level(d))
             for j in range(max(0, -r0), min(h, H - r0)):
                 img[r0 + j, x0:x1] = rp[j]
-    for (r, c), col in sprite(yaw).items():
-        img[r, c:c + 2] = col
+    for (r, c), k in sprite(yaw)[p].items():
+        img[r, c:c + 2] = GLOW[p] if k == 3 else SHIPCOL[k]
     return img
 
 def main(path):
@@ -137,7 +196,7 @@ def main(path):
     for f in range(n):
         t = min(max(f - HOLD, 0), TURN) / TURN
         yaw = 360 * (0.5 - 0.5 * math.cos(math.pi * t))     # eased in and out
-        img = frame(yaw % 360, f * SPEED)
+        img = frame(yaw % 360, f * SPEED, f & 1)
         canvas = Image.new("RGB", (v.w, v.h), (8, 8, 16))
         dr = ImageDraw.Draw(canvas)
         dr.text((16, 8), f"C64 mockup: camera orbiting the ship {yaw:5.1f} degrees   "
@@ -147,7 +206,8 @@ def main(path):
         if f % 60 == 0:
             print("frame", f, "of", n, "sprites", len(_SPR), flush=True)
     v.close()
-    print("wrote", path, n, "frames")
+    print("wrote", path, n, "frames; ship width in multicolour pixels by direction:",
+          dict(sorted(WIDTHS.items())))
 
 if __name__ == "__main__":
     main(sys.argv[1])

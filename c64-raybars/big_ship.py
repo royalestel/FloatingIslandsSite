@@ -104,7 +104,11 @@ def pair(roll, pitch, wmc=24, rows=21, scale=1.44, hi=0.7, lo=0.28):
     -- a covered pixel lit in both, a half covered one in one frame in a
     checkerboard, a pixel split between shadowed and lit hull alternating,
     the phase swapped on alternate lines."""
-    counts = sample_counts(roll, pitch, wmc, rows, scale)
+    return pair_from_counts(sample_counts(roll, pitch, wmc, rows, scale), hi, lo)
+
+def pair_from_counts(counts, hi=0.7, lo=0.28):
+    """pair()'s rules on any grid of sample counts (rows x wmc x 4 classes)."""
+    rows, wmc = counts.shape[:2]
     tot = SX * SY
     f0 = np.zeros((rows, wmc), int)
     f1 = np.zeros((rows, wmc), int)
