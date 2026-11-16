@@ -58,7 +58,7 @@ def ship_pitch(zship):
     dz = 0.05
     return math.degrees(math.atan2(ship_y(zship + dz) - ship_y(zship - dz), 2 * dz))
 HOLD, TURN = 60, 2880
-YAWSTEPS = 128
+YAWSTEPS = 64
 _SPR = {}
 LEVELS = [(5.0, 1.0), (8.0, 0.7), (12.0, 0.45), (16.0, 0.25)]   # (up to this depth, brightness)
 _RAMPS = {}
