@@ -94,4 +94,12 @@ IDLE state (graphics = the idle byte at $3fff = $bfff, the ghost byte the line c
   - Builder (after the level build, when the roll is not level): compose the columns from the level records, then replace the blocks:
     each widened by MARG lines, stretched over the band if it overlaps it, merged when closer than GAPMIN; patch the segment offsets
     into the buffer's two copies when the tilt changed.
+* Tilted display, status (VICE, TESTROLL=1: the roll sweeps 0..8): the six-segment tilted bars draw (flat colours from flat_ladder, six
+  segments shifted by the roll, the ship band in straight-line code, a block per merged run of the level blocks), no garbage in 136
+  captured frames (level and tilted).  Bugs found on the way (all in cosmicstrings.s): temit overwrote the caller's scratch; tvecset's
+  scratch was the builder's (it runs in irq); the ship-band stretch let a block start inside the DMA lines; the entry stubs were
+  `jmp (tvec)` through a table in the stub's page; and the tilted block's END: it used the level `exit`, entered ~25 cycles later than a
+  level block reaches it (its `sta $d011` landed at cycle 62 of the line): VICE started a display row at the line before (a badline at E - 1
+  with Y = (E - 1) & 7).  `texit` now does the dodge write first, as a level exit does (cycle ~38).
+  Measuring tools: /tmp scripts (IRQ order per frame, display state RC / Idle per step, `watch store d011`): in the monitor, `io d000`.
 * Next: top masking, the scroll (xscroll + column shifts), vertical follow, the choreography.

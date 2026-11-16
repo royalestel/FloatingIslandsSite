@@ -3455,7 +3455,17 @@ dodtab:                         ; the ship band's dodge (every other row): Y for
         .byte DODGE0 + ((WTOPR + I + 3) .mod 8)
         .endrep
         .include "ctilt.inc"
-texit:  jmp exit
+texit:  lda $d012               ; the block's end, entered ~cycle 21 (a level block's exit: cycle ~62 of the line before): the dodge write first (as exit's)
+        sta gc
+        sec
+        sbc #1
+        and #7
+        ora #$18
+        sta $d011
+        lda #0
+        sta $d021
+        sta $bfff
+        jmp exitd
 
 ; irqvbl: the stubs' vectors for the next frame, copy c = 2 * tfront + parity (x = that parity; kept): tent + 8i + 2c (one page: low bytes only)
 tvecset:
