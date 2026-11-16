@@ -157,6 +157,8 @@ def sprite(yaw):
 WIDTHS = {}
 SHIPCOL = {1: 4, 2: 14}                          # %01 purple, %10 light blue; %11 GLOW by frame
 
+SEG_FRAME = (o.SEG, [0, 64, 128, 192, 256, 320])   # frame 0: GOLDSHIP's 6 segments; frame 1: 5 of 64
+
 def frame(yaw, zship, p=0):
     img = np.zeros((H, W), int)
     k0 = math.floor((zship - 8) / SPACING)
@@ -165,7 +167,8 @@ def frame(yaw, zship, p=0):
         barz = o.ZS + k * SPACING - zship
         yc = HEIGHTS[k % len(HEIGHTS)]
         bars.append(edges(yaw, yc, barz))
-    for (x0, x1), xm in zip(zip(o.SEG, o.SEG[1:]), oa.MIDS):
+    seg = SEG_FRAME[p & 1]                           # option D: the splits move 32 pixels over on alternate frames
+    for (x0, x1), xm in zip(zip(seg, seg[1:]), [(a + b) / 2 for a, b in zip(seg, seg[1:])]):
         spans = []
         for es in bars:
             ys = [oa.edge_y(e, xm) for e in es]
