@@ -35,7 +35,28 @@ import orbit_algo as oa
 W, H, F, CY, SS = fb.W, fb.H, fb.F, fb.CY, fb.SS
 SPEED, SPACING = 0.045, 2.5
 NEAR = 10 / F * o.ZS + o.R                       # 0.27 m: the near edge 10 lines off at 3 m
-HEIGHTS = [-NEAR, NEAR, -0.6, NEAR, -NEAR, 0.6]  # bar centres (ship at 0), repeating
+HEIGHTS = [0.0, 0.12, -0.12, 0.0, 0.08, -0.08]   # bar centres (the camera's height is 0), repeating:
+                                                 # across the ship's line of flight, so it dodges them
+DODGE = 0.32                                     # the ship passes this far above or below each bar's centre
+PITCH_STEP, PITCH_MAX = 7.5, 22.5                # the ship's pitch frames (degrees)
+
+def bar_k(k):
+    return HEIGHTS[k % len(HEIGHTS)]
+
+def ship_y(zship):
+    """The ship's height as it flies: over / under each bar in turn (up at
+    even bars, down at odd ones), a cosine between the bars (so the
+    pitch changes smoothly)."""
+    k = math.floor(zship / SPACING)
+    ya = bar_k(k) + (DODGE if k % 2 == 0 else -DODGE)
+    yb = bar_k(k + 1) + (DODGE if (k + 1) % 2 == 0 else -DODGE)
+    u = (zship - k * SPACING) / SPACING
+    return ya + (yb - ya) * (0.5 - 0.5 * math.cos(math.pi * u))
+
+def ship_pitch(zship):
+    """Degrees nose up: the slope of the flight path."""
+    dz = 0.05
+    return math.degrees(math.atan2(ship_y(zship + dz) - ship_y(zship - dz), 2 * dz))
 HOLD, TURN = 60, 2880
 YAWSTEPS = 128
 _SPR = {}
@@ -91,7 +112,7 @@ def ship_model():
         out.append((poly, kind))
     return out
 
-def counts(yaw, x0=96, x1=224, y0=78, y1=120):
+def counts(yaw, pitch=0.0, x0=96, x1=224, y0=78, y1=120):
     """Sample counts per multicolour pixel (8 x 4 samples) of the ship seen
     from the orbit camera, classes 0 none, 1 shadowed hull (and the dark
     canopy), 2 lit hull and trim, 3 the engines' glow: (rows, cols, 4)."""
@@ -107,7 +128,8 @@ def counts(yaw, x0=96, x1=224, y0=78, y1=120):
     Rm, cam = o.rot(yaw), o.camera(yaw)
     L = Rm @ (np.array(ship3d.LIGHT, float) / np.linalg.norm(ship3d.LIGHT))
     for poly, kind in ship_model():
-        Pw = np.array([(x * s, y * s, o.ZS + z * s) for x, y, z in poly])
+        cp, sp = math.cos(math.radians(pitch)), math.sin(math.radians(pitch))   # nose up
+        Pw = np.array([(x * s, (y * cp + z * sp) * s, o.ZS + (-y * sp + z * cp) * s) for x, y, z in poly])
         P = (Pw - cam) @ Rm.T
         n = np.cross(P[1] - P[0], P[2] - P[0])
         if np.linalg.norm(n) < 1e-12:
@@ -137,22 +159,24 @@ def counts(yaw, x0=96, x1=224, y0=78, y1=120):
         out[..., k] = (cls == k).reshape(h, syn, w, sxn).sum(axis=(1, 3))
     return out, (x0, y0)
 
-def sprite(yaw):
+def sprite(yaw, pitch=0.0):
     """The ship's antialiased pair of sprite frames at the nearest of
-    YAWSTEPS directions (big_ship.pair's rules: covered pixels lit in both
-    frames, half covered ones in one frame in a checkerboard, pixels split
-    between shadowed and lit hull alternating), as [{(row, col): class}] x 2."""
+    YAWSTEPS directions and pitch frame (big_ship.pair's rules: covered
+    pixels lit in both frames, half covered ones in one frame in a
+    checkerboard, pixels split between shadowed and lit hull alternating),
+    as [{(row, col): class}] x 2, for the ship at the screen centre."""
     import big_ship
     q = round(yaw / (360 / YAWSTEPS)) % YAWSTEPS
-    if q not in _SPR:
-        cn, (x0, y0) = counts(q * 360 / YAWSTEPS)
+    pq = max(-PITCH_MAX, min(PITCH_MAX, round(pitch / PITCH_STEP) * PITCH_STEP))
+    if (q, pq) not in _SPR:
+        cn, (x0, y0) = counts(q * 360 / YAWSTEPS, pq)
         f0, f1 = big_ship.pair_from_counts(cn)
-        _SPR[q] = []
+        _SPR[(q, pq)] = []
         for fr in (f0, f1):
-            _SPR[q].append({(y0 + r, x0 + 2 * c): int(fr[r, c]) for r, c in zip(*np.nonzero(fr))})
+            _SPR[(q, pq)].append({(y0 + r, x0 + 2 * c): int(fr[r, c]) for r, c in zip(*np.nonzero(fr))})
         cols = np.nonzero((f0 | f1).any(0))[0]
-        WIDTHS[q] = cols.max() - cols.min() + 1 if len(cols) else 0
-    return _SPR[q]
+        WIDTHS[(q, pq)] = cols.max() - cols.min() + 1 if len(cols) else 0
+    return _SPR[(q, pq)]
 
 WIDTHS = {}
 SHIPCOL = {1: 4, 2: 14}                          # %01 purple, %10 light blue; %11 GLOW by frame
@@ -165,7 +189,7 @@ def frame(yaw, zship, p=0):
     bars = []
     for k in range(k0, k0 + int(20 / SPACING) + 2):
         barz = o.ZS + k * SPACING - zship
-        yc = HEIGHTS[k % len(HEIGHTS)]
+        yc = bar_k(k)
         bars.append(edges(yaw, yc, barz))
     seg = SEG_FRAME[p & 1]                           # option D: the splits move 32 pixels over on alternate frames
     for (x0, x1), xm in zip(zip(seg, seg[1:]), [(a + b) / 2 for a, b in zip(seg, seg[1:])]):
@@ -187,8 +211,10 @@ def frame(yaw, zship, p=0):
             rp = ramp(min(h, 2000), level(d))
             for j in range(max(0, -r0), min(h, H - r0)):
                 img[r0 + j, x0:x1] = rp[j]
-    for (r, c), k in sprite(yaw)[p].items():
-        img[r, c:c + 2] = GLOW[p] if k == 3 else SHIPCOL[k]
+    roff = int(round(-F * ship_y(zship) / o.ZS))      # the ship's height on the screen, in lines
+    for (r, c), k in sprite(yaw, ship_pitch(zship))[p].items():
+        if 0 <= r + roff < H:
+            img[r + roff, c:c + 2] = GLOW[p] if k == 3 else SHIPCOL[k]
     return img
 
 FAST_FROM, FAST_TO = 21.0, 159.0                 # twice as fast from here to here (and mirrored: 201..339)
@@ -236,8 +262,7 @@ def main(path):
         if f % 60 == 0:
             print("frame", f, "of", n, "sprites", len(_SPR), flush=True)
     v.close()
-    print("wrote", path, n, "frames; ship width in multicolour pixels by direction:",
-          dict(sorted(WIDTHS.items())))
+    print("wrote", path, n, "frames;", len(_SPR), "ship sprite pairs (yaw x pitch frames)")
 
 if __name__ == "__main__":
     main(sys.argv[1])
