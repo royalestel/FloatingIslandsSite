@@ -68,7 +68,9 @@ def bar(yaw):
     c = oy * oy + oz * oz - R * R
     disc = b * b - 4 * a * c
     hit = disc >= 0
-    t = np.where(hit, (-b - np.sqrt(np.maximum(disc, 0))) / (2 * a), np.inf)
+    t = (-b - np.sqrt(np.maximum(disc, 0))) / (2 * a)
+    hit = hit & (t > 0)                           # only what is in front of the camera
+    t = np.where(hit, t, np.inf)
     y = np.where(hit, o[1] + t * vy, YC)
     band = np.clip(((YC + R - y) / (2 * R) * 48).astype(int), 0, 47)
     return np.where(hit, t, np.inf), GOLD48[band]
