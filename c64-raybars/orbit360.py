@@ -39,7 +39,7 @@ GRID = [-NEAR, NEAR, -0.6, NEAR, -NEAR, 0.6]     # the older layout: bars pass t
 # each dodge's shape: (height above / below the level line, m; half-width of the hold at the top, m;
 # width of each ramp up / down, m).  The ramps are wide enough to keep the pitch within +-22.5 degrees.
 # The first dodge holds high for about a second (1.35 m of flight each side of the bar at 0.045 m a frame).
-DODGE_SHAPES = [(1.0, 1.35, 3.9), (0.7, 0.0, 2.7)]
+DODGE_SHAPES = [(1.0, 1.35, 3.9), (0.7, 1.35, 2.7)]
 DODGES = [(30.0, +1), (220.0, -1)]               # (camera yaw when the ship reaches the bar, up +1 / down -1)
 PITCH_STEP, PITCH_MAX = 7.5, 22.5                # the ship's pitch frames (degrees)
 # bar index -> height (m), overriding the layout: the bar just before the second dive, raised clear of the ship
