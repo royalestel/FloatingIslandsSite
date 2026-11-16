@@ -44,29 +44,33 @@ _DZ = None
 _BARS = None
 
 def dodge_z():
-    """(z, direction) of each dodge: the bar sits where the camera has
-    swung to the dodge's yaw."""
+    """(z, direction) of each dodge: the bar where the camera has swung to
+    the dodge's yaw, snapped onto the bar grid so that the neighbouring bars
+    (2.5 m away) are where the ship is nearly level, not in its path."""
     global _DZ
     if _DZ is None:
         tt, th = yaw_table()
-        _DZ = [((HOLD + float(np.interp(yaw, th, tt))) * SPEED, d) for yaw, d in DODGES]
+        _DZ = [(round((HOLD + float(np.interp(yaw, th, tt))) * SPEED / SPACING) * SPACING, d)
+               for yaw, d in DODGES]
     return _DZ
 
 def bars():
     """Every bar as (z, height): the older layout on its grid, except that
-    the two dodge bars sit on the level line (height 0) where the ship is
-    to pass them, and the grid bars near them are left out."""
+    each dodge bar sits on the level line (height 0), where the ship is to
+    pass it."""
     global _BARS
     if _BARS is None:
-        dz = dodge_z()
+        dz = [zc for zc, _ in dodge_z()]
+        heights = {}
+        for zc, d in dodge_z():
+            kd = round(zc / SPACING)
+            heights[kd] = 0.0
+            for kn in (kd - 1, kd + 1):              # the neighbours lie on the side the ship is not moving to
+                heights[kn] = -d * NEAR
         out = []
         for k in range(int(160 / SPACING)):
-            z = k * SPACING
-            if any(abs(z - zc) < 1.0 for zc, _ in dz):
-                continue
-            out.append((z, GRID[k % len(GRID)]))
-        out += [(zc, 0.0) for zc, _ in dz]
-        _BARS = sorted(out)
+            out.append((k * SPACING, heights[k] if k in heights else GRID[k % len(GRID)]))
+        _BARS = out
     return _BARS
 
 def ship_y(zship):
