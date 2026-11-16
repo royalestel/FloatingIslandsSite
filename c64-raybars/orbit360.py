@@ -191,14 +191,41 @@ def frame(yaw, zship, p=0):
         img[r, c:c + 2] = GLOW[p] if k == 3 else SHIPCOL[k]
     return img
 
+FAST_FROM, FAST_TO = 21.0, 159.0                 # twice as fast from here to here (and mirrored: 201..339)
+
+def speedup(yaw):
+    """The orbit's speed factor at this angle: 1 behind and in front of the
+    ship, 2 between FAST_FROM and FAST_TO degrees (and 180 + the same),
+    faded smoothly (a cosine) between the two."""
+    a = yaw % 180.0
+    if a < FAST_FROM:
+        k = 0.5 - 0.5 * math.cos(math.pi * a / FAST_FROM)
+    elif a > FAST_TO:
+        k = 0.5 - 0.5 * math.cos(math.pi * (180.0 - a) / (180.0 - FAST_TO))
+    else:
+        k = 1.0
+    return 1.0 + k
+
+def yaw_table(turn=TURN, steps=40000):
+    """frame (from the start of the turn) -> yaw: the eased orbit (a cosine
+    in time, the speed zero at both ends) with its speed multiplied by
+    speedup(yaw): elapsed time = turn * integral du / speedup(yaw(u))."""
+    u = np.linspace(0, 1, steps + 1)
+    th = 360 * (0.5 - 0.5 * np.cos(np.pi * u))
+    g = np.array([speedup(x) for x in th])
+    t = np.concatenate([[0], np.cumsum(0.5 * (1 / g[1:] + 1 / g[:-1]) * np.diff(u))]) * turn
+    return t, th
+
 def main(path):
     Z = 3
     font, small = fl.fonts()
     v = iv.Video(path, W * Z + 32, H * Z + 50)
-    n = HOLD + TURN + HOLD
+    tt, th = yaw_table()
+    turn = int(round(tt[-1]))
+    n = HOLD + turn + HOLD
+    print("turn", turn, "frames (was", TURN, ")", flush=True)
     for f in range(n):
-        t = min(max(f - HOLD, 0), TURN) / TURN
-        yaw = 360 * (0.5 - 0.5 * math.cos(math.pi * t))     # eased in and out
+        yaw = float(np.interp(min(max(f - HOLD, 0), turn), tt, th))   # eased in and out
         img = frame(yaw % 360, f * SPEED, f & 1)
         canvas = Image.new("RGB", (v.w, v.h), (8, 8, 16))
         dr = ImageDraw.Draw(canvas)
