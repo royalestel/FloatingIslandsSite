@@ -38,6 +38,8 @@ GAP = 10                                   # bar top: lines below the ship's cen
 SEG = [0, 32, 96, 160, 224, 288, 320]      # GOLDSHIP's split points (window x)
 SPRCOL = [4, 14, 1]                        # sprite colours: purple, light blue, white
 GOLD48 = fb.bands48(fb.GOLD)
+BARZ = ZS                                  # the bar's distance ahead of the camera's start (the video moves it)
+_SHIPS = {}
 YC = -(GAP / F * ZS) - R                   # the bar's centre height (ship at y = 0)
 
 def rot(yaw):
@@ -62,7 +64,7 @@ def bar(yaw):
     d = rays_world(yaw)
     o = camera(yaw)
     vy, vz = d[..., 1], d[..., 2]
-    oy, oz = o[1] - YC, o[2] - ZS
+    oy, oz = o[1] - YC, o[2] - BARZ
     a = vy * vy + vz * vz
     b = 2 * (oy * vy + oz * vz)
     c = oy * oy + oz * oz - R * R
@@ -116,7 +118,9 @@ def ship(yaw):
 def shot(yaw):
     """The 3D render (RGB, W x H, averaged) and the C64 version (colour indices)."""
     zb, bc = bar(yaw)
-    zs, sc = ship(yaw)
+    if yaw not in _SHIPS:
+        _SHIPS[yaw] = ship(yaw)               # the ship never moves: once per angle
+    zs, sc = _SHIPS[yaw]
     img = np.zeros(zb.shape + (3,))
     hb = np.isfinite(zb)
     img[hb] = bc[hb]
