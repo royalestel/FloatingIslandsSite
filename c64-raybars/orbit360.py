@@ -35,23 +35,49 @@ import orbit_algo as oa
 W, H, F, CY, SS = fb.W, fb.H, fb.F, fb.CY, fb.SS
 SPEED, SPACING = 0.045, 2.5
 NEAR = 10 / F * o.ZS + o.R                       # 0.27 m: the near edge 10 lines off at 3 m
-HEIGHTS = [0.0, 0.12, -0.12, 0.0, 0.08, -0.08]   # bar centres (the camera's height is 0), repeating:
-                                                 # across the ship's line of flight, so it dodges them
-DODGE = 0.32                                     # the ship passes this far above or below each bar's centre
+GRID = [-NEAR, NEAR, -0.6, NEAR, -NEAR, 0.6]     # the older layout: bars pass the level flight line in its gaps
+DODGE = 0.7                                      # the ship's dodge: this far above or below the level line (m)
+HALF = 2.7                                       # a dodge lasts HALF m either side of its bar (wide enough to keep the pitch within +-22.5)
+DODGES = [(30.0, +1), (220.0, -1)]               # (camera yaw when the ship reaches the bar, up +1 / down -1)
 PITCH_STEP, PITCH_MAX = 7.5, 22.5                # the ship's pitch frames (degrees)
+_DZ = None
+_BARS = None
 
-def bar_k(k):
-    return HEIGHTS[k % len(HEIGHTS)]
+def dodge_z():
+    """(z, direction) of each dodge: the bar sits where the camera has
+    swung to the dodge's yaw."""
+    global _DZ
+    if _DZ is None:
+        tt, th = yaw_table()
+        _DZ = [((HOLD + float(np.interp(yaw, th, tt))) * SPEED, d) for yaw, d in DODGES]
+    return _DZ
+
+def bars():
+    """Every bar as (z, height): the older layout on its grid, except that
+    the two dodge bars sit on the level line (height 0) where the ship is
+    to pass them, and the grid bars near them are left out."""
+    global _BARS
+    if _BARS is None:
+        dz = dodge_z()
+        out = []
+        for k in range(int(160 / SPACING)):
+            z = k * SPACING
+            if any(abs(z - zc) < 1.0 for zc, _ in dz):
+                continue
+            out.append((z, GRID[k % len(GRID)]))
+        out += [(zc, 0.0) for zc, _ in dz]
+        _BARS = sorted(out)
+    return _BARS
 
 def ship_y(zship):
-    """The ship's height as it flies: over / under each bar in turn (up at
-    even bars, down at odd ones), a cosine between the bars (so the
-    pitch changes smoothly)."""
-    k = math.floor(zship / SPACING)
-    ya = bar_k(k) + (DODGE if k % 2 == 0 else -DODGE)
-    yb = bar_k(k + 1) + (DODGE if (k + 1) % 2 == 0 else -DODGE)
-    u = (zship - k * SPACING) / SPACING
-    return ya + (yb - ya) * (0.5 - 0.5 * math.cos(math.pi * u))
+    """The ship's height: level, except for the two dodges, each a smooth
+    rise (or fall) over its bar, back to level after it."""
+    y = 0.0
+    for zc, d in dodge_z():
+        x = (zship - zc) / HALF
+        if abs(x) < 1:
+            y += d * DODGE * 0.5 * (1 + math.cos(math.pi * x))
+    return y
 
 def ship_pitch(zship):
     """Degrees nose up: the slope of the flight path."""
@@ -185,16 +211,11 @@ SEG_FRAME = (o.SEG, [0, 64, 128, 192, 256, 320])   # frame 0: GOLDSHIP's 6 segme
 
 def frame(yaw, zship, p=0):
     img = np.zeros((H, W), int)
-    k0 = math.floor((zship - 8) / SPACING)
-    bars = []
-    for k in range(k0, k0 + int(20 / SPACING) + 2):
-        barz = o.ZS + k * SPACING - zship
-        yc = bar_k(k)
-        bars.append(edges(yaw, yc, barz))
+    bars_here = [edges(yaw, yc, o.ZS + z - zship) for z, yc in bars() if zship - 8 <= z <= zship + 12]
     seg = SEG_FRAME[p & 1]                           # option D: the splits move 32 pixels over on alternate frames
     for (x0, x1), xm in zip(zip(seg, seg[1:]), [(a + b) / 2 for a, b in zip(seg, seg[1:])]):
         spans = []
-        for es in bars:
+        for es in bars_here:
             ys = [oa.edge_y(e, xm) for e in es]
             if None in ys:
                 continue
