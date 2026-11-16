@@ -145,8 +145,11 @@ def shot(yaw):
     near = np.argmin(((sa[..., None, :] - pal) ** 2).sum(-1), -1)
     on = m >= 0.5
     ys, xs = np.nonzero(on)
+    global SPR
+    SPR = np.full((H, W), -1)                     # the sprite layer alone (-1: transparent)
     for y, x in zip(ys, xs):
         c64[y, 2 * x:2 * x + 2] = SPRCOL[near[y, x]]
+        SPR[y, 2 * x:2 * x + 2] = SPRCOL[near[y, x]]
     box = (xs.min(), xs.max(), ys.min(), ys.max()) if len(xs) else None
     return true, c64, box
 
