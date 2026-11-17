@@ -224,9 +224,26 @@ SHIPCOL = {1: 4, 2: 14}                          # %01 purple, %10 light blue; %
 
 SEG_FRAME = (o.SEG, [0, 64, 128, 192, 256, 320])   # frame 0: GOLDSHIP's 6 segments; frame 1: 5 of 64
 
+GLINT_FRAMES = 16                                # the glint lasts this many frames (about a quarter of a second),
+GLINT_AT = 180.0                                 # centred on the camera passing the front of the ship
+GLINT_SWEEP = (-34.0, 34.0)                      # the streak crosses the ship over the glint (px)
+GLINT_SLANT, GLINT_WIDTH = 0.7, 5.0              # streak slant (px across per line) and half-width (px)
+STAR, STAR_ARM = (0.3, 0.8), 7                   # the star on the cockpit glass: when (of the glint), how big (MC px)
+CANOPY = (0.0, 2.2, 1.5)                         # the cockpit glass's centre in the ship model
+
+def canopy_screen(yaw, zship):
+    """Where the cockpit glass is on the screen (x px, line), for the ship at the screen centre."""
+    s = 0.36 / 23.6 * SHIPSCALE
+    pitch = math.radians(ship_pitch(zship))
+    cp, sp = math.cos(pitch), math.sin(pitch)
+    x, y, z = CANOPY
+    Pw = np.array([x * s, (y * cp + z * sp) * s, o.ZS + (-y * sp + z * cp) * s])
+    P = (Pw - o.camera(yaw)) @ o.rot(yaw).T
+    return P[0] / P[2] * F + W / 2, CY + 0.5 - P[1] / P[2] * F
+
 SHIP_DEPTH = o.ZS + 0.15                         # a bar nearer than this (camera z, m) at the ship's columns is in front of it
 
-def frame(yaw, zship, p=0, info=None):
+def frame(yaw, zship, p=0, info=None, glint=None):
     """One C64 frame.  Bars nearer to the camera than the ship are in front
     of it: where their rows cover the ship's sprite, the sprite is hidden
     (on the C64: its pointer set to a blank block for those lines).  If
@@ -258,6 +275,9 @@ def frame(yaw, zship, p=0, info=None):
                 front[max(0, r0):max(0, r1 + 1), x0:x1] = True
     roff = int(round(-F * ship_y(zship) / o.ZS))      # the ship's height on the screen, in lines
     px = sprite(yaw, ship_pitch(zship))[p]
+    if glint is not None and px:
+        gx = np.mean([c for (_, c) in px]); gy = np.mean([r + roff for (r, _) in px])
+        sweep = GLINT_SWEEP[0] + (GLINT_SWEEP[1] - GLINT_SWEEP[0]) * glint   # the streak's position (px along u)
     hid = 0
     rows = {0: {}, 1: {}}                            # per sprite half: screen line -> hidden
     for (r, c), k in px.items():
@@ -270,6 +290,19 @@ def frame(yaw, zship, p=0, info=None):
             hid += 1
         else:
             img[y, c:c + 2] = GLOW[p] if k == 3 else SHIPCOL[k]
+            if glint is not None and abs((c - gx) - GLINT_SLANT * (y - gy) - sweep) < GLINT_WIDTH:
+                img[y, c:c + 2] = 1                  # the streak crossing the ship: white
+    if glint is not None and STAR[0] <= glint <= STAR[1]:
+        cx, cy = canopy_screen(yaw, zship)
+        t = (glint - STAR[0]) / (STAR[1] - STAR[0])
+        arm = int(round(STAR_ARM * math.sin(math.pi * t) ** 1.5))      # the star grows, then shrinks
+        cy += roff
+        if 0 <= cy < H and not front[min(max(int(cy), 0), H - 1), min(max(int(cx), 0), W - 1)]:
+            for d in range(-arm, arm + 1):                              # a four-point star: long arms across, short up and down
+                for (xx, yy) in ((cx + 2 * d, cy), (cx, cy + d // 2 * 1)):
+                    xx, yy = int(xx) // 2 * 2, int(yy)
+                    if 0 <= xx < W - 1 and 0 <= yy < H:
+                        img[yy, xx:xx + 2] = 1
     if info is not None:
         info["hidden"] = hid / max(1, len(px))
         info["lines"] = {h: dict(sorted(v.items())) for h, v in rows.items()}
@@ -319,9 +352,11 @@ def main(path):
     turn = int(round(tt[-1]))
     n = HOLD + turn + HOLD
     print("turn", turn, "frames (was", TURN, ")", flush=True)
+    f_glint = HOLD + float(np.interp(GLINT_AT, th, tt)) - GLINT_FRAMES / 2
     for f in range(n):
         yaw = float(np.interp(min(max(f - HOLD, 0), turn), tt, th))   # eased in and out
-        img = frame(yaw % 360, f * SPEED, f & 1)
+        g = (f - f_glint) / GLINT_FRAMES
+        img = frame(yaw % 360, f * SPEED, f & 1, glint=g if 0 <= g <= 1 else None)
         canvas = Image.new("RGB", (v.w, v.h), (8, 8, 16))
         dr = ImageDraw.Draw(canvas)
         dr.text((16, 8), f"C64 mockup: camera orbiting the ship {yaw:5.1f} degrees   "
