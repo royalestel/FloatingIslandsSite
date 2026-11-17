@@ -100,6 +100,29 @@ def ship_pitch(zship):
     return math.degrees(math.atan2(ship_y(zship + dz) - ship_y(zship - dz), 2 * dz))
 HOLD, TURN = 60, 2880
 YAWSTEPS = 64
+FINE = 128                                       # the direction grid the ship's directions are picked from (2.8125 degrees)
+_DIRS = None
+
+def directions():
+    """The ship's sprite directions (degrees): a step of 2 grid steps (5.6 deg)
+    where the orbit is slow, 3 (8.4 deg) where it is 2x, 4 (11.25 deg) where it
+    is 3x -- the faster the orbit, the fewer frames; they stay about as long
+    on screen, and the motion is too quick to see the difference."""
+    global _DIRS
+    if _DIRS is None:
+        out, k = [0.0], 0
+        while True:
+            k += 1 + int(round(speedup(out[-1])))
+            if k > FINE - 2:
+                break
+            out.append(k * 360.0 / FINE)
+        _DIRS = np.array(out)
+    return _DIRS
+
+def nearest_direction(yaw):
+    d = directions()
+    diff = np.abs((d - yaw + 180.0) % 360.0 - 180.0)
+    return float(d[int(np.argmin(diff))])
 _SPR = {}
 LEVELS = [(5.0, 1.0), (8.0, 0.7), (12.0, 0.45), (16.0, 0.25)]   # (up to this depth, brightness)
 _RAMPS = {}
@@ -207,10 +230,10 @@ def sprite(yaw, pitch=0.0):
     checkerboard, pixels split between shadowed and lit hull alternating),
     as [{(row, col): class}] x 2, for the ship at the screen centre."""
     import big_ship
-    q = round(yaw / (360 / YAWSTEPS)) % YAWSTEPS
+    q = round(nearest_direction(yaw) * 100)          # the direction used (degrees x 100)
     pq = max(-PITCH_MAX, min(PITCH_MAX, round(pitch / PITCH_STEP) * PITCH_STEP))
     if (q, pq) not in _SPR:
-        cn, (x0, y0) = counts(q * 360 / YAWSTEPS, pq)
+        cn, (x0, y0) = counts(q / 100.0, pq)
         f0, f1 = big_ship.pair_from_counts(cn)
         _SPR[(q, pq)] = []
         for fr in (f0, f1):
