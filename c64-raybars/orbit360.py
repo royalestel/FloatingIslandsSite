@@ -291,7 +291,7 @@ def frame(yaw, zship, p=0, info=None, glint=None):
         else:
             img[y, c:c + 2] = GLOW[p] if k == 3 else SHIPCOL[k]
             if glint is not None and abs((c - gx) - GLINT_SLANT * (y - gy) - sweep) < GLINT_WIDTH:
-                img[y, c:c + 2] = 1                  # the streak crossing the ship: white
+                img[y, c:c + 2] = 3                  # the streak crossing the ship: cyan (the star on the glass stays white)
     if glint is not None and STAR[0] <= glint <= STAR[1]:
         cx, cy = canopy_screen(yaw, zship)
         t = (glint - STAR[0]) / (STAR[1] - STAR[0])
