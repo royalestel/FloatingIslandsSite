@@ -224,8 +224,15 @@ SHIPCOL = {1: 4, 2: 14}                          # %01 purple, %10 light blue; %
 
 SEG_FRAME = (o.SEG, [0, 64, 128, 192, 256, 320])   # frame 0: GOLDSHIP's 6 segments; frame 1: 5 of 64
 
-def frame(yaw, zship, p=0):
+SHIP_DEPTH = o.ZS + 0.15                         # a bar nearer than this (camera z, m) at the ship's columns is in front of it
+
+def frame(yaw, zship, p=0, info=None):
+    """One C64 frame.  Bars nearer to the camera than the ship are in front
+    of it: where their rows cover the ship's sprite, the sprite is hidden
+    (on the C64: its pointer set to a blank block for those lines).  If
+    `info` is a dict it gets the sprite's hidden lines per half."""
     img = np.zeros((H, W), int)
+    front = np.zeros((H, W), bool)
     bars_here = [edges(yaw, yc, o.ZS + z - zship) for z, yc in bars() if zship - 8 <= z <= zship + 12]
     seg = SEG_FRAME[p & 1]                           # option D: the splits move 32 pixels over on alternate frames
     for (x0, x1), xm in zip(zip(seg, seg[1:]), [(a + b) / 2 for a, b in zip(seg, seg[1:])]):
@@ -247,10 +254,25 @@ def frame(yaw, zship, p=0):
             rp = ramp(min(h, 2000), level(d))
             for j in range(max(0, -r0), min(h, H - r0)):
                 img[r0 + j, x0:x1] = rp[j]
+            if d < SHIP_DEPTH:
+                front[max(0, r0):max(0, r1 + 1), x0:x1] = True
     roff = int(round(-F * ship_y(zship) / o.ZS))      # the ship's height on the screen, in lines
-    for (r, c), k in sprite(yaw, ship_pitch(zship))[p].items():
-        if 0 <= r + roff < H:
-            img[r + roff, c:c + 2] = GLOW[p] if k == 3 else SHIPCOL[k]
+    px = sprite(yaw, ship_pitch(zship))[p]
+    hid = 0
+    rows = {0: {}, 1: {}}                            # per sprite half: screen line -> hidden
+    for (r, c), k in px.items():
+        y = r + roff
+        if not 0 <= y < H:
+            continue
+        gone = bool(front[y, c])
+        rows[c >= 160][y] = rows[c >= 160].get(y, True) and gone
+        if gone:
+            hid += 1
+        else:
+            img[y, c:c + 2] = GLOW[p] if k == 3 else SHIPCOL[k]
+    if info is not None:
+        info["hidden"] = hid / max(1, len(px))
+        info["lines"] = {h: dict(sorted(v.items())) for h, v in rows.items()}
     return img
 
 FAST_FROM, FAST_TO = 21.0, 159.0                 # twice as fast from here to here (and mirrored: 201..339)
